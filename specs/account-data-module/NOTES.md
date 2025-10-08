@@ -430,6 +430,40 @@ Co-Authored-By: Claude <noreply@anthropic.com>
   - test_account_integration.py (integration tests)
 - **Status**: ✅ Committed (e4df3a5)
 
+### Phase 2: Tasks (✅ COMPLETE)
+- **Date**: 2025-01-08
+- **Duration**: ~30 minutes
+- **Artifacts**:
+  - tasks.md (60 concrete TDD tasks)
+- **Task Breakdown**:
+  - Total tasks: 60
+  - RED tasks: 19 (test-first behaviors)
+  - GREEN tasks: 14 (implementations)
+  - Parallel tasks: 23 (setup, refactor, docs)
+  - REFACTOR tasks: 4 (type hints, logging, cleanup)
+- **TDD Structure**:
+  - Phase 3.1: Setup (T001-T005) - Module structure
+  - Phase 3.2: RED - Data Models (T006-T010) - Failing tests
+  - Phase 3.3: GREEN - Data Models (T011-T015) - Implementation
+  - Phase 3.4: RED - Cache Logic (T016-T020) - Failing tests
+  - Phase 3.5: GREEN - Cache (T021-T025) - Implementation
+  - Phase 3.6: RED - API Fetching (T026-T032) - Failing tests
+  - Phase 3.7: GREEN - API (T033-T039) - Implementation
+  - Phase 3.8: REFACTOR (T040-T043) - Type hints, logging, docs
+  - Phase 3.9: Integration (T044-T052) - Bot & SafetyChecks
+  - Phase 3.10: Testing (T053-T056) - Coverage validation
+  - Phase 3.11: Documentation (T057-T059) - DEPLOYMENT_READY.md
+  - Phase 3.12: Final Validation (T060)
+- **Coverage Target**: ≥90% line coverage (~30-35 tests)
+- **Key Tasks**:
+  - T011: Position dataclass with P&L calculations
+  - T022: get_buying_power with TTL cache
+  - T033: get_positions with robin-stocks integration
+  - T036: Exponential backoff retry (reuse from auth)
+  - T045: Replace bot.get_buying_power() mock
+  - T046: Cache invalidation on trade execution
+- **Status**: ✅ Committed ([SHA pending])
+
 ---
 
 Last Updated: 2025-01-08 (Phase 1 - Planning Complete)
