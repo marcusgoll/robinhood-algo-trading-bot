@@ -191,6 +191,135 @@ The bot will **refuse to start** if validation fails (§Safety_First).
 
 ---
 
+## 🔄 Trading Mode (Paper vs Live)
+
+**Mode Switcher (Constitution §Safety_First)**:
+
+The bot supports two trading modes with strict safety controls:
+
+### Paper Trading Mode (Default)
+- **Simulation only** - No real money used
+- Perfect for testing strategies and learning
+- Real-time market data with simulated trades
+- Identical analytics to live mode
+- **Always safe** - Can't lose real money
+
+### Live Trading Mode
+- **Real money** - Trades execute with actual funds
+- Requires phase progression validation
+- **Blocked in "experience" phase** (§Safety_First)
+- Visual warnings when active
+
+### Mode Switching Rules
+
+**Phase-Based Restrictions**:
+- **Experience Phase**: Paper trading ONLY (live mode blocked)
+- **Proof Phase**: Live trading allowed (1 trade/day)
+- **Trial Phase**: Live trading allowed (small position sizes)
+- **Scaling Phase**: Live trading allowed (gradual scaling)
+
+**Visual Indicators**:
+```
+╔════════════════════════════════════════════════════════════╗
+║                    PAPER TRADING MODE                      ║
+║                  (Simulation - No Real Money)              ║
+╚════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════╗
+║  ⚠️  ⚠️  ⚠️       LIVE TRADING MODE       ⚠️  ⚠️  ⚠️        ║
+║                                                            ║
+║              REAL MONEY WILL BE USED!                      ║
+╚════════════════════════════════════════════════════════════╝
+```
+
+### Usage
+
+```python
+from src.trading_bot.mode_switcher import ModeSwitcher
+
+# Initialize with config
+switcher = ModeSwitcher(config)
+
+# Check current mode
+print(switcher.get_mode_indicator())  # [PAPER] or [⚠️  LIVE ⚠️]
+
+# Display full banner
+print(switcher.display_mode_banner())
+
+# Switch modes
+switcher.switch_to_paper()  # Always allowed (safer)
+switcher.switch_to_live()   # Blocked if in experience phase
+
+# Get detailed status
+status = switcher.get_status()
+print(f"Mode: {status.current_mode}")
+print(f"Phase: {status.phase}")
+print(f"Can switch to live: {status.can_switch_to_live}")
+```
+
+---
+
+## 📊 Phase Progression
+
+**Gradual Scaling System (Constitution §Risk_Management)**:
+
+The bot uses a 4-phase progression system to safely transition from paper trading to live trading:
+
+### Phase 1: Experience (Paper Trading Only)
+- **Mode**: Paper trading ONLY (live mode blocked)
+- **Purpose**: Learn strategy mechanics without risk
+- **Trades/Day**: Unlimited
+- **Position Size**: Simulated (100 shares default)
+- **Advancement**: Complete 10-20 profitable sessions
+
+### Phase 2: Proof of Concept (Limited Live Trading)
+- **Mode**: Paper or live trading allowed
+- **Purpose**: Prove strategy works with real money
+- **Trades/Day**: 1 trade maximum
+- **Position Size**: Small (100 shares)
+- **Advancement**: Consistent profitability over 10-20 sessions
+
+### Phase 3: Trial (Controlled Live Trading)
+- **Mode**: Paper or live trading allowed
+- **Purpose**: Build confidence with larger size
+- **Trades/Day**: Unlimited
+- **Position Size**: Small to medium
+- **Advancement**: Meet risk-reward targets consistently
+
+### Phase 4: Scaling (Full Operation)
+- **Mode**: Paper or live trading allowed
+- **Purpose**: Gradually increase position size
+- **Trades/Day**: Unlimited
+- **Position Size**: Gradual increases based on performance
+- **Advancement**: Ongoing based on metrics
+
+**Phase Configuration** (config.json):
+```json
+{
+  "phase_progression": {
+    "current_phase": "experience",
+    "experience": {
+      "mode": "paper",
+      "max_trades_per_day": 999
+    },
+    "proof": {
+      "mode": "paper",
+      "max_trades_per_day": 1
+    },
+    "trial": {
+      "mode": "paper",
+      "max_trades_per_day": 999
+    },
+    "scaling": {
+      "mode": "paper",
+      "max_trades_per_day": 999
+    }
+  }
+}
+```
+
+---
+
 ## 🔒 Security
 
 **Constitution §Security Requirements**:

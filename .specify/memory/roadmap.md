@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-07 22:35 UTC
+**Last updated**: 2025-10-07 (mode-switcher implementation)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -20,9 +20,47 @@
   - requirements.txt with robin-stocks and pyotp dependencies
   - .gitignore for credentials
 
+### environment-config
+- **Title**: Environment configuration
+- **Area**: infra
+- **Role**: all
+- **Intra**: Yes
+- **Date**: 2025-10-07
+- **Commit**: 0b0833b
+- **Delivered**:
+  - .env.example with credentials (username, password, MFA secret, device token)
+  - config.example.json with trading parameters (risk limits, hours, phase progression)
+  - Config.from_env_and_json() dual-source loader
+  - test_config.py verification script
+
+### configuration-validator
+- **Title**: Configuration validator
+- **Area**: infra
+- **Role**: all
+- **Intra**: Yes
+- **Date**: 2025-10-07
+- **Commit**: 7d269ca
+- **Delivered**:
+  - ConfigValidator class with credential, config, and safety checks
+  - 15 unit tests covering all validation scenarios
+  - validate_startup.py pre-deploy validation script
+  - Blocks startup if validation fails (§Pre_Deploy)
+
 ## In Progress
 
 <!-- Currently implementing -->
+
+### mode-switcher
+- **Title**: Paper/live trading mode switcher
+- **Area**: infra
+- **Role**: all
+- **Intra**: Yes
+- **Requirements**:
+  - Toggle between paper trading (simulation) and live trading (§Safety_First)
+  - Full simulator functionality with real-time data
+  - Performance analytics identical to live mode
+  - Separate config for each mode
+  - Visual indicator of current mode (CLI banner)
 
 ## Next
 
@@ -36,44 +74,6 @@
 
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
-
-### environment-config
-- **Title**: Environment configuration
-- **Area**: infra
-- **Role**: all
-- **Intra**: Yes
-- **Impact**: 5 | **Effort**: 1 | **Confidence**: 1.0 | **Score**: 5.00
-- **Requirements**:
-  - .env file for credentials (username, password, MFA secret)
-  - config.json for trading parameters (max daily loss, position sizes, trading hours)
-  - [PIGGYBACK: project-setup - extends existing config.py]
-
-### configuration-validator
-- **Title**: Configuration validator
-- **Area**: infra
-- **Role**: all
-- **Intra**: Yes
-- **Impact**: 5 | **Effort**: 1 | **Confidence**: 1.0 | **Score**: 5.00
-- **Requirements**:
-  - Check credentials exist before start (§Security)
-  - Validate all config parameters on boot
-  - Test API connection before live trading
-  - [BLOCKED: environment-config]
-
-### mode-switcher
-- **Title**: Paper/live trading mode switcher
-- **Area**: infra
-- **Role**: all
-- **Intra**: Yes
-- **Impact**: 5 | **Effort**: 1 | **Confidence**: 1.0 | **Score**: 5.00
-- **Requirements**:
-  - Toggle between paper trading (simulation) and live trading (§Safety_First)
-  - Full simulator functionality with real-time data
-  - Performance analytics identical to live mode
-  - Separate config for each mode
-  - Visual indicator of current mode (CLI banner)
-  - [BLOCKED: environment-config]
-  - [MERGED: paper-trading-mode features]
 
 ### logging-system
 - **Title**: Structured logging system
