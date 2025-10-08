@@ -9,10 +9,10 @@ Constitution v1.0.0:
 - §Audit_Everything: All retry attempts logged
 """
 
+from .circuit_breaker import circuit_breaker
 from .exceptions import NonRetriableError, RateLimitError, RetriableError
 from .policies import AGGRESSIVE_POLICY, CONSERVATIVE_POLICY, DEFAULT_POLICY, RetryPolicy
 from .retry import with_retry
-from .circuit_breaker import circuit_breaker
 
 __all__ = [
     "RetriableError",

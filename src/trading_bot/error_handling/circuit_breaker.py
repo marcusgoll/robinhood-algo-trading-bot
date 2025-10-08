@@ -14,7 +14,6 @@ Constitution v1.0.0:
 
 import time
 from collections import deque
-from typing import Deque
 
 
 class CircuitBreaker:
@@ -52,7 +51,7 @@ class CircuitBreaker:
         """
         self.threshold = threshold
         self.window_seconds = window_seconds
-        self._failures: Deque[float] = deque()
+        self._failures: deque[float] = deque()
 
     def record_failure(self) -> None:
         """

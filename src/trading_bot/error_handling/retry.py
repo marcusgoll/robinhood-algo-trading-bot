@@ -10,14 +10,16 @@ Supports:
 - Logging integration
 """
 
-import time
-import random
 import logging
+import random
+import time
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, TypeVar
 
-from .policies import RetryPolicy, DEFAULT_POLICY
+from .circuit_breaker import circuit_breaker
 from .exceptions import RateLimitError
+from .policies import DEFAULT_POLICY, RetryPolicy
 
 # Module logger
 logger = logging.getLogger(__name__)
@@ -26,9 +28,9 @@ T = TypeVar("T")
 
 
 def with_retry(
-    policy: Optional[RetryPolicy] = None,
-    on_retry: Optional[Callable[[Exception, int], None]] = None,
-    on_exhausted: Optional[Callable[[Exception], None]] = None,
+    policy: RetryPolicy | None = None,
+    on_retry: Callable[[Exception, int], None] | None = None,
+    on_exhausted: Callable[[Exception], None] | None = None,
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
     Decorator to add exponential backoff retry logic to a function.
@@ -66,11 +68,19 @@ def with_retry(
         def wrapper(*args: Any, **kwargs: Any) -> T:
             last_exception: Exception | None = None
 
+            # Ensure retriable_exceptions is not None (should be set by __post_init__)
+            if policy.retriable_exceptions is None:  # noqa: S101
+                raise ValueError("retriable_exceptions must be set in RetryPolicy")
+
             # max_attempts is number of retries, so total calls = max_attempts + 1
             for attempt in range(policy.max_attempts + 1):
                 try:
                     # Call the original function
                     result = func(*args, **kwargs)
+
+                    # Record success with circuit breaker
+                    circuit_breaker.record_success()
+
                     return result
 
                 except Exception as e:
@@ -82,6 +92,9 @@ def with_retry(
                     if not should_retry:
                         # Non-retriable error - raise immediately
                         raise
+
+                    # Record failure with circuit breaker (only for retriable errors)
+                    circuit_breaker.record_failure()
 
                     # Check if we have more attempts left
                     if attempt < policy.max_attempts:
@@ -97,7 +110,7 @@ def with_retry(
                             # Add jitter (±10% randomness)
                             if policy.jitter:
                                 jitter_amount = delay * 0.1
-                                delay += random.uniform(-jitter_amount, jitter_amount)
+                                delay += random.uniform(-jitter_amount, jitter_amount)  # noqa: S311
 
                         # Log retry attempt
                         logger.warning(
@@ -125,6 +138,9 @@ def with_retry(
             # Re-raise last exception with chaining
             if last_exception:
                 raise last_exception
+
+            # This should never happen (last_exception should always be set if we get here)
+            raise RuntimeError("Unexpected: no exception was raised during retry attempts")
 
         return wrapper
 

@@ -10,7 +10,6 @@ Defines retry behavior for the @with_retry decorator:
 """
 
 from dataclasses import dataclass
-from typing import Tuple, Type
 
 
 @dataclass
@@ -43,7 +42,7 @@ class RetryPolicy:
     base_delay: float = 1.0
     backoff_multiplier: float = 2.0
     jitter: bool = True
-    retriable_exceptions: Tuple[Type[Exception], ...] | None = None
+    retriable_exceptions: tuple[type[Exception], ...] | None = None
 
     def __post_init__(self) -> None:
         """Validate policy configuration after initialization."""
