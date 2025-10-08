@@ -5,6 +5,47 @@ Implements circuit breakers, buying power checks, trading hours enforcement,
 and position sizing to comply with Constitution §Safety_First and §Risk_Management.
 
 Constitution v1.0.0 - §Code_Quality: Type hints required
+
+Usage Example:
+    from src.trading_bot.safety_checks import SafetyChecks
+    from src.trading_bot.config import Config
+
+    # Initialize
+    config = Config.from_env_and_json()
+    safety = SafetyChecks(config)
+
+    # Validate trade before execution
+    result = safety.validate_trade(
+        symbol="AAPL",
+        action="BUY",
+        quantity=100,
+        price=150.00,
+        current_buying_power=20000.00
+    )
+
+    if result.is_safe:
+        # Execute trade
+        print("Trade allowed")
+    else:
+        print(f"Trade blocked: {result.reason}")
+        if result.circuit_breaker_triggered:
+            print("Circuit breaker triggered - manual reset required")
+
+    # Calculate position size
+    position = safety.calculate_position_size(
+        entry_price=150.00,
+        stop_loss_price=145.00,
+        account_balance=100000.00
+    )
+    print(f"Position size: {position.share_quantity} shares (${position.dollar_amount:.2f})")
+
+    # Manual circuit breaker management
+    safety.trigger_circuit_breaker(reason="3 consecutive losses")
+    # ... later ...
+    safety.reset_circuit_breaker()
+
+From: spec.md, plan.md, contracts/api.yaml
+Task: T029 [REFACTOR]
 """
 
 import json

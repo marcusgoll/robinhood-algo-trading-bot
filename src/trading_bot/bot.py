@@ -12,13 +12,38 @@ from decimal import Decimal
 import logging
 from datetime import datetime
 
+# REFACTORED: Import SafetyChecks instead of local CircuitBreaker
+# Old CircuitBreaker class removed in favor of comprehensive SafetyChecks module
+# See: src/trading_bot/safety_checks.py for enhanced circuit breaker functionality
+from src.trading_bot.safety_checks import SafetyChecks
+
 logger = logging.getLogger(__name__)
 
 
+# DEPRECATED: CircuitBreaker class moved to SafetyChecks module
+# This class is kept for backward compatibility but will be removed in future version
+# Use SafetyChecks instead for comprehensive pre-trade validation
 class CircuitBreaker:
-    """Circuit breaker to halt trading on excessive losses (§Safety_First)."""
+    """
+    DEPRECATED: Use SafetyChecks module instead.
+
+    This class is kept for backward compatibility only.
+    The new SafetyChecks module provides enhanced functionality:
+    - Circuit breakers (daily loss, consecutive losses)
+    - Buying power validation
+    - Trading hours enforcement
+    - Position sizing
+    - Duplicate order prevention
+
+    See: src/trading_bot/safety_checks.SafetyChecks
+    Task: T027 [REFACTOR]
+    """
 
     def __init__(self, max_daily_loss_pct: float, max_consecutive_losses: int):
+        logger.warning(
+            "CircuitBreaker is deprecated. Use SafetyChecks module instead. "
+            "See src/trading_bot/safety_checks.py"
+        )
         self.max_daily_loss_pct = max_daily_loss_pct
         self.max_consecutive_losses = max_consecutive_losses
         self.daily_pnl: Decimal = Decimal("0")
@@ -26,16 +51,7 @@ class CircuitBreaker:
         self.is_tripped: bool = False
 
     def check_and_trip(self, trade_pnl: Decimal, portfolio_value: Decimal) -> bool:
-        """
-        Check if circuit breaker should trip.
-
-        Args:
-            trade_pnl: Profit/loss from latest trade
-            portfolio_value: Current portfolio value
-
-        Returns:
-            True if circuit breaker tripped, False otherwise
-        """
+        """DEPRECATED: Use SafetyChecks.check_daily_loss_limit() instead."""
         self.daily_pnl += trade_pnl
 
         # Check consecutive losses
@@ -66,7 +82,7 @@ class CircuitBreaker:
         return False
 
     def reset_daily(self) -> None:
-        """Reset daily counters (call at market open)."""
+        """DEPRECATED: Use SafetyChecks.reset_circuit_breaker() instead."""
         self.daily_pnl = Decimal("0")
         self.is_tripped = False
         logger.info("Circuit breaker reset for new trading day")
