@@ -8,26 +8,9 @@ Constitution v1.0.0 - §Testing_Requirements: TDD with RED-GREEN-REFACTOR
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from dataclasses import dataclass
-from typing import Optional
 
-
-# Data classes from contract (will be in safety_checks.py)
-@dataclass
-class SafetyResult:
-    """Result of safety validation."""
-    is_safe: bool
-    reason: Optional[str] = None
-    circuit_breaker_triggered: bool = False
-
-
-@dataclass
-class PositionSize:
-    """Position size calculation result."""
-    dollar_amount: float
-    share_quantity: int
-    risk_amount: float
-    stop_loss_price: float
+# Import data classes from safety_checks module
+from src.trading_bot.safety_checks import SafetyResult, PositionSize
 
 
 class TestBuyingPowerCheck:
@@ -292,7 +275,8 @@ class TestCircuitBreakerManagement:
 class TestValidateTradeOrchestration:
     """Test suite for validate_trade() orchestration."""
 
-    def test_validate_trade_passes_all_checks(self):
+    @patch('src.trading_bot.safety_checks.is_trading_hours')
+    def test_validate_trade_passes_all_checks(self, mock_trading_hours):
         """
         Test validate_trade() returns safe when all checks pass.
 
@@ -305,6 +289,9 @@ class TestValidateTradeOrchestration:
         """
         from src.trading_bot.safety_checks import SafetyChecks
         from src.trading_bot.config import Config
+
+        # Mock trading hours check to pass
+        mock_trading_hours.return_value = True
 
         config = Mock(spec=Config)
         config.trading_timezone = "America/New_York"
@@ -331,7 +318,8 @@ class TestValidateTradeOrchestration:
         assert result.is_safe is True, "Trade should be allowed when all checks pass"
         assert result.reason is None, "No failure reason when trade is safe"
 
-    def test_validate_trade_blocks_on_buying_power_failure(self):
+    @patch('src.trading_bot.safety_checks.is_trading_hours')
+    def test_validate_trade_blocks_on_buying_power_failure(self, mock_trading_hours):
         """
         Test validate_trade() blocks on buying power failure (fail-safe).
 
@@ -344,6 +332,9 @@ class TestValidateTradeOrchestration:
         """
         from src.trading_bot.safety_checks import SafetyChecks
         from src.trading_bot.config import Config
+
+        # Mock trading hours check to pass (so we reach buying power check)
+        mock_trading_hours.return_value = True
 
         config = Mock(spec=Config)
         config.trading_timezone = "America/New_York"
