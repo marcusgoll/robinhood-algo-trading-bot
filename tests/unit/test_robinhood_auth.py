@@ -228,3 +228,106 @@ class TestLoginFlows:
         mock_pyotp.TOTP.assert_called_once_with("BASE32SECRET")
         mock_totp.now.assert_called_once()
         assert result is True
+
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    def test_device_token_login_skips_mfa(self, mock_path, mock_robin_stocks):
+        """
+        Test login with device token - skips MFA.
+
+        GIVEN: ROBINHOOD_DEVICE_TOKEN set
+        WHEN: RobinhoodAuth.login() called
+        THEN: robin_stocks.login() called with device_token parameter
+              No MFA challenge required
+              Login succeeds
+        """
+        # Given: No pickle file
+        mock_path.return_value.exists.return_value = False
+
+        # And: Device token configured
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = None
+        config.robinhood_device_token = "DEVICE123ABC"
+
+        # And: robin_stocks.login succeeds
+        mock_session = MagicMock()
+        mock_robin_stocks.login.return_value = mock_session
+
+        # When: RobinhoodAuth logs in
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth
+        auth = RobinhoodAuth(config)
+        result = auth.login()
+
+        # Then: Login called with device token (no MFA needed)
+        mock_robin_stocks.login.assert_called_once()
+        assert result is True
+        assert auth.is_authenticated() is True
+
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    def test_invalid_credentials_raises_authentication_error(self, mock_path, mock_robin_stocks):
+        """
+        Test login with invalid credentials - raises AuthenticationError.
+
+        GIVEN: Invalid username/password
+        WHEN: RobinhoodAuth.login() called
+        THEN: robin_stocks.login() returns None/error
+              AuthenticationError raised with clear message
+              Not authenticated
+        """
+        # Given: No pickle file
+        mock_path.return_value.exists.return_value = False
+
+        # And: Invalid credentials
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "wrong_password"
+        config.robinhood_mfa_secret = None
+        config.robinhood_device_token = None
+
+        # And: robin_stocks.login fails
+        mock_robin_stocks.login.return_value = None
+
+        # When/Then: RobinhoodAuth login raises AuthenticationError
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth, AuthenticationError
+        auth = RobinhoodAuth(config)
+        with pytest.raises(AuthenticationError, match="Invalid credentials"):
+            auth.login()
+
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    @patch('src.trading_bot.auth.robinhood_auth.pyotp')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    def test_mfa_failure_raises_authentication_error(self, mock_path, mock_pyotp, mock_robin_stocks):
+        """
+        Test login with MFA failure - raises AuthenticationError.
+
+        GIVEN: Valid credentials but MFA challenge fails
+        WHEN: RobinhoodAuth.login() called with MFA
+        THEN: AuthenticationError raised with MFA error message
+              Not authenticated
+        """
+        # Given: No pickle file
+        mock_path.return_value.exists.return_value = False
+
+        # And: MFA secret configured
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = "BASE32SECRET"
+        config.robinhood_device_token = None
+
+        # And: pyotp generates MFA code
+        mock_totp = MagicMock()
+        mock_totp.now.return_value = "123456"
+        mock_pyotp.TOTP.return_value = mock_totp
+
+        # And: robin_stocks.login fails (MFA rejected)
+        mock_robin_stocks.login.return_value = None
+
+        # When/Then: RobinhoodAuth login raises AuthenticationError
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth, AuthenticationError
+        auth = RobinhoodAuth(config)
+        with pytest.raises(AuthenticationError, match="MFA|authentication failed"):
+            auth.login()
