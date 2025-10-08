@@ -428,7 +428,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
   - Position, AccountBalance, CacheEntry dataclasses
   - test_account_data.py (unit tests)
   - test_account_integration.py (integration tests)
-- **Status**: ✅ Committed ([SHA pending])
+- **Status**: ✅ Committed (e4df3a5)
 
 ---
 
