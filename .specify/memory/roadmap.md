@@ -79,6 +79,25 @@
 
 <!-- Currently implementing -->
 
+### safety-checks
+- **Title**: Pre-trade safety checks & risk management
+- **Area**: api
+- **Role**: all
+- **Intra**: No
+- **Branch**: safety-checks
+- **Spec**: specs/safety-checks/spec.md
+- **Requirements**:
+  - Verify sufficient buying power before order (§Risk_Management)
+  - Block orders outside allowed hours (7am-10am EST)
+  - Check if max daily loss already hit (circuit breaker)
+  - Position size calculator based on account balance
+  - Consecutive loss detector: Track last 3 trades
+  - Stop all trading after 3 consecutive losses (§Safety_First)
+  - Require manual restart
+  - Log circuit breaker events
+  - Prevent duplicate orders
+  - [BLOCKED: account-data-module, market-data-module]
+
 ## Next
 
 <!-- Top 5-10 prioritized features (sorted by score) -->
@@ -91,25 +110,6 @@
 
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
-
-### safety-checks
-- **Title**: Pre-trade safety checks & risk management
-- **Area**: api
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 1.0 | **Score**: 2.50
-- **Requirements**:
-  - Verify sufficient buying power before order (§Risk_Management)
-  - Block orders outside allowed hours (7am-10am EST)
-  - Check if max daily loss already hit (circuit breaker)
-  - Position size calculator based on account balance
-  - **Consecutive loss detector**: Track last 3 trades
-  - Stop all trading after 3 consecutive losses (§Safety_First)
-  - Require manual restart
-  - Log circuit breaker events
-  - Prevent duplicate orders
-  - [BLOCKED: account-data-module, market-data-module]
-  - [MERGED: risk-management, consecutive-loss-detector]
 
 ### authentication-module
 - **Title**: Robinhood authentication with MFA

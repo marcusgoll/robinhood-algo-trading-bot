@@ -1,0 +1,68 @@
+# Feature: safety-checks
+
+## Overview
+Pre-trade safety checks and circuit breakers to enforce Constitution §Safety_First and §Risk_Management. Prevents trades that violate risk limits, trading hours, or circuit breaker conditions.
+
+## Research Findings
+
+### Constitution Compliance (§Safety_First, §Risk_Management)
+- Source: `.specify/memory/constitution.md`
+- Finding: Circuit breakers mandatory, fail-safe required
+- Decision: Block all trades on any validation failure (fail-safe)
+
+### Roadmap Context
+- Source: `.specify/memory/roadmap.md` (safety-checks)
+- Requirements identified:
+  1. Buying power verification
+  2. Trading hours enforcement (7am-10am EST)
+  3. Daily loss circuit breaker
+  4. Consecutive loss detector (3 losses)
+  5. Position size calculator
+  6. Duplicate order prevention
+- Blocked by: account-data-module, market-data-module
+
+### Existing Infrastructure
+- Source: `src/trading_bot/config.py`
+- Finding: Risk parameters already defined:
+  - max_daily_loss_pct: 3.0%
+  - max_consecutive_losses: 3
+  - max_position_pct: 5.0%
+- Decision: Reuse config values, no new config needed
+
+- Source: `src/trading_bot/logger.py`
+- Finding: Audit logging system with trades.log and errors.log
+- Decision: Log all safety check results to errors.log, circuit breakers to trades.log
+
+## Feature Classification
+- UI screens: No (backend-only)
+- Improvement: No (new feature)
+- Measurable: Yes (can track circuit breaker triggers, rejection rates)
+- Deployment impact: Yes (requires account-data-module, market-data-module)
+
+## System Dependencies
+**Required (blocked by)**:
+- account-data-module: For buying power, account balance
+- market-data-module: For current time, market hours
+
+**Existing (available now)**:
+- config.py: Risk parameters
+- logger.py: Audit logging
+
+## Implementation Notes
+
+### Design Decisions
+1. **Fail-safe approach**: Any validation failure blocks trade
+2. **State persistence**: Circuit breaker state saved to logs/circuit_breaker.json
+3. **Trade history**: Load last N trades from logs/trades.log for consecutive loss detection
+4. **Performance**: Cache buying power for 30s to avoid API spam
+
+### Risk Mitigation
+- Test coverage target: 95% (high-risk safety-critical code)
+- Integration tests with mocked APIs (account, market)
+- Manual testing of all circuit breaker scenarios before deployment
+
+## Checkpoints
+- Phase 0 (Specify): 2025-10-07
+
+## Last Updated
+2025-10-07T04:35:00Z
