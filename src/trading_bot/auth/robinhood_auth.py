@@ -15,19 +15,23 @@ import re
 import pickle
 import os
 import logging
-from typing import Optional
+from typing import Optional, Any
 
 logger = logging.getLogger(__name__)
 
 try:
     import robin_stocks
+    robin_stocks_available = True
 except ImportError:
     robin_stocks = None
+    robin_stocks_available = False
 
 try:
     import pyotp
+    pyotp_available = True
 except ImportError:
     pyotp = None
+    pyotp_available = False
 
 
 def _mask_credential(value: str) -> str:
@@ -66,7 +70,7 @@ class AuthConfig:
     pickle_path: str = ".robinhood.pickle"
 
     @classmethod
-    def from_config(cls, config) -> "AuthConfig":
+    def from_config(cls, config: Any) -> "AuthConfig":
         """
         Create AuthConfig from Config instance.
 
@@ -111,7 +115,7 @@ class RobinhoodAuth:
     Handles login, logout, session management, MFA, and token refresh.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: Any) -> None:
         """
         Initialize RobinhoodAuth with configuration.
 
@@ -124,8 +128,8 @@ class RobinhoodAuth:
         else:
             self.auth_config = config
 
-        self._authenticated = False
-        self._session = None
+        self._authenticated: bool = False
+        self._session: Optional[Any] = None
 
     def is_authenticated(self) -> bool:
         """Check if currently authenticated."""
