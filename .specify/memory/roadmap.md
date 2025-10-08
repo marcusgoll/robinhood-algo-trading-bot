@@ -75,28 +75,32 @@
   - Convenience functions: log_trade(), log_error()
   - 25 unit tests covering all scenarios
 
-## In Progress
-
-<!-- Currently implementing -->
-
 ### safety-checks
 - **Title**: Pre-trade safety checks & risk management
 - **Area**: api
 - **Role**: all
 - **Intra**: No
-- **Branch**: safety-checks
-- **Spec**: specs/safety-checks/spec.md
-- **Requirements**:
-  - Verify sufficient buying power before order (§Risk_Management)
-  - Block orders outside allowed hours (7am-10am EST)
-  - Check if max daily loss already hit (circuit breaker)
-  - Position size calculator based on account balance
-  - Consecutive loss detector: Track last 3 trades
-  - Stop all trading after 3 consecutive losses (§Safety_First)
-  - Require manual restart
-  - Log circuit breaker events
-  - Prevent duplicate orders
-  - [BLOCKED: account-data-module, market-data-module]
+- **Date**: 2025-10-08
+- **Commit**: 7ce2d5c
+- **Delivered**:
+  - SafetyChecks module with comprehensive pre-trade validation
+  - Buying power validation (blocks insufficient funds)
+  - Trading hours enforcement (7am-10am EST with DST support)
+  - Daily loss circuit breaker (3% threshold)
+  - Consecutive loss detection (3 losses triggers halt)
+  - Position size calculator (5% portfolio max)
+  - Duplicate order prevention
+  - Circuit breaker management (trigger/reset)
+  - Fail-safe error handling (corrupt state trips breaker)
+  - Input validation (ValueError on invalid trades)
+  - Integrated into TradingBot.execute_trade()
+  - 16 unit tests + 11 integration tests (100% pass rate)
+  - 85.86% code coverage
+  - Full Constitution v1.0.0 compliance
+
+## In Progress
+
+<!-- Currently implementing -->
 
 ## Next
 
