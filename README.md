@@ -70,7 +70,12 @@ This project follows strict development principles defined in [`.specify/memory/
    python test_config.py  # Verify config loads correctly
    ```
 
-7. **Verify installation**:
+7. **Validate configuration (§Pre_Deploy)**:
+   ```bash
+   python validate_startup.py  # Run pre-deploy validation checks
+   ```
+
+8. **Verify installation**:
    ```bash
    pytest  # Run tests
    mypy src/  # Type checking
@@ -139,6 +144,50 @@ Stocks/
 - **.env**: Secrets that **never** change (credentials)
 - **config.json**: Parameters you **frequently adjust** (position size, hours, phase)
 - Keeps sensitive data separate from trading strategy
+
+---
+
+## ✅ Configuration Validation
+
+**Pre-Deploy Validation (Constitution §Pre_Deploy)**:
+
+The `ConfigValidator` enforces all configuration requirements before the bot starts:
+
+### Validation Checks
+
+1. **Credentials Validation (§Security)**:
+   - `.env` file exists
+   - `ROBINHOOD_USERNAME` is set
+   - `ROBINHOOD_PASSWORD` is set
+   - Warnings for missing optional credentials (MFA secret, device token)
+
+2. **Config Parameters (§Data_Integrity)**:
+   - All percentage values are valid (0-100%)
+   - Position sizes are positive
+   - Trading hours are valid
+   - Phase progression settings are correct
+
+3. **Safety Checks (§Safety_First)**:
+   - Warns if live trading is enabled
+   - **Blocks** live trading in "experience" phase
+   - Validates risk management parameters
+
+4. **File Paths**:
+   - Required directories exist or can be created
+
+### Running Validation
+
+```bash
+# Validate before starting bot
+python validate_startup.py
+
+# Output:
+# ✅ All checks passed - Ready to start bot!
+# OR
+# ❌ Startup blocked: Fix errors before running bot
+```
+
+The bot will **refuse to start** if validation fails (§Safety_First).
 
 ---
 
@@ -263,6 +312,15 @@ ruff format src/
 
 # Security scan
 bandit -r src/
+```
+
+### Validation
+```bash
+# Validate configuration before startup (§Pre_Deploy)
+python validate_startup.py
+
+# Test configuration loading
+python test_config.py
 ```
 
 ### Trading
