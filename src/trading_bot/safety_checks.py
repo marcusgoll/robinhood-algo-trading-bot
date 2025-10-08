@@ -50,13 +50,15 @@ Task: T029 [REFACTOR]
 
 import json
 from dataclasses import dataclass
-from typing import Optional, Dict, List
 from datetime import datetime
+from typing import Any
+
 import pytz
+
+from src.trading_bot.config import Config
 
 # REUSE: Import time utilities
 from src.trading_bot.utils.time_utils import is_trading_hours
-from src.trading_bot.config import Config
 
 
 @dataclass
@@ -72,7 +74,7 @@ class SafetyResult:
     From: spec.md, contracts/api.yaml
     """
     is_safe: bool
-    reason: Optional[str] = None
+    reason: str | None = None
     circuit_breaker_triggered: bool = False
 
 
@@ -121,10 +123,10 @@ class SafetyChecks:
         self._circuit_breaker_active = False
 
         # Pending orders tracking (for duplicate prevention)
-        self._pending_orders: Dict[str, str] = {}
+        self._pending_orders: dict[str, str] = {}
 
         # Trade history (for consecutive loss detection)
-        self._trade_history: List[Dict] = []
+        self._trade_history: list[dict[str, Any]] = []
 
         # Load circuit breaker state from file (if exists)
         self._load_circuit_breaker_state()
@@ -416,7 +418,7 @@ class SafetyChecks:
         Task: T036 [GREEN→T035]
         """
         try:
-            with open("logs/circuit_breaker.json", "r") as f:
+            with open("logs/circuit_breaker.json") as f:
                 state = json.load(f)
                 self._circuit_breaker_active = state.get("active", False)
         except FileNotFoundError:

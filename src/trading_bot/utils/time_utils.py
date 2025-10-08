@@ -7,6 +7,7 @@ Constitution v1.0.0 - §Code_Quality: Type hints required
 """
 
 from datetime import datetime
+
 import pytz
 
 
