@@ -15,9 +15,12 @@ import re
 import pickle
 import os
 import logging
-from typing import Optional, Any
+import time
+from typing import Optional, Any, Callable, TypeVar
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar('T')
 
 try:
     import robin_stocks
@@ -32,6 +35,45 @@ try:
 except ImportError:
     pyotp = None
     pyotp_available = False
+
+
+def _retry_with_backoff(
+    func: Callable[[], T],
+    max_attempts: int = 3,
+    base_delay: float = 1.0
+) -> T:
+    """
+    Retry a function with exponential backoff (T034).
+
+    Args:
+        func: Function to retry (takes no args, returns T)
+        max_attempts: Maximum number of attempts (default: 3)
+        base_delay: Base delay in seconds (default: 1.0)
+
+    Returns:
+        Result from successful function call
+
+    Raises:
+        Last exception if all attempts fail
+
+    Pattern: 1s, 2s, 4s delays between retries
+    """
+    last_exception = None
+
+    for attempt in range(max_attempts):
+        try:
+            return func()
+        except Exception as e:
+            last_exception = e
+            if attempt < max_attempts - 1:
+                delay = base_delay * (2 ** attempt)
+                logger.warning(f"Attempt {attempt + 1}/{max_attempts} failed: {e}. Retrying in {delay}s...")
+                time.sleep(delay)
+            else:
+                logger.error(f"All {max_attempts} attempts failed")
+
+    # Re-raise the last exception
+    raise last_exception  # type: ignore
 
 
 def _mask_credential(value: str) -> str:
@@ -175,19 +217,25 @@ class RobinhoodAuth:
             totp = pyotp.TOTP(self.auth_config.mfa_secret)
             mfa_code = totp.now()
 
-        # Attempt login
+        # Attempt login with retry logic (T034)
         try:
-            # Call robin_stocks.login()
-            # Note: Actual robin_stocks API may require different parameters
-            if mfa_code:
-                self._session = robin_stocks.login(username, password, mfa_code=mfa_code)
-            elif self.auth_config.device_token:
-                self._session = robin_stocks.login(username, password, device_token=self.auth_config.device_token)
-            else:
-                self._session = robin_stocks.login(username, password)
+            # Define login function for retry wrapper
+            def _do_login() -> Any:
+                # Call robin_stocks.login()
+                # Note: Actual robin_stocks API may require different parameters
+                if mfa_code:
+                    result = robin_stocks.login(username, password, mfa_code=mfa_code)
+                elif self.auth_config.device_token:
+                    result = robin_stocks.login(username, password, device_token=self.auth_config.device_token)
+                else:
+                    result = robin_stocks.login(username, password)
 
-            if not self._session:
-                raise AuthenticationError("Invalid credentials or authentication failed")
+                if not result:
+                    raise AuthenticationError("Invalid credentials or authentication failed")
+                return result
+
+            # Use retry with exponential backoff for network resilience
+            self._session = _retry_with_backoff(_do_login, max_attempts=3, base_delay=1.0)
 
             self._authenticated = True
 
