@@ -658,3 +658,164 @@ class TestTradingHoursError:
 
         # And: robin_stocks called (not blocked)
         mock_get_latest_price.assert_called_once()
+
+
+class TestIsMarketOpen:
+    """Test suite for is_market_open method."""
+
+    @patch('robin_stocks.robinhood.get_market_hours')
+    def test_is_market_open_during_hours(self, mock_get_market_hours):
+        """
+        Test is_market_open returns MarketStatus with is_open=True.
+
+        GIVEN: MarketDataService initialized
+        WHEN: is_market_open called and market is open
+        THEN: Returns MarketStatus with is_open=True
+        """
+        from datetime import datetime
+        from trading_bot.market_data.market_data_service import MarketDataService
+        from trading_bot.market_data.data_models import MarketStatus
+
+        # Given: robin_stocks returns market open
+        mock_get_market_hours.return_value = {
+            'is_open': True,
+            'next_open_hours': '2025-10-08T09:30:00-04:00',
+            'next_close_hours': '2025-10-08T16:00:00-04:00'
+        }
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When: is_market_open called
+        status = service.is_market_open()
+
+        # Then: Returns MarketStatus with is_open=True
+        assert isinstance(status, MarketStatus)
+        assert status.is_open is True
+        assert status.next_open is not None
+        assert status.next_close is not None
+
+        # Verify robin_stocks called correctly (verify call was made with NYSE symbol)
+        mock_get_market_hours.assert_called_once()
+        assert mock_get_market_hours.call_args[0][0] == 'XNYS'
+
+    @patch('robin_stocks.robinhood.get_market_hours')
+    def test_is_market_open_outside_hours(self, mock_get_market_hours):
+        """
+        Test is_market_open returns MarketStatus with is_open=False.
+
+        GIVEN: MarketDataService initialized
+        WHEN: is_market_open called and market is closed
+        THEN: Returns MarketStatus with is_open=False
+        """
+        from trading_bot.market_data.market_data_service import MarketDataService
+        from trading_bot.market_data.data_models import MarketStatus
+
+        # Given: robin_stocks returns market closed
+        mock_get_market_hours.return_value = {
+            'is_open': False,
+            'next_open_hours': '2025-10-09T09:30:00-04:00',
+            'next_close_hours': '2025-10-08T16:00:00-04:00'
+        }
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When: is_market_open called
+        status = service.is_market_open()
+
+        # Then: Returns MarketStatus with is_open=False
+        assert isinstance(status, MarketStatus)
+        assert status.is_open is False
+        assert status.next_open is not None
+        assert status.next_close is not None
+
+        # Verify robin_stocks called correctly
+        mock_get_market_hours.assert_called_once()
+
+
+class TestGetQuotesBatch:
+    """Test suite for get_quotes_batch method."""
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_get_quotes_batch_success(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        Test get_quotes_batch returns quotes for all symbols.
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quotes_batch called with multiple symbols
+        THEN: Returns dict with Quote for each symbol
+        """
+        from trading_bot.market_data.market_data_service import MarketDataService
+        from trading_bot.market_data.data_models import Quote
+
+        # Given: Trading hours enabled
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks returns valid prices for all symbols
+        mock_get_latest_price.side_effect = [["150.25"], ["250.50"], ["75.10"]]
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When: get_quotes_batch called with multiple symbols
+        symbols = ["AAPL", "GOOGL", "MSFT"]
+        quotes = service.get_quotes_batch(symbols)
+
+        # Then: Returns dict with Quote for each symbol
+        assert len(quotes) == 3
+        assert all(symbol in quotes for symbol in symbols)
+        assert all(isinstance(quote, Quote) for quote in quotes.values())
+        assert quotes["AAPL"].symbol == "AAPL"
+        assert quotes["GOOGL"].symbol == "GOOGL"
+        assert quotes["MSFT"].symbol == "MSFT"
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_get_quotes_batch_partial_failure(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        Test get_quotes_batch continues on individual failures and logs warning.
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quotes_batch called and some symbols fail
+        THEN: Returns quotes for successful symbols only, logs warning for failures
+        """
+        from trading_bot.market_data.market_data_service import MarketDataService
+        from trading_bot.market_data.data_models import Quote
+
+        # Given: Trading hours enabled
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks fails for second symbol
+        mock_get_latest_price.side_effect = [
+            ["150.25"],  # AAPL succeeds
+            ValueError("Invalid symbol"),  # INVALID fails
+            ["75.10"]  # MSFT succeeds
+        ]
+
+        # And: MarketDataService initialized with mock logger
+        mock_auth = Mock()
+        mock_logger = Mock()
+        service = MarketDataService(auth=mock_auth, logger=mock_logger)
+
+        # When: get_quotes_batch called with mix of valid and invalid symbols
+        symbols = ["AAPL", "INVALID", "MSFT"]
+        quotes = service.get_quotes_batch(symbols)
+
+        # Then: Returns quotes for successful symbols only
+        assert len(quotes) == 2
+        assert "AAPL" in quotes
+        assert "MSFT" in quotes
+        assert "INVALID" not in quotes
+        assert isinstance(quotes["AAPL"], Quote)
+        assert isinstance(quotes["MSFT"], Quote)
+
+        # And: Warning logged for failed symbol
+        mock_logger.warning.assert_called_once()
+        warning_call = mock_logger.warning.call_args[0][0]
+        assert "Failed to get quote for INVALID" in warning_call
+        assert "Invalid symbol" in warning_call
