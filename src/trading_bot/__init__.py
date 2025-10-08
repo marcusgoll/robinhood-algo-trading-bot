@@ -12,5 +12,6 @@ __author__ = "Your Name"
 
 from .bot import TradingBot
 from .config import Config
+from . import error_handling
 
-__all__ = ["TradingBot", "Config"]
+__all__ = ["TradingBot", "Config", "error_handling"]
