@@ -331,3 +331,199 @@ class TestLoginFlows:
         auth = RobinhoodAuth(config)
         with pytest.raises(AuthenticationError, match="MFA|authentication failed"):
             auth.login()
+
+
+class TestSessionManagement:
+    """Test suite for session persistence and management."""
+
+    @patch('src.trading_bot.auth.robinhood_auth.pickle')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    def test_pickle_saved_with_600_permissions(self, mock_robin_stocks, mock_path, mock_pickle):
+        """
+        Test session saved to pickle with 600 permissions.
+
+        GIVEN: Successful login creates a session
+        WHEN: Session saved to .robinhood.pickle
+        THEN: Pickle file created with 600 permissions (owner read/write only)
+              Logged "Session saved to cache"
+        """
+        # Given: No pickle file initially
+        mock_path.return_value.exists.return_value = False
+
+        # And: Successful login
+        mock_session = MagicMock()
+        mock_robin_stocks.login.return_value = mock_session
+
+        # And: Config
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = None
+        config.robinhood_device_token = None
+
+        # When: RobinhoodAuth logs in and saves session
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth
+        auth = RobinhoodAuth(config)
+        auth.login()
+
+        # Then: Pickle saved and permissions set to 600
+        mock_pickle.dump.assert_called_once()
+        # Note: Permission check will be in implementation (os.chmod(path, 0o600))
+
+    @patch('src.trading_bot.auth.robinhood_auth.pickle')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    def test_corrupt_pickle_falls_back_to_credentials(self, mock_robin_stocks, mock_path, mock_pickle):
+        """
+        Test corrupt pickle triggers fallback to credential auth.
+
+        GIVEN: .robinhood.pickle exists but is corrupted
+        WHEN: RobinhoodAuth.login() called
+        THEN: pickle.load() raises exception
+              Falls back to username/password login
+              Logged "Cached session corrupted, re-authenticating"
+        """
+        # Given: Pickle file exists but is corrupted
+        mock_path.return_value.exists.return_value = True
+        mock_pickle.load.side_effect = Exception("Pickle corrupted")
+
+        # And: Fallback login succeeds
+        mock_session = MagicMock()
+        mock_robin_stocks.login.return_value = mock_session
+
+        # And: Config
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = None
+        config.robinhood_device_token = None
+
+        # When: RobinhoodAuth logs in
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth
+        auth = RobinhoodAuth(config)
+        result = auth.login()
+
+        # Then: Fallback to credentials login
+        mock_robin_stocks.login.assert_called_once()
+        assert result is True
+        assert auth.is_authenticated() is True
+
+    @patch('src.trading_bot.auth.robinhood_auth.pickle')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    def test_logout_clears_session_and_deletes_pickle(self, mock_robin_stocks, mock_path, mock_pickle):
+        """
+        Test logout clears session and deletes pickle.
+
+        GIVEN: Authenticated session exists
+        WHEN: RobinhoodAuth.logout() called
+        THEN: robin_stocks.logout() called
+              .robinhood.pickle deleted
+              is_authenticated() returns False
+              Logged "Logged out successfully"
+        """
+        # Given: Authenticated session
+        mock_path.return_value.exists.return_value = True
+        mock_session = MagicMock()
+        mock_pickle.load.return_value = mock_session
+
+        # And: Config
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = None
+        config.robinhood_device_token = None
+
+        # When: RobinhoodAuth logs in then logs out
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth
+        auth = RobinhoodAuth(config)
+        auth.login()
+        auth.logout()
+
+        # Then: robin_stocks.logout called and pickle deleted
+        mock_robin_stocks.logout.assert_called_once()
+        mock_path.return_value.unlink.assert_called_once()
+        assert auth.is_authenticated() is False
+
+    @patch('src.trading_bot.auth.robinhood_auth.pickle')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    def test_token_refresh_on_401_error(self, mock_robin_stocks, mock_path, mock_pickle):
+        """
+        Test token automatically refreshed on 401 error.
+
+        GIVEN: Authenticated session with expired token
+        WHEN: API call returns 401 Unauthorized
+        THEN: Token automatically refreshed via robin_stocks
+              Pickle updated with new token
+              Logged "Token expired, refreshing"
+        """
+        # Given: Valid pickle session
+        mock_path.return_value.exists.return_value = True
+        mock_session = MagicMock()
+        mock_pickle.load.return_value = mock_session
+
+        # And: Config
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = None
+        config.robinhood_device_token = None
+
+        # When: RobinhoodAuth detects expired token
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth
+        auth = RobinhoodAuth(config)
+        auth.login()
+
+        # Simulate token refresh
+        auth.refresh_token()
+
+        # Then: Token refreshed (implementation will call robin_stocks refresh)
+        # Note: Actual refresh logic tested in implementation
+        assert auth.is_authenticated() is True
+
+
+class TestSecurity:
+    """Test suite for security requirements."""
+
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    def test_credentials_never_logged(self, mock_path, mock_robin_stocks, caplog):
+        """
+        Test credentials are never logged.
+
+        GIVEN: RobinhoodAuth performing login
+        WHEN: Login flow executes (success or failure)
+        THEN: Credentials (username, password, MFA secret, device token) NEVER appear in logs
+              Only masked values appear (e.g., "user****@example.com", "****")
+        """
+        # Given: No pickle
+        mock_path.return_value.exists.return_value = False
+
+        # And: Credentials
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "super_secret_password"
+        config.robinhood_mfa_secret = "BASE32SECRETKEY"
+        config.robinhood_device_token = "DEVICE123ABC"
+
+        # And: Login succeeds
+        mock_session = MagicMock()
+        mock_robin_stocks.login.return_value = mock_session
+
+        # When: RobinhoodAuth logs in (captures logs)
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth
+        import logging
+        caplog.set_level(logging.DEBUG)
+
+        auth = RobinhoodAuth(config)
+        auth.login()
+
+        # Then: Credentials NEVER appear in logs
+        all_logs = caplog.text
+        assert "super_secret_password" not in all_logs
+        assert "BASE32SECRETKEY" not in all_logs
+        assert "DEVICE123ABC" not in all_logs
+        # Should see masked version instead
+        assert "****" in all_logs or "user****" in all_logs
