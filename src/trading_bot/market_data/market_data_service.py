@@ -92,8 +92,8 @@ class MarketDataService:
         # Get current timestamp in UTC
         timestamp_utc = datetime.now(UTC)
 
-        # Determine market state (simplified for T033, full logic in later tasks)
-        market_state = "regular"
+        # Determine market state based on current time
+        market_state = self._determine_market_state()
 
         # Build quote data dict for validation
         quote_data = {
@@ -216,6 +216,48 @@ class MarketDataService:
                 self.logger.warning(f"Failed to get quote for {symbol}: {e}")
 
         return quotes
+
+    def _determine_market_state(self) -> str:
+        """
+        Determine current market state based on time.
+
+        Returns market state as one of: "pre", "regular", "post", "closed"
+        based on current time in EST timezone.
+
+        Market states:
+        - "pre": Pre-market (4am-9:30am EST, weekdays)
+        - "regular": Regular hours (9:30am-4pm EST, weekdays)
+        - "post": After-hours (4pm-8pm EST, weekdays)
+        - "closed": Market closed (weekends, late night/early morning)
+
+        Returns:
+            str: Market state ("pre", "regular", "post", or "closed")
+        """
+        from zoneinfo import ZoneInfo
+
+        # Get current time in EST
+        est_tz = ZoneInfo("America/New_York")
+        now_est = datetime.now(UTC).astimezone(est_tz)
+
+        # Check if weekend
+        if now_est.weekday() >= 5:  # Saturday=5, Sunday=6
+            return "closed"
+
+        # Get hour and minute
+        hour = now_est.hour
+        minute = now_est.minute
+
+        # Determine market state based on time
+        if hour < 4 or hour >= 20:  # Before 4am or after 8pm
+            return "closed"
+        elif hour < 9 or (hour == 9 and minute < 30):  # 4am-9:30am
+            return "pre"
+        elif hour < 16:  # 9:30am-4pm
+            return "regular"
+        elif hour < 20:  # 4pm-8pm
+            return "post"
+        else:
+            return "closed"
 
     def _log_request(self, method: str, params: dict) -> None:
         """

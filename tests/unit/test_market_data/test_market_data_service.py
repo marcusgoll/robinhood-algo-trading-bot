@@ -131,7 +131,8 @@ class TestGetQuote:
         assert quote.current_price == Decimal("150.25")
         assert isinstance(quote.timestamp_utc, datetime)
         assert quote.timestamp_utc.tzinfo == timezone.utc
-        assert quote.market_state in ["regular", "pre_market", "after_hours", "closed"]
+        # Contract compliance: market_state must be one of [regular, pre, post, closed]
+        assert quote.market_state in ["regular", "pre", "post", "closed"]
 
         # Verify robin_stocks called correctly
         mock_get_latest_price.assert_called_once_with("AAPL", includeExtendedHours=True)
@@ -436,6 +437,164 @@ class TestTimestampStaleness:
         now = datetime.now(timezone.utc)
         age = now - quote.timestamp_utc
         assert age < timedelta(seconds=5), "Timestamp should be fresh"
+
+
+class TestMarketStateDetection:
+    """Test market_state detection per contract (pre, regular, post, closed)."""
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_market_state_pre_market(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        Test market_state = 'pre' during pre-market hours (4am-9:30am EST).
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote called during pre-market hours (8am EST)
+        THEN: Quote.market_state == "pre"
+        """
+        from datetime import UTC, datetime
+        from freezegun import freeze_time
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: Trading hours check passes (pre-market is within 7am-10am window)
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks returns valid price
+        mock_get_latest_price.return_value = ["150.25"]
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When: get_quote called during pre-market hours (8am EST = 12:00 UTC)
+        with freeze_time("2025-10-08 12:00:00", tz_offset=0):  # Wednesday 8am EST
+            quote = service.get_quote("AAPL")
+
+        # Then: market_state is "pre"
+        assert quote.market_state == "pre"
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_market_state_regular_hours(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        Test market_state = 'regular' during regular hours (9:30am-4pm EST).
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote called during regular hours (2pm EST)
+        THEN: Quote.market_state == "regular"
+        """
+        from freezegun import freeze_time
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: Trading hours check passes
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks returns valid price
+        mock_get_latest_price.return_value = ["150.25"]
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When: get_quote called during regular hours (2pm EST = 18:00 UTC)
+        with freeze_time("2025-10-08 18:00:00", tz_offset=0):  # Wednesday 2pm EST
+            quote = service.get_quote("AAPL")
+
+        # Then: market_state is "regular"
+        assert quote.market_state == "regular"
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_market_state_post_market(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        Test market_state = 'post' during after-hours (4pm-8pm EST).
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote called during after-hours (6pm EST)
+        THEN: Quote.market_state == "post"
+        """
+        from freezegun import freeze_time
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: Trading hours check fails (after-hours outside 7am-10am window)
+        # But we'll mock it to pass for testing market_state detection
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks returns valid price
+        mock_get_latest_price.return_value = ["150.25"]
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When: get_quote called during after-hours (6pm EST = 22:00 UTC)
+        with freeze_time("2025-10-08 22:00:00", tz_offset=0):  # Wednesday 6pm EST
+            quote = service.get_quote("AAPL")
+
+        # Then: market_state is "post"
+        assert quote.market_state == "post"
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_market_state_closed_weekend(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        Test market_state = 'closed' during weekend.
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote called on Saturday
+        THEN: Quote.market_state == "closed"
+        """
+        from freezegun import freeze_time
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: Trading hours check fails (weekend)
+        # But we'll mock it to pass for testing market_state detection
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks returns valid price
+        mock_get_latest_price.return_value = ["150.25"]
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When: get_quote called on weekend (Saturday 10am EST = 14:00 UTC)
+        with freeze_time("2025-10-11 14:00:00", tz_offset=0):  # Saturday 10am EST
+            quote = service.get_quote("AAPL")
+
+        # Then: market_state is "closed"
+        assert quote.market_state == "closed"
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_market_state_closed_late_night(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        Test market_state = 'closed' late at night (after 8pm EST).
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote called at 10pm EST
+        THEN: Quote.market_state == "closed"
+        """
+        from freezegun import freeze_time
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: Trading hours check fails (late night)
+        # But we'll mock it to pass for testing market_state detection
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks returns valid price
+        mock_get_latest_price.return_value = ["150.25"]
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When: get_quote called late at night (10pm EST = 02:00 UTC next day)
+        with freeze_time("2025-10-09 02:00:00", tz_offset=0):  # Wednesday 10pm EST
+            quote = service.get_quote("AAPL")
+
+        # Then: market_state is "closed"
+        assert quote.market_state == "closed"
 
 
 class TestTradingHoursError:

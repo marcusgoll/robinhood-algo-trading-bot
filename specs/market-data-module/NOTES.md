@@ -766,5 +766,33 @@ Market data and trading hours module for Robinhood stock trading bot. Provides r
 
 **Next Phase**: Create commit and prepare for /optimize phase
 
+## Contract Compliance Fix: Market State Detection
+
+**Issue**: Implementation hardcoded `market_state = "regular"` but OpenAPI contract requires detecting actual state: `[regular, pre, post, closed]`
+
+**Fix Implemented**: 2025-10-08T22:00:00
+- Added `_determine_market_state()` private method with timezone logic
+- Uses zoneinfo to convert UTC to America/New_York timezone
+- Detects 4 market states based on EST time:
+  * "pre": Pre-market (4am-9:30am EST, weekdays)
+  * "regular": Regular hours (9:30am-4pm EST, weekdays)
+  * "post": After-hours (4pm-8pm EST, weekdays)
+  * "closed": Market closed (weekends, late night/early morning)
+- Updated `get_quote()` to call `_determine_market_state()` instead of hardcoding
+- Added 5 comprehensive tests (TestMarketStateDetection class):
+  * test_market_state_pre_market (8am EST)
+  * test_market_state_regular_hours (2pm EST)
+  * test_market_state_post_market (6pm EST)
+  * test_market_state_closed_weekend (Saturday)
+  * test_market_state_closed_late_night (10pm EST)
+- Used freezegun library for deterministic datetime mocking
+- All 21 unit tests passing (100%)
+
+**Files Modified**:
+- src/trading_bot/market_data/market_data_service.py (added _determine_market_state method, updated get_quote)
+- tests/unit/test_market_data/test_market_data_service.py (added TestMarketStateDetection class with 5 tests)
+
+**Contract Compliance**: ✅ Quote.market_state now correctly returns ["regular", "pre", "post", "closed"] per api.yaml specification
+
 ## Last Updated
-2025-10-08T21:00:00
+2025-10-08T22:00:00
