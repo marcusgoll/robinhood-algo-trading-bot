@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-07 (mode-switcher implementation)
+**Last updated**: 2025-10-08 (authentication-module spec)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -102,6 +102,21 @@
 
 <!-- Currently implementing -->
 
+### authentication-module
+- **Title**: Robinhood authentication with MFA
+- **Area**: api
+- **Role**: all
+- **Intra**: No
+- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
+- **Status**: Specification complete (2025-10-08)
+- **Requirements**:
+  - Login with MFA support using pyotp
+  - Session pickle file storage
+  - Auto-refresh token
+  - Logout handler
+  - Authentication error recovery
+  - [UNBLOCKED: environment-config shipped]
+
 ## Next
 
 <!-- Top 5-10 prioritized features (sorted by score) -->
@@ -114,20 +129,6 @@
 
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
-
-### authentication-module
-- **Title**: Robinhood authentication with MFA
-- **Area**: api
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Login with MFA support using pyotp
-  - Session pickle file storage
-  - Auto-refresh token
-  - Logout handler
-  - Authentication error recovery
-  - [BLOCKED: environment-config]
 
 ### account-data-module
 - **Title**: Account data fetching
