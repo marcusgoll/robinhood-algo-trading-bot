@@ -8,8 +8,8 @@ All timestamps are in UTC, prices use Decimal for precision.
 """
 
 from dataclasses import dataclass
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
 
 
 @dataclass(frozen=True)

@@ -10,20 +10,23 @@ Constitution v1.0.0:
 - §Safety_First: Fail-fast on validation errors
 """
 
-from typing import Optional, List, Dict
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
-import robin_stocks.robinhood as r
 import pandas as pd
+import robin_stocks.robinhood as r
 
 from trading_bot.auth.robinhood_auth import RobinhoodAuth
-from trading_bot.market_data.data_models import MarketDataConfig, Quote, MarketStatus
-from trading_bot.market_data.validators import validate_quote, validate_historical_data, validate_trade_time
-from trading_bot.logger import TradingLogger
-from trading_bot.error_handling.retry import with_retry
 from trading_bot.error_handling.policies import DEFAULT_POLICY
+from trading_bot.error_handling.retry import with_retry
+from trading_bot.logger import TradingLogger
+from trading_bot.market_data.data_models import MarketDataConfig, MarketStatus, Quote
+from trading_bot.market_data.validators import (
+    validate_historical_data,
+    validate_quote,
+    validate_trade_time,
+)
 
 
 class MarketDataService:
@@ -37,8 +40,8 @@ class MarketDataService:
     def __init__(
         self,
         auth: RobinhoodAuth,
-        config: Optional[MarketDataConfig] = None,
-        logger: Optional[logging.Logger] = None
+        config: MarketDataConfig | None = None,
+        logger: logging.Logger | None = None
     ) -> None:
         """
         Initialize MarketDataService.
@@ -87,7 +90,7 @@ class MarketDataService:
         price = float(price_str)
 
         # Get current timestamp in UTC
-        timestamp_utc = datetime.now(timezone.utc)
+        timestamp_utc = datetime.now(UTC)
 
         # Determine market state (simplified for T033, full logic in later tasks)
         market_state = "regular"
@@ -190,7 +193,7 @@ class MarketDataService:
             next_close=next_close
         )
 
-    def get_quotes_batch(self, symbols: List[str]) -> Dict[str, Quote]:
+    def get_quotes_batch(self, symbols: list[str]) -> dict[str, Quote]:
         """
         Get quotes for multiple symbols.
 

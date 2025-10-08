@@ -3,15 +3,16 @@ Market Data Validators
 
 Validation functions for prices, timestamps, quotes, and historical data.
 """
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from datetime import UTC, datetime
+from typing import Any
+
 import pandas as pd
 
 from trading_bot.market_data.exceptions import DataValidationError, TradingHoursError
 
 
 # T028: Common validation helpers
-def _check_required_fields(data: Dict[str, Any], required_fields: list[str]) -> None:
+def _check_required_fields(data: dict[str, Any], required_fields: list[str]) -> None:
     """
     Check that all required fields are present in data dictionary.
 
@@ -88,13 +89,13 @@ def validate_timestamp(timestamp: datetime, max_age_seconds: int = 300) -> None:
     """
     # Check if timestamp has timezone info and is UTC
     if timestamp.tzinfo is None:
-        raise DataValidationError(f"Timestamp must have UTC timezone, got naive datetime")
+        raise DataValidationError("Timestamp must have UTC timezone, got naive datetime")
 
-    if timestamp.tzinfo != timezone.utc:
+    if timestamp.tzinfo != UTC:
         raise DataValidationError(f"Timestamp must be UTC, got {timestamp.tzinfo}")
 
     # Check if timestamp is recent enough
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     age_seconds = (now_utc - timestamp).total_seconds()
 
     if age_seconds > max_age_seconds:
@@ -108,7 +109,7 @@ def validate_timestamp(timestamp: datetime, max_age_seconds: int = 300) -> None:
 
 
 # T024: Implement validate_quote
-def validate_quote(data: Dict[str, Any]) -> None:
+def validate_quote(data: dict[str, Any]) -> None:
     """
     Validate quote data dictionary.
 
@@ -156,7 +157,7 @@ def validate_historical_data(df: pd.DataFrame) -> None:
             try:
                 validate_price(float(price))
             except DataValidationError as e:
-                raise DataValidationError(f"Invalid {col} at row {idx}: {e}")
+                raise DataValidationError(f"Invalid {col} at row {idx}: {e}") from e
 
     # Validate volume >= 0
     if (df['volume'] < 0).any():
@@ -167,7 +168,7 @@ def validate_historical_data(df: pd.DataFrame) -> None:
 
 
 # T045-T051: Trading hours validation
-def validate_trade_time(current_time: Optional[datetime] = None) -> None:
+def validate_trade_time(current_time: datetime | None = None) -> None:
     """
     Validate that current time is within trading hours (7am-10am EST).
 

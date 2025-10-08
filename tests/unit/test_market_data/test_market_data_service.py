@@ -187,3 +187,315 @@ class TestRetryBehavior:
     # TODO T034-T035: Add integration test for actual retry behavior
     # Note: Unit test with mocks has issues with decorator evaluation order.
     # Integration test should use real RateLimitError from robin_stocks.
+
+
+class TestNetworkErrorHandling:
+    """T056: Test network error handling."""
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_network_error_handling(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        T056: Test network error handling with ConnectionError.
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote called and robin_stocks raises ConnectionError
+        THEN: Raises RetriableError (propagated from network layer)
+        """
+        from trading_bot.error_handling.exceptions import RetriableError
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: Trading hours enabled
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks raises ConnectionError
+        mock_get_latest_price.side_effect = ConnectionError("Network unreachable")
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When/Then: get_quote raises ConnectionError (will be caught by retry decorator)
+        with pytest.raises(ConnectionError, match="Network unreachable"):
+            service.get_quote("AAPL")
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_timeout_error_handling(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        T056: Test timeout error handling.
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote called and robin_stocks raises TimeoutError
+        THEN: Raises TimeoutError (propagated from network layer)
+        """
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: Trading hours enabled
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks raises TimeoutError
+        mock_get_latest_price.side_effect = TimeoutError("Request timed out")
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When/Then: get_quote raises TimeoutError
+        with pytest.raises(TimeoutError, match="Request timed out"):
+            service.get_quote("AAPL")
+
+
+class TestInvalidSymbolHandling:
+    """T057: Test invalid symbol handling."""
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_invalid_symbol_handling(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        T057: Test invalid symbol raises ValueError from robin_stocks.
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote called with invalid symbol
+        THEN: Raises ValueError from robin_stocks
+        """
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: Trading hours enabled
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks raises ValueError for invalid symbol
+        mock_get_latest_price.side_effect = ValueError("Invalid stock symbol: INVALID_XYZ")
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When/Then: get_quote raises ValueError
+        with pytest.raises(ValueError, match="Invalid stock symbol"):
+            service.get_quote("INVALID_XYZ")
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_empty_response_handling(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        T057: Test empty response from robin_stocks.
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote called and robin_stocks returns empty list
+        THEN: Raises IndexError when trying to access price
+        """
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: Trading hours enabled
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks returns empty list
+        mock_get_latest_price.return_value = []
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When/Then: get_quote raises IndexError
+        with pytest.raises(IndexError):
+            service.get_quote("UNKNOWN")
+
+
+class TestCircuitBreakerIntegration:
+    """T058: Test circuit breaker integration."""
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_circuit_breaker_integration(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        T058: Test circuit breaker triggers on repeated failures.
+
+        GIVEN: MarketDataService with circuit breaker enabled
+        WHEN: get_quote fails repeatedly (exceeds failure threshold)
+        THEN: Circuit breaker opens and blocks subsequent requests
+
+        NOTE: Circuit breaker implementation is in error_handling module.
+        This test verifies integration with MarketDataService.
+        """
+        from trading_bot.market_data.market_data_service import MarketDataService
+        from trading_bot.error_handling.circuit_breaker import CircuitBreaker
+
+        # Given: Trading hours enabled
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks always fails
+        mock_get_latest_price.side_effect = ConnectionError("Network unreachable")
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When: Multiple failures occur
+        # Then: Each call raises ConnectionError
+        for i in range(3):
+            with pytest.raises(ConnectionError):
+                service.get_quote("AAPL")
+
+        # NOTE: Circuit breaker state verification requires access to circuit breaker instance
+        # Full integration test should be in test_circuit_breaker_integration.py
+
+
+class TestDataValidationErrors:
+    """T059: Test data validation error handling."""
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_data_validation_errors(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        T059: Test DataValidationError raised on invalid price.
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote returns invalid price (negative)
+        THEN: Raises DataValidationError from validate_quote
+        """
+        from trading_bot.market_data.exceptions import DataValidationError
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: Trading hours enabled
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks returns negative price
+        mock_get_latest_price.return_value = ["-10.50"]
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When/Then: get_quote raises DataValidationError
+        with pytest.raises(DataValidationError, match="Price must be > 0"):
+            service.get_quote("INVALID")
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_zero_price_validation(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        T059: Test DataValidationError raised on zero price.
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote returns zero price
+        THEN: Raises DataValidationError from validate_quote
+        """
+        from trading_bot.market_data.exceptions import DataValidationError
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: Trading hours enabled
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks returns zero price
+        mock_get_latest_price.return_value = ["0.0"]
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When/Then: get_quote raises DataValidationError
+        with pytest.raises(DataValidationError, match="Price must be > 0"):
+            service.get_quote("ZERO")
+
+
+class TestTimestampStaleness:
+    """T060: Test timestamp staleness validation."""
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_timestamp_staleness(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        T060: Test timestamp staleness check (future work).
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote returns data with stale timestamp
+        THEN: Should raise DataValidationError (future enhancement)
+
+        NOTE: Current implementation always uses datetime.now(timezone.utc)
+        so timestamp is always fresh. This test documents future behavior
+        when we receive timestamps from API responses.
+        """
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: Trading hours enabled
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks returns valid price
+        mock_get_latest_price.return_value = ["150.00"]
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When: get_quote called
+        quote = service.get_quote("AAPL")
+
+        # Then: Timestamp is fresh (within seconds of now)
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        age = now - quote.timestamp_utc
+        assert age < timedelta(seconds=5), "Timestamp should be fresh"
+
+
+class TestTradingHoursError:
+    """T061: Test TradingHoursError raised outside trading window."""
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_trading_hours_error(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        T061: Test TradingHoursError raised outside trading window.
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote called outside trading hours (7am-10am EST)
+        THEN: Raises TradingHoursError before calling robin_stocks
+        """
+        from trading_bot.market_data.exceptions import TradingHoursError
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: Outside trading hours
+        mock_is_trading_hours.return_value = False
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When/Then: get_quote raises TradingHoursError
+        with pytest.raises(TradingHoursError, match="Trading blocked outside 7am-10am EST"):
+            service.get_quote("AAPL")
+
+        # And: robin_stocks NOT called (blocked before API call)
+        mock_get_latest_price.assert_not_called()
+
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_trading_hours_allows_during_window(self, mock_get_latest_price, mock_is_trading_hours):
+        """
+        T061: Test get_quote proceeds during trading hours.
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote called during trading hours
+        THEN: Proceeds to API call (no TradingHoursError)
+        """
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: During trading hours
+        mock_is_trading_hours.return_value = True
+
+        # And: robin_stocks returns valid price
+        mock_get_latest_price.return_value = ["150.00"]
+
+        # And: MarketDataService initialized
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When: get_quote called
+        quote = service.get_quote("AAPL")
+
+        # Then: Returns Quote (no TradingHoursError)
+        assert quote is not None
+        assert quote.symbol == "AAPL"
+
+        # And: robin_stocks called (not blocked)
+        mock_get_latest_price.assert_called_once()
