@@ -354,3 +354,62 @@ class TestValidateTradeOrchestration:
         assert isinstance(result, SafetyResult), "Should return SafetyResult"
         assert result.is_safe is False, "Trade should be blocked"
         assert "buying power" in result.reason.lower(), "Reason should mention buying power"
+
+
+class TestFailSafeBehavior:
+    """Test suite for fail-safe error handling."""
+
+    @patch('builtins.open', new_callable=MagicMock)
+    @patch('json.load')
+    def test_corrupt_state_file_trips_circuit_breaker(self, mock_json_load, mock_open):
+        """
+        Test corrupt circuit breaker state file trips circuit breaker (fail-safe).
+
+        GIVEN: logs/circuit_breaker.json contains invalid JSON
+        WHEN: SafetyChecks initialized
+        THEN: Circuit breaker automatically trips (fail-safe)
+
+        From: spec.md NFR-002, plan.md [RISK MITIGATION]
+        Task: T035 [RED]
+        """
+        from src.trading_bot.safety_checks import SafetyChecks
+        from src.trading_bot.config import Config
+        import json as json_module
+
+        # Mock json.load to raise JSONDecodeError (simulates corrupt file)
+        mock_json_load.side_effect = json_module.JSONDecodeError("Invalid", "", 0)
+
+        # Mock config
+        config = Mock(spec=Config)
+
+        safety = SafetyChecks(config)
+
+        # Circuit breaker should be tripped (fail-safe)
+        assert safety._circuit_breaker_active is True, "Circuit breaker should trip on corrupt state file"
+
+    def test_missing_trades_log_assumes_zero_losses(self):
+        """
+        Test missing trades.log is handled gracefully.
+
+        GIVEN: logs/trades.log does not exist
+        WHEN: check_consecutive_losses() called
+        THEN: Returns True (assume 0 losses), logs warning
+
+        From: plan.md [RISK MITIGATION] Parse errors in trades.log
+        Task: T037 [RED]
+        """
+        from src.trading_bot.safety_checks import SafetyChecks
+        from src.trading_bot.config import Config
+
+        config = Mock(spec=Config)
+        config.max_consecutive_losses = 3
+
+        safety = SafetyChecks(config)
+
+        # Ensure trade history is empty (simulates missing log file)
+        safety._trade_history = []
+
+        result = safety.check_consecutive_losses()
+
+        # Should return True (pass check) when no history available
+        assert result is True, "Should assume 0 losses when trades.log missing"

@@ -152,10 +152,28 @@ class SafetyChecks:
         Returns:
             SafetyResult with is_safe, reason, circuit_breaker_triggered
 
+        Raises:
+            ValueError: If input parameters are invalid
+
         From: spec.md Requirements FR-001 through FR-007
         Pattern: Fail-safe (any failure blocks trade)
-        Task: T026 [GREEN→T016,T017]
+        Task: T026 [GREEN→T016,T017], T039 (input validation)
         """
+        # Input validation (T039)
+        if not symbol or not symbol.isalnum():
+            raise ValueError(f"Invalid symbol: {symbol}. Must be alphanumeric.")
+
+        if action not in ["BUY", "SELL"]:
+            raise ValueError(f"Invalid action: {action}. Must be 'BUY' or 'SELL'.")
+
+        if quantity <= 0:
+            raise ValueError(f"Invalid quantity: {quantity}. Must be > 0.")
+
+        if price <= 0:
+            raise ValueError(f"Invalid price: {price}. Must be > 0.")
+
+        if current_buying_power < 0:
+            raise ValueError(f"Invalid buying power: {current_buying_power}. Must be >= 0.")
         # Check circuit breaker first (hard stop)
         if self._circuit_breaker_active:
             return SafetyResult(
@@ -391,14 +409,20 @@ class SafetyChecks:
         Load circuit breaker state from file.
 
         Internal method called during __init__.
-        Fail-safe: If file corrupt or missing, assume inactive.
+        Fail-safe: If file corrupt, TRIP circuit breaker (halt trading).
+        If file missing, assume inactive (first run).
 
-        From: plan.md [RISK MITIGATION]
+        From: plan.md [RISK MITIGATION], spec.md NFR-002
+        Task: T036 [GREEN→T035]
         """
         try:
             with open("logs/circuit_breaker.json", "r") as f:
                 state = json.load(f)
                 self._circuit_breaker_active = state.get("active", False)
-        except (FileNotFoundError, json.JSONDecodeError):
-            # File missing or corrupt → assume inactive (fail-safe)
+        except FileNotFoundError:
+            # File missing → assume inactive (first run, OK)
             self._circuit_breaker_active = False
+        except json.JSONDecodeError:
+            # File corrupt → TRIP circuit breaker (fail-safe: halt trading)
+            self._circuit_breaker_active = True
+            # Note: Would log error here, but avoiding logger dependency in __init__
