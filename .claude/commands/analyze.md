@@ -6,7 +6,7 @@ Analyze feature artifacts for consistency, coverage, and quality.
 
 ## MENTAL MODEL
 
-**Workflow**: specify → clarify → plan → tasks → **analyze** → implement → optimize → debug → preview → phase-1-ship → validate-staging → phase-2-ship
+**Workflow**:\spec-flow → clarify → plan → tasks → **analyze** → implement → optimize → debug → preview → phase-1-ship → validate-staging → phase-2-ship
 
 **State machine:**
 - Load artifacts → Scan issues → Generate report → Suggest next
@@ -57,7 +57,7 @@ ERROR_LOG="$FEATURE_DIR/error-log.md"
 POLISH_REPORT="$FEATURE_DIR/design/polish-report.md"
 CRIT_FILE="$FEATURE_DIR/design/crit.md"
 MIGRATION_PLAN="$FEATURE_DIR/migration-plan.md"
-CONSTITUTION_FILE=".specify/memory/constitution.md"
+CONSTITUTION_FILE="\spec-flow/memory/constitution.md"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📋 Loading artifacts"
@@ -86,7 +86,7 @@ if [ ${#MISSING_FILES[@]} -gt 0 ]; then
   done
   echo ""
   echo "Run workflow:"
-  echo "  1. /specify $SLUG (if missing spec.md)"
+  echo "  1. \spec-flow $SLUG (if missing spec.md)"
   echo "  2. /plan $SLUG (if missing plan.md)"
   echo "  3. /tasks $SLUG (if missing tasks.md)"
   exit 1
@@ -1061,3 +1061,4 @@ fi
 
 echo ""
 ```
+

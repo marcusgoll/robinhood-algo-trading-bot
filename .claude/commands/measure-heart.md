@@ -31,7 +31,7 @@ HEART_FILE="$FEATURE_DIR/heart-metrics.md"
 
 if [ ! -f "$HEART_FILE" ]; then
   echo "❌ Missing: $HEART_FILE"
-  echo "Run /specify to create HEART metrics plan"
+  echo "Run \spec-flow to create HEART metrics plan"
   exit 1
 fi
 
@@ -40,7 +40,7 @@ EXPERIMENT_FILE="$FEATURE_DIR/experiment.md"
 
 if [ ! -f "$EXPERIMENT_FILE" ]; then
   echo "❌ Missing: $EXPERIMENT_FILE"
-  echo "Run /specify to create experiment design"
+  echo "Run \spec-flow to create experiment design"
   exit 1
 fi
 
@@ -509,3 +509,4 @@ All data accessible via Claude Code tools (no external dashboards required)
 
 **Command Version**: 1.0
 **Last Updated**: 2025-10-05
+

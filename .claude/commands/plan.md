@@ -6,7 +6,7 @@ Design implementation for: $ARGUMENTS
 
 ## MENTAL MODEL
 
-**Workflow**: specify -> clarify -> plan -> tasks -> analyze -> implement -> optimize -> debug -> preview -> phase-1-ship -> validate-staging -> phase-2-ship
+**Workflow**:\spec-flow -> clarify -> plan -> tasks -> analyze -> implement -> optimize -> debug -> preview -> phase-1-ship -> validate-staging -> phase-2-ship
 
 **State machine:**
 - Load feature -> Research codebase -> Design artifacts -> Document plan -> Suggest next
@@ -45,7 +45,7 @@ FEATURE_SPEC="$FEATURE_DIR/spec.md"
 # Validate spec exists
 if [ ! -f "$FEATURE_SPEC" ]; then
   echo "Error: Spec not found at $FEATURE_SPEC"
-  echo "Run /specify first"
+  echo "Run \spec-flow first"
   exit 1
 fi
 
@@ -72,13 +72,13 @@ fi
 
 ```bash
 REQUIRED_TEMPLATES=(
-  ".specify/templates/error-log-template.md"
+  "\spec-flow/templates/error-log-template.md"
 )
 
 for template in "${REQUIRED_TEMPLATES[@]}"; do
   if [ ! -f "$template" ]; then
     echo "Error: Missing required template: $template"
-    echo "Run: git checkout main -- .specify/templates/"
+    echo "Run: git checkout main -- \spec-flow/templates/"
     exit 1
   fi
 done
@@ -601,7 +601,7 @@ echo "  - contracts/api.yaml (OpenAPI specs)"
 echo "  - error-log.md (initialized for tracking)"
 
 # Update NOTES.md with Phase 1 checkpoint and summary
-source .specify/templates/notes-update-template.sh
+source \spec-flow/templates/notes-update-template.sh
 
 # Calculate metrics
 RESEARCH_LINES=$(wc -l < "$FEATURE_DIR/research.md" 2>/dev/null || echo 0)
@@ -699,3 +699,4 @@ if [ "$CONTEXT_CHECK" -gt 500 ]; then
   echo "   Consider: /compact before /tasks"
 fi
 ```
+

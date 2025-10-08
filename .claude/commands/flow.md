@@ -18,7 +18,7 @@ Examples:
 
 If $ARGUMENTS is "continue":
 - Set CONTINUE_MODE = true
-- Load workflow state from `.specify/workflow-state.json`
+- Load workflow state from `\spec-flow/workflow-state.json`
 - Resume from last completed phase
 
 Else:
@@ -26,17 +26,39 @@ Else:
 - Set FEATURE_DESCRIPTION = $ARGUMENTS
 - Initialize new workflow
 
+## DETECT PROJECT TYPE
+
+**Run project type detection:**
+
+```bash
+# Use detection script (bash or PowerShell based on OS)
+if command -v bash &> /dev/null; then
+  PROJECT_TYPE=$(bash .spec-flow/scripts/bash/detect-project-type.sh)
+else
+  PROJECT_TYPE=$(pwsh -File .spec-flow/scripts/powershell/detect-project-type.ps1)
+fi
+
+echo "📦 Project type: $PROJECT_TYPE"
+echo ""
+```
+
+**Project types:**
+- `local-only` - No remote repo, workflow ends at `/optimize`
+- `remote-staging-prod` - Full staging → production workflow
+- `remote-direct` - Remote repo, direct to main (no staging)
+
 ## INITIALIZE WORKFLOW STATE
 
 **Create or load workflow state file:**
 
-State file location: `.specify/workflow-state.json`
+State file location: `\spec-flow/workflow-state.json`
 
 **For new workflows:**
 Create state file with:
 ```json
 {
   "feature": "[feature-slug]",
+  "project_type": "[local-only|remote-staging-prod|remote-direct]",
   "current_phase": 0,
   "phases_completed": [],
   "started_at": "[ISO timestamp]",
@@ -51,7 +73,7 @@ Create state file with:
 ```
 
 **For continue mode:**
-Read existing state file to determine next phase.
+Read existing state file to determine next phase and project type.
 
 ## MENTAL MODEL
 
@@ -61,7 +83,7 @@ Read existing state file to determine next phase.
 - **Orchestrator**: /flow tracks progress, manages context, handles errors
 - **Workers**: Individual slash commands are specialists
 - **YOLO mode**: Full automation, only stops for:
-  - User questions (clarifications during /specify)
+  - User questions (clarifications during \spec-flow)
   - Manual testing gates (/preview, /validate-staging)
 
 **Context management**:
@@ -74,7 +96,7 @@ Read existing state file to determine next phase.
 ```
 IDEA/DESCRIPTION
   ↓
-PHASE 0: SPECIFY → spec.md created → /compact (preserve spec decisions)
+PHASE 0:\spec-flow → spec.md created → /compact (preserve spec decisions)
   ↓ [auto-check for clarifications]
   ├─ If [NEEDS CLARIFICATION] → PHASE 0.5: CLARIFY → /compact
   └─ Else → PHASE 1: PLAN
@@ -122,8 +144,8 @@ PHASE 7.5: FINALIZE → Update docs (CHANGELOG, README, help), manage milestones
    - Set `status = "in_progress"`
    - Record start timestamp
 
-2. **Run /specify command:**
-   - INVOKE: `/specify "$ARGUMENTS"` (use SlashCommand tool)
+2. **Run /spec-flow command:**
+   - INVOKE: `/spec-flow "$ARGUMENTS"` (use SlashCommand tool)
    - WAIT: For completion
    - VERIFY: `specs/[feature-slug]/spec.md` created
 
@@ -301,6 +323,39 @@ PHASE 7.5: FINALIZE → Update docs (CHANGELOG, README, help), manage milestones
 
 ### Phase 6: Ship to Staging (DEPLOYMENT)
 
+**Check project type (skip for local-only):**
+
+```bash
+# Read project type from state file
+PROJECT_TYPE=$(grep -o '"project_type":\s*"[^"]*"' .spec-flow/workflow-state.json | cut -d'"' -f4)
+
+if [ "$PROJECT_TYPE" = "local-only" ]; then
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "📦 Local-only project detected"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  echo "Skipping staging deployment (no remote repository configured)."
+  echo ""
+  echo "✅ Feature implementation complete!"
+  echo ""
+  echo "Next steps (manual deployment):"
+  echo "  1. Review changes: git diff main"
+  echo "  2. Merge to main: git checkout main && git merge \$FEATURE_BRANCH"
+  echo "  3. Tag release: git tag v1.0.0"
+  echo "  4. Deploy manually to your environment"
+  echo ""
+  echo "To enable remote workflow:"
+  echo "  1. Add remote: git remote add origin <url>"
+  echo "  2. Create staging branch: git checkout -b staging main && git push -u origin staging"
+  echo "  3. Re-run: /flow continue"
+  echo ""
+  exit 0
+fi
+
+echo "✅ Project type: $PROJECT_TYPE (remote deployment enabled)"
+echo ""
+```
+
 **EXECUTE in sequence (after /preview completed):**
 
 1. **Update state (start phase 6):**
@@ -410,7 +465,7 @@ The `/flow` command automatically runs `/compact` after each phase with phase-sp
 
 Try to invoke `/compact` after each phase:
 
-- **After /specify**: `/compact "preserve spec decisions, requirements, and UX research"`
+- **After \spec-flow**: `/compact "preserve spec decisions, requirements, and UX research"`
 - **After /clarify**: `/compact "preserve spec decisions and clarifications"`
 - **After /plan**: `/compact "preserve research decisions, architecture headings, and reuse analysis"`
 - **After /tasks**: `/compact "keep task breakdown, priorities, and error log"`
@@ -505,7 +560,7 @@ Resume workflow after manual intervention:
 
 **Load workflow state:**
 
-1. Read `.specify/workflow-state.json`
+1. Read `\spec-flow/workflow-state.json`
 2. Extract current phase, manual gate status, and feature slug
 3. Determine next action based on state
 
@@ -576,7 +631,7 @@ Show user:
 **State file operations:**
 
 Use JSON manipulation:
-- Read: Parse `.specify/workflow-state.json`
+- Read: Parse `\spec-flow/workflow-state.json`
 - Write: Update and save back to file
 - Atomic: Ensure writes don't corrupt state
 
@@ -621,7 +676,7 @@ Then: /flow continue
 Use SlashCommand tool to invoke other commands:
 
 ```
-/specify "[feature description]"
+\spec-flow "[feature description]"
 /clarify
 /plan
 /tasks
@@ -760,7 +815,7 @@ Check for blockers:
 
 4. **Cleanup (optional):**
    - Archive workflow state to `specs/[feature-slug]/.workflow-state.json`
-   - Remove `.specify/workflow-state.json`
+   - Remove `\spec-flow/workflow-state.json`
    - Allow starting new workflow
 
 ## PROGRESS VISUALIZATION
@@ -772,7 +827,7 @@ Check for blockers:
 Workflow Progress
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✅ Phase 0: Specify
+✅ Phase 0:\spec-flow
 ✅ Phase 1: Plan
 ✅ Phase 2: Tasks
 ✅ Phase 3: Analyze
@@ -792,7 +847,7 @@ Estimated remaining: 2h 30m
 - **Sequential phases**: Cannot skip phases (analysis before implementation)
 - **Manual gates are mandatory**: Preview and staging validation required
 - **Auto-compaction**: Runs after each phase (if /compact available)
-- **State persistence**: All state in `.specify/workflow-state.json`
+- **State persistence**: All state in `\spec-flow/workflow-state.json`
 - **Resumable**: Can pause/continue at any phase or gate
 
 ## USAGE EXAMPLES
@@ -903,3 +958,4 @@ Options:
 
 Logs: specs/NNN-*/NOTES.md
 ```
+

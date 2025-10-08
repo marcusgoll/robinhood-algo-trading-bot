@@ -64,7 +64,7 @@ fi
 
 ## MENTAL MODEL
 
-**Workflow**: specify → clarify → plan → tasks → analyze → implement → optimize → debug → preview → phase-1-ship → validate-staging → phase-2-ship
+**Workflow**: spec-flow → clarify → plan → tasks → analyze → implement → optimize → debug → preview → phase-1-ship → validate-staging → phase-2-ship
 
 **State machine:**
 - Load design artifacts → Extract concrete details → Generate tasks → Suggest next
@@ -122,13 +122,13 @@ fi
 **Check test pattern templates:**
 
 ```bash
-TEST_PATTERNS=".specify/templates/test-patterns.md"
+TEST_PATTERNS=".spec-flow/templates/test-patterns.md"
 
 if [ ! -f "$TEST_PATTERNS" ]; then
   echo "⚠️  Test patterns template not found: $TEST_PATTERNS"
   echo "Creating basic test patterns..."
 
-  mkdir -p .specify/templates
+  mkdir -p .spec-flow/templates
 
   cat > "$TEST_PATTERNS" <<'EOF'
 # Test Patterns
@@ -453,7 +453,7 @@ expect(wrapper).toMatchSnapshot()
 expect(screen.getByText('Message sent')).toBeInTheDocument()
 ```
 
-**Reference:** `.specify/templates/test-patterns.md` for copy-paste templates
+**Reference:** `.spec-flow/templates/test-patterns.md` for copy-paste templates
 
 ## GIT COMMIT
 
@@ -475,7 +475,7 @@ After generating tasks.md, update NOTES.md with Phase 2 checkpoint and summary:
 
 ```bash
 # Source the template
-source .specify/templates/notes-update-template.sh
+source .spec-flow/templates/notes-update-template.sh
 
 # Count tasks by type
 TOTAL_TASKS=$(grep -c "^T[0-9]" "$FEATURE_DIR/tasks.md")

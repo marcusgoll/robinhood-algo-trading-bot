@@ -68,7 +68,7 @@ echo "PHASE C.1: LOAD CONSTITUTION"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-CONSTITUTION_FILE=".specify/memory/constitution.md"
+CONSTITUTION_FILE="\spec-flow/memory/constitution.md"
 
 if [ ! -f "$CONSTITUTION_FILE" ]; then
   echo "❌ Constitution not found: $CONSTITUTION_FILE"
@@ -324,19 +324,19 @@ declare -A AFFECTED_TEMPLATES
 
 # Auto-detect based on keywords
 if [[ "$CHANGE_DESCRIPTION" =~ [Pp]lan|[Qq]uality|[Gg]ate ]]; then
-  AFFECTED_TEMPLATES["plan-template.md"]=".specify/templates/plan-template.md"
+  AFFECTED_TEMPLATES["plan-template.md"]="\spec-flow/templates/plan-template.md"
 fi
 
 if [[ "$CHANGE_DESCRIPTION" =~ [Tt]est|[Cc]overage|[Tt]ask ]]; then
-  AFFECTED_TEMPLATES["tasks-template.md"]=".specify/templates/tasks-template.md"
+  AFFECTED_TEMPLATES["tasks-template.md"]="\spec-flow/templates/tasks-template.md"
 fi
 
 if [[ "$CHANGE_DESCRIPTION" =~ [Ss]pec|[Rr]equirement|[Aa]cceptance ]]; then
-  AFFECTED_TEMPLATES["spec-template.md"]=".specify/templates/spec-template.md"
+  AFFECTED_TEMPLATES["spec-template.md"]="\spec-flow/templates/spec-template.md"
 fi
 
 if [[ "$CHANGE_DESCRIPTION" =~ [Oo]ptimize|[Pp]erformance|[Ss]ecurity ]]; then
-  AFFECTED_TEMPLATES["optimization-report-template.md"]=".specify/templates/optimization-report-template.md"
+  AFFECTED_TEMPLATES["optimization-report-template.md"]="\spec-flow/templates/optimization-report-template.md"
 fi
 
 # If no specific match, prompt user
@@ -351,16 +351,16 @@ if [ ${#AFFECTED_TEMPLATES[@]} -eq 0 ]; then
   read -p "Select (1-5, comma-separated): " TEMPLATE_CHOICE
 
   if [[ "$TEMPLATE_CHOICE" =~ 1 ]]; then
-    AFFECTED_TEMPLATES["plan-template.md"]=".specify/templates/plan-template.md"
+    AFFECTED_TEMPLATES["plan-template.md"]="\spec-flow/templates/plan-template.md"
   fi
   if [[ "$TEMPLATE_CHOICE" =~ 2 ]]; then
-    AFFECTED_TEMPLATES["tasks-template.md"]=".specify/templates/tasks-template.md"
+    AFFECTED_TEMPLATES["tasks-template.md"]="\spec-flow/templates/tasks-template.md"
   fi
   if [[ "$TEMPLATE_CHOICE" =~ 3 ]]; then
-    AFFECTED_TEMPLATES["spec-template.md"]=".specify/templates/spec-template.md"
+    AFFECTED_TEMPLATES["spec-template.md"]="\spec-flow/templates/spec-template.md"
   fi
   if [[ "$TEMPLATE_CHOICE" =~ 4 ]]; then
-    AFFECTED_TEMPLATES["optimization-report-template.md"]=".specify/templates/optimization-report-template.md"
+    AFFECTED_TEMPLATES["optimization-report-template.md"]="\spec-flow/templates/optimization-report-template.md"
   fi
 fi
 
@@ -613,7 +613,7 @@ if [[ "$CHANGE_DESCRIPTION" =~ [Nn]ever|[Dd]on.t|[Aa]void|anti-pattern|[Ff]ail ]
   echo "Change mentions anti-patterns or restrictions."
   echo ""
 
-  DONT_DO_FILE=".specify/memory/DONT_DO.md"
+  DONT_DO_FILE="\spec-flow/memory/DONT_DO.md"
 
   read -p "Add to DONT_DO.md? (y/N): " ADD_DONT_DO
 
@@ -661,7 +661,7 @@ echo "PHASE C.11: CHANGELOG"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-CHANGELOG_FILE=".specify/memory/CONSTITUTION_CHANGELOG.md"
+CHANGELOG_FILE="\spec-flow/memory/CONSTITUTION_CHANGELOG.md"
 
 if [ ! -f "$CHANGELOG_FILE" ]; then
   cat > "$CHANGELOG_FILE" <<'EOF'
@@ -793,8 +793,8 @@ fi
 echo ""
 echo "### 💾 Next Steps"
 echo ""
-echo "1. Review changes: git diff .specify/"
-echo "2. Commit changes: git add .specify/ && git commit"
+echo "1. Review changes: git diff \spec-flow/"
+echo "2. Commit changes: git add \spec-flow/ && git commit"
 echo "3. Update dependent specs if needed"
 echo ""
 
@@ -852,9 +852,10 @@ Other commands should reference constitution principles:
 ```bash
 # Example: In /plan command, reference quality gates
 echo "Quality gates defined in constitution.md §Quality_Gates"
-echo "See: .specify/memory/constitution.md"
+echo "See: \spec-flow/memory/constitution.md"
 ```
 
 **Cross-references**: Use §Section_Name format for linking to constitution sections.
 
 **Version Awareness**: Templates show which constitution version they were last synced with.
+
