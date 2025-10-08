@@ -4,10 +4,10 @@ Market Data Validators
 Validation functions for prices, timestamps, quotes, and historical data.
 """
 from datetime import datetime, timezone
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import pandas as pd
 
-from trading_bot.market_data.exceptions import DataValidationError
+from trading_bot.market_data.exceptions import DataValidationError, TradingHoursError
 
 
 # T028: Common validation helpers
@@ -164,3 +164,20 @@ def validate_historical_data(df: pd.DataFrame) -> None:
 
     # Check for date continuity using helper (T028)
     _check_date_continuity(df, date_column='date', max_gap_ratio=0.1)
+
+
+# T045-T051: Trading hours validation
+def validate_trade_time(current_time: Optional[datetime] = None) -> None:
+    """
+    Validate that current time is within trading hours (7am-10am EST).
+
+    Args:
+        current_time: Optional datetime to check (defaults to now if not provided)
+
+    Raises:
+        TradingHoursError: If current time is outside trading hours
+    """
+    from trading_bot.utils.time_utils import is_trading_hours
+
+    if not is_trading_hours("America/New_York", current_time):
+        raise TradingHoursError("Trading blocked outside 7am-10am EST")

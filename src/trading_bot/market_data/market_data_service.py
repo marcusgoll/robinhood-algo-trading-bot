@@ -10,16 +10,17 @@ Constitution v1.0.0:
 - §Safety_First: Fail-fast on validation errors
 """
 
-from typing import Optional
+from typing import Optional, List, Dict
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 
 import robin_stocks.robinhood as r
+import pandas as pd
 
 from trading_bot.auth.robinhood_auth import RobinhoodAuth
-from trading_bot.market_data.data_models import MarketDataConfig, Quote
-from trading_bot.market_data.validators import validate_quote
+from trading_bot.market_data.data_models import MarketDataConfig, Quote, MarketStatus
+from trading_bot.market_data.validators import validate_quote, validate_historical_data, validate_trade_time
 from trading_bot.logger import TradingLogger
 from trading_bot.error_handling.retry import with_retry
 from trading_bot.error_handling.policies import DEFAULT_POLICY
@@ -59,6 +60,7 @@ class MarketDataService:
         T033: Fetches latest price from robin_stocks, validates with validate_quote,
         and returns Quote dataclass.
         T035: Added @with_retry decorator for automatic retry on rate limits.
+        T045-T051: Added trading hours validation.
 
         Args:
             symbol: Stock ticker symbol (e.g., "AAPL", "TSLA")
@@ -69,7 +71,14 @@ class MarketDataService:
         Raises:
             DataValidationError: If price is invalid or timestamp is stale
             RateLimitError: After 3 retries on HTTP 429
+            TradingHoursError: If called outside trading hours (7am-10am EST)
         """
+        # T045-T051: Validate trading hours before fetching quote
+        validate_trade_time()
+
+        # Log the request (T044)
+        self._log_request("get_quote", {"symbol": symbol})
+
         # Fetch latest price from robin_stocks
         price_list = r.get_latest_price(symbol, includeExtendedHours=True)
 
@@ -101,3 +110,118 @@ class MarketDataService:
             timestamp_utc=timestamp_utc,
             market_state=market_state
         )
+
+    @with_retry(policy=DEFAULT_POLICY)
+    def get_historical_data(
+        self,
+        symbol: str,
+        interval: str = "day",
+        span: str = "3month"
+    ) -> pd.DataFrame:
+        """
+        Get historical OHLCV data for a symbol.
+
+        T036-T038: Fetches historical data from robin_stocks, normalizes column names,
+        validates with validate_historical_data, and returns DataFrame.
+
+        Args:
+            symbol: Stock ticker symbol (e.g., "AAPL", "TSLA")
+            interval: Data interval ("day", "week", "10minute", "5minute")
+            span: Time span ("day", "week", "month", "3month", "year", "5year")
+
+        Returns:
+            DataFrame with columns: date, open, high, low, close, volume
+
+        Raises:
+            DataValidationError: If historical data is invalid or incomplete
+            RateLimitError: After 3 retries on HTTP 429
+        """
+        # Log the request (T044)
+        self._log_request("get_historical_data", {"symbol": symbol, "interval": interval, "span": span})
+
+        # Fetch historical data from robin_stocks
+        data = r.get_stock_historicals(symbol, interval=interval, span=span)
+
+        # Convert to DataFrame
+        df = pd.DataFrame(data)
+
+        # Normalize column names to standard OHLCV format
+        df = df.rename(columns={
+            'begins_at': 'date',
+            'open_price': 'open',
+            'high_price': 'high',
+            'low_price': 'low',
+            'close_price': 'close',
+            'volume': 'volume'
+        })
+
+        # Validate historical data (raises DataValidationError if invalid)
+        validate_historical_data(df)
+
+        return df
+
+    @with_retry(policy=DEFAULT_POLICY)
+    def is_market_open(self) -> MarketStatus:
+        """
+        Check if market is currently open.
+
+        T039-T041: Fetches market hours from robin_stocks and returns MarketStatus.
+
+        Returns:
+            MarketStatus with is_open, next_open, and next_close times
+
+        Raises:
+            RateLimitError: After 3 retries on HTTP 429
+        """
+        # Log the request (T044)
+        self._log_request("is_market_open", {"date": datetime.now().strftime('%Y-%m-%d')})
+
+        # Fetch market hours for NYSE (representative of US stock market)
+        market_hours = r.get_market_hours('XNYS', datetime.now().strftime('%Y-%m-%d'))
+
+        # Parse market status
+        is_open = market_hours.get('is_open', False)
+        next_open = datetime.fromisoformat(market_hours['next_open_hours'])
+        next_close = datetime.fromisoformat(market_hours['next_close_hours'])
+
+        return MarketStatus(
+            is_open=is_open,
+            next_open=next_open,
+            next_close=next_close
+        )
+
+    def get_quotes_batch(self, symbols: List[str]) -> Dict[str, Quote]:
+        """
+        Get quotes for multiple symbols.
+
+        T042-T043: Fetches quotes for a list of symbols, continues on individual failures.
+
+        Args:
+            symbols: List of stock ticker symbols
+
+        Returns:
+            Dictionary mapping symbols to Quote objects (excludes failed symbols)
+        """
+        # Log the request (T044)
+        self._log_request("get_quotes_batch", {"symbols": symbols, "count": len(symbols)})
+
+        quotes = {}
+        for symbol in symbols:
+            try:
+                quotes[symbol] = self.get_quote(symbol)
+            except Exception as e:
+                self.logger.warning(f"Failed to get quote for {symbol}: {e}")
+
+        return quotes
+
+    def _log_request(self, method: str, params: dict) -> None:
+        """
+        Log API request with method name and parameters.
+
+        T044: Helper for standardized API request logging.
+
+        Args:
+            method: API method name (e.g., "get_quote", "get_historical_data")
+            params: Request parameters dictionary
+        """
+        self.logger.info(f"API Request: {method}", extra={'params': params})

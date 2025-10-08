@@ -97,8 +97,9 @@ class TestServiceInitialization:
 class TestGetQuote:
     """Test suite for get_quote method."""
 
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
     @patch('robin_stocks.robinhood.get_latest_price')
-    def test_get_quote_valid_symbol(self, mock_get_latest_price):
+    def test_get_quote_valid_symbol(self, mock_get_latest_price, mock_is_trading_hours):
         """
         T031 [RED]: Test get_quote returns Quote for valid symbol.
 
@@ -108,13 +109,16 @@ class TestGetQuote:
         """
         from datetime import datetime, timezone
         from decimal import Decimal
-        from src.trading_bot.market_data.data_models import Quote
+        from trading_bot.market_data.data_models import Quote
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Mock trading hours check to allow trading
+        mock_is_trading_hours.return_value = True
 
         # Mock robin_stocks.robinhood.get_latest_price to return ["150.25"]
         mock_get_latest_price.return_value = ["150.25"]
 
         # Given: MarketDataService initialized with mock auth
-        from src.trading_bot.market_data.market_data_service import MarketDataService
         mock_auth = Mock()
         service = MarketDataService(auth=mock_auth)
 
@@ -132,8 +136,9 @@ class TestGetQuote:
         # Verify robin_stocks called correctly
         mock_get_latest_price.assert_called_once_with("AAPL", includeExtendedHours=True)
 
+    @patch('trading_bot.utils.time_utils.is_trading_hours')
     @patch('robin_stocks.robinhood.get_latest_price')
-    def test_get_quote_validates_price(self, mock_get_latest_price):
+    def test_get_quote_validates_price(self, mock_get_latest_price, mock_is_trading_hours):
         """
         T032 [RED]: Test get_quote validates price using validate_quote.
 
@@ -141,13 +146,16 @@ class TestGetQuote:
         WHEN: get_quote called with symbol that returns invalid price "0.0"
         THEN: Raises DataValidationError from validate_quote
         """
-        from src.trading_bot.market_data.exceptions import DataValidationError
+        from trading_bot.market_data.exceptions import DataValidationError
+        from trading_bot.market_data.market_data_service import MarketDataService
+
+        # Mock trading hours check to allow trading
+        mock_is_trading_hours.return_value = True
 
         # Mock robin_stocks.robinhood.get_latest_price to return ["0.0"] (invalid)
         mock_get_latest_price.return_value = ["0.0"]
 
         # Given: MarketDataService initialized with mock auth
-        from src.trading_bot.market_data.market_data_service import MarketDataService
         mock_auth = Mock()
         service = MarketDataService(auth=mock_auth)
 
