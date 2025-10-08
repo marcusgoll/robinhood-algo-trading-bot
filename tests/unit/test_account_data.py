@@ -143,7 +143,143 @@ class TestDataModels:
 
 class TestCacheLogic:
     """Test suite for TTL-based caching."""
-    pass
+
+    def test_cache_miss_fetches_from_api(self):
+        """
+        T016: Test cache miss triggers API call.
+
+        GIVEN: Empty cache
+        WHEN: get_buying_power called
+        THEN: API called and result returned
+        """
+        from src.trading_bot.account.account_data import AccountData
+
+        with patch('robin_stocks.robinhood.account.load_account_profile') as mock_api:
+            mock_api.return_value = {'buying_power': '10000.50'}
+            mock_auth = Mock()
+
+            account = AccountData(auth=mock_auth)
+
+            # WHEN: get_buying_power called
+            result = account.get_buying_power()
+
+            # THEN: API called and result returned
+            assert result == 10000.50
+            mock_api.assert_called_once()
+
+    def test_cache_hit_returns_cached_value(self):
+        """
+        T017: Test cache hit returns cached value.
+
+        GIVEN: Cached buying power
+        WHEN: get_buying_power called twice
+        THEN: API called only once, second call uses cache
+        """
+        from src.trading_bot.account.account_data import AccountData
+
+        with patch('robin_stocks.robinhood.account.load_account_profile') as mock_api:
+            mock_api.return_value = {'buying_power': '10000.50'}
+            mock_auth = Mock()
+
+            account = AccountData(auth=mock_auth)
+
+            # WHEN: Called twice
+            result1 = account.get_buying_power(use_cache=True)
+            result2 = account.get_buying_power(use_cache=True)
+
+            # THEN: API called only once
+            assert result1 == result2 == 10000.50
+            assert mock_api.call_count == 1
+
+    def test_stale_cache_triggers_refetch(self):
+        """
+        T018: Test stale cache (expired TTL) triggers refetch.
+
+        GIVEN: Cached buying power older than TTL
+        WHEN: get_buying_power called
+        THEN: API called again with fresh data
+        """
+        from src.trading_bot.account.account_data import AccountData
+
+        with patch('robin_stocks.robinhood.account.load_account_profile') as mock_api:
+            with patch('src.trading_bot.account.account_data.datetime') as mock_datetime:
+                mock_api.return_value = {'buying_power': '10000.50'}
+                mock_auth = Mock()
+
+                # Mock time progression
+                start_time = datetime(2025, 1, 8, 12, 0, 0)
+                stale_time = datetime(2025, 1, 8, 12, 2, 0)  # 2 minutes later (past 60s TTL)
+
+                mock_datetime.utcnow.side_effect = [start_time, stale_time, stale_time]
+
+                account = AccountData(auth=mock_auth)
+
+                # WHEN: First call caches
+                result1 = account.get_buying_power(use_cache=True)
+
+                # Advance time past TTL
+                mock_api.return_value = {'buying_power': '12000.75'}
+
+                # Second call should refetch
+                result2 = account.get_buying_power(use_cache=True)
+
+                # THEN: API called twice
+                assert mock_api.call_count == 2
+                assert result2 == 12000.75
+
+    def test_manual_cache_invalidation_specific_key(self):
+        """
+        T019: Test manual cache invalidation clears specific key.
+
+        GIVEN: Cached buying power
+        WHEN: invalidate_cache('buying_power') called
+        THEN: Next call fetches fresh data
+        """
+        from src.trading_bot.account.account_data import AccountData
+
+        with patch('robin_stocks.robinhood.account.load_account_profile') as mock_api:
+            mock_api.return_value = {'buying_power': '10000.50'}
+            mock_auth = Mock()
+
+            account = AccountData(auth=mock_auth)
+
+            # WHEN: First call caches
+            result1 = account.get_buying_power(use_cache=True)
+
+            # Invalidate cache
+            account.invalidate_cache('buying_power')
+
+            # Second call should refetch
+            mock_api.return_value = {'buying_power': '15000.00'}
+            result2 = account.get_buying_power(use_cache=True)
+
+            # THEN: API called twice
+            assert mock_api.call_count == 2
+            assert result2 == 15000.00
+
+    def test_manual_cache_invalidation_all_keys(self):
+        """
+        T020: Test manual cache invalidation clears all keys.
+
+        GIVEN: Multiple cached values
+        WHEN: invalidate_cache(None) called
+        THEN: All caches cleared
+        """
+        from src.trading_bot.account.account_data import AccountData
+
+        mock_auth = Mock()
+        account = AccountData(auth=mock_auth)
+
+        # WHEN: Populate cache manually
+        account._cache['buying_power'] = Mock()
+        account._cache['positions'] = Mock()
+        account._cache['balance'] = Mock()
+
+        # Invalidate all
+        account.invalidate_cache(None)
+
+        # THEN: All caches cleared
+        assert len(account._cache) == 0
 
 
 class TestAPIFetching:
