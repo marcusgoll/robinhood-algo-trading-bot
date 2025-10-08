@@ -43,9 +43,9 @@ class RetryPolicy:
     base_delay: float = 1.0
     backoff_multiplier: float = 2.0
     jitter: bool = True
-    retriable_exceptions: Tuple[Type[Exception], ...] = None
+    retriable_exceptions: Tuple[Type[Exception], ...] | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate policy configuration after initialization."""
         # Import here to avoid circular dependency
         from .exceptions import RetriableError

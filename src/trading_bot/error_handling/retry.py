@@ -14,10 +14,10 @@ import time
 import random
 import logging
 from functools import wraps
-from typing import Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 from .policies import RetryPolicy, DEFAULT_POLICY
-from .exceptions import RetriableError, RateLimitError
+from .exceptions import RateLimitError
 
 # Module logger
 logger = logging.getLogger(__name__)
@@ -63,8 +63,8 @@ def with_retry(
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)  # Preserve function metadata
-        def wrapper(*args, **kwargs) -> T:
-            last_exception = None
+        def wrapper(*args: Any, **kwargs: Any) -> T:
+            last_exception: Exception | None = None
 
             # max_attempts is number of retries, so total calls = max_attempts + 1
             for attempt in range(policy.max_attempts + 1):
@@ -86,9 +86,10 @@ def with_retry(
                     # Check if we have more attempts left
                     if attempt < policy.max_attempts:
                         # Calculate delay
+                        delay: float
                         if isinstance(e, RateLimitError) and hasattr(e, "retry_after"):
                             # Use retry_after from RateLimitError
-                            delay = e.retry_after
+                            delay = float(e.retry_after)
                         else:
                             # Exponential backoff: base_delay * (multiplier ^ attempt)
                             delay = policy.base_delay * (policy.backoff_multiplier ** attempt)
