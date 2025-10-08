@@ -7,7 +7,7 @@ Enforces Constitution v1.0.0 principles:
 - §Code_Quality: Type hints, clear logic
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from decimal import Decimal
 import logging
 from datetime import datetime
@@ -16,6 +16,9 @@ from datetime import datetime
 # Old CircuitBreaker class removed in favor of comprehensive SafetyChecks module
 # See: src/trading_bot/safety_checks.py for enhanced circuit breaker functionality
 from src.trading_bot.safety_checks import SafetyChecks
+
+# T038: Authentication module integration
+from src.trading_bot.auth import RobinhoodAuth, AuthenticationError
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +105,7 @@ class TradingBot:
     def __init__(
         self,
         *,
+        config: Optional[Any] = None,
         paper_trading: bool = True,
         max_position_pct: float = 5.0,
         max_daily_loss_pct: float = 3.0,
@@ -112,6 +116,7 @@ class TradingBot:
         Initialize trading bot with safety parameters.
 
         Args:
+            config: Optional Config instance for authentication (§Security)
             paper_trading: If True, simulate trades without real money (§Safety_First)
             max_position_pct: Maximum % of portfolio per position (§Risk_Management)
             max_daily_loss_pct: Circuit breaker: max daily loss % (§Safety_First)
@@ -120,6 +125,12 @@ class TradingBot:
         """
         self.paper_trading = paper_trading
         self.max_position_pct = max_position_pct
+
+        # T038: Initialize authentication if config provided
+        self.auth: Optional[RobinhoodAuth] = None
+        if config is not None:
+            self.auth = RobinhoodAuth(config)
+            logger.info("Authentication module initialized")
 
         # DEPRECATED: Old circuit breaker kept for backward compatibility
         self.circuit_breaker = CircuitBreaker(
@@ -130,13 +141,13 @@ class TradingBot:
         # NEW: Initialize SafetyChecks module for comprehensive pre-trade validation
         from unittest.mock import Mock
         # Create mock config with safety parameters
-        config = Mock()
-        config.max_daily_loss_pct = max_daily_loss_pct
-        config.max_consecutive_losses = max_consecutive_losses
-        config.max_position_pct = max_position_pct
-        config.trading_timezone = trading_timezone
+        safety_config = Mock()
+        safety_config.max_daily_loss_pct = max_daily_loss_pct
+        safety_config.max_consecutive_losses = max_consecutive_losses
+        safety_config.max_position_pct = max_position_pct
+        safety_config.trading_timezone = trading_timezone
 
-        self.safety_checks = SafetyChecks(config)
+        self.safety_checks = SafetyChecks(safety_config)
 
         self.positions: Dict[str, Dict] = {}
         self.is_running: bool = False
@@ -151,17 +162,49 @@ class TradingBot:
         )
 
     def start(self) -> None:
-        """Start the trading bot (§Safety_First: manual start required)."""
+        """
+        Start the trading bot (§Safety_First: manual start required).
+
+        T038: Authenticates with Robinhood before starting if auth configured.
+        T039: Raises RuntimeError if authentication fails (§Safety_First).
+        """
         if self.circuit_breaker.is_tripped:
             logger.error("Cannot start: Circuit breaker is tripped")
             raise RuntimeError("Circuit breaker is tripped - manual reset required")
+
+        # T038-T039: Authenticate before starting bot
+        if self.auth is not None:
+            try:
+                logger.info("Authenticating with Robinhood...")
+                self.auth.login()
+                logger.info("Authentication successful")
+            except AuthenticationError as e:
+                logger.error(f"Authentication failed: {e}")
+                raise RuntimeError(
+                    f"Authentication failed - check credentials: {e}"
+                ) from e
 
         self.is_running = True
         logger.info("Trading bot started")
 
     def stop(self) -> None:
-        """Emergency stop (§Safety_First: kill switch)."""
+        """
+        Emergency stop (§Safety_First: kill switch).
+
+        T040: Logs out of Robinhood session on shutdown.
+        """
         self.is_running = False
+
+        # T040: Logout on bot shutdown
+        if self.auth is not None:
+            try:
+                logger.info("Logging out of Robinhood...")
+                self.auth.logout()
+                logger.info("Logout successful")
+            except Exception as e:
+                # Non-critical: Log error but don't block shutdown
+                logger.warning(f"Logout error (non-critical): {e}")
+
         logger.warning("Trading bot stopped (manual kill switch)")
 
     def calculate_position_size(
