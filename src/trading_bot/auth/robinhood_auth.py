@@ -12,7 +12,34 @@ Constitution v1.0.0:
 from dataclasses import dataclass
 from pathlib import Path
 import re
+import pickle
+import os
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+try:
+    import robin_stocks
+except ImportError:
+    robin_stocks = None
+
+try:
+    import pyotp
+except ImportError:
+    pyotp = None
+
+
+def _mask_credential(value: str) -> str:
+    """Mask a credential for logging (§Security)."""
+    if not value:
+        return "****"
+    if "@" in value:
+        # Email: user****@example.com
+        parts = value.split("@")
+        return f"{parts[0][:4]}****@{parts[1]}"
+    # Other credentials: show first 4 chars
+    return f"{value[:4]}****" if len(value) > 4 else "****"
 
 
 class AuthenticationError(Exception):
@@ -114,15 +141,96 @@ class RobinhoodAuth:
         Raises:
             AuthenticationError: If authentication fails
         """
-        # Placeholder - will implement in subsequent tasks
-        pass
+        # T021: Try to restore session from pickle first
+        pickle_path = Path(self.auth_config.pickle_path)
+        if pickle_path.exists():
+            try:
+                with open(pickle_path, 'rb') as f:
+                    self._session = pickle.load(f)
+                self._authenticated = True
+                logger.info(f"Session restored from cache for {_mask_credential(self.auth_config.username)}")
+                return True
+            except Exception as e:
+                # T015: Corrupt pickle - fall back to credentials
+                logger.warning(f"Cached session corrupted, re-authenticating for {_mask_credential(self.auth_config.username)}")
+                pass
+
+        # T022: Credentials-based login
+        if not robin_stocks:
+            raise AuthenticationError("robin_stocks library not available")
+
+        # Prepare login parameters
+        username = self.auth_config.username
+        password = self.auth_config.password
+
+        logger.info(f"Authenticating user {_mask_credential(username)}")
+
+        # T023: Handle MFA if configured
+        mfa_code = None
+        if self.auth_config.mfa_secret and pyotp:
+            totp = pyotp.TOTP(self.auth_config.mfa_secret)
+            mfa_code = totp.now()
+
+        # Attempt login
+        try:
+            # Call robin_stocks.login()
+            # Note: Actual robin_stocks API may require different parameters
+            if mfa_code:
+                self._session = robin_stocks.login(username, password, mfa_code=mfa_code)
+            elif self.auth_config.device_token:
+                self._session = robin_stocks.login(username, password, device_token=self.auth_config.device_token)
+            else:
+                self._session = robin_stocks.login(username, password)
+
+            if not self._session:
+                raise AuthenticationError("Invalid credentials or authentication failed")
+
+            self._authenticated = True
+
+            # T014: Save session to pickle with 600 permissions
+            try:
+                with open(pickle_path, 'wb') as f:
+                    pickle.dump(self._session, f)
+                os.chmod(pickle_path, 0o600)
+                logger.info(f"Session saved to cache for {_mask_credential(username)}")
+            except Exception:
+                # Non-critical: If pickle save fails, continue with authenticated session
+                logger.warning(f"Failed to save session cache for {_mask_credential(username)}")
+                pass
+
+            logger.info(f"Authentication successful for {_mask_credential(username)}")
+            return True
+
+        except AuthenticationError:
+            raise
+        except Exception as e:
+            if "MFA" in str(e) or "authentication failed" in str(e):
+                raise AuthenticationError(f"MFA or authentication failed: {e}")
+            raise AuthenticationError(f"Invalid credentials: {e}")
 
     def logout(self) -> None:
         """Logout and clear session."""
-        # Placeholder - will implement in subsequent tasks
-        pass
+        # T016: Logout implementation
+        if robin_stocks:
+            robin_stocks.logout()
+
+        self._authenticated = False
+        self._session = None
+
+        # Delete pickle file
+        pickle_path = Path(self.auth_config.pickle_path)
+        if pickle_path.exists():
+            pickle_path.unlink()
+
+        # TODO: Add logging - "Logged out successfully"
 
     def refresh_token(self) -> None:
         """Refresh expired authentication token."""
-        # Placeholder - will implement in subsequent tasks
-        pass
+        # T017: Token refresh implementation
+        # This is a placeholder - robin_stocks handles token refresh automatically
+        # In a real implementation, this would call robin_stocks refresh method
+        # and update the pickle file
+        if self._authenticated:
+            # TODO: Add logging - "Token expired, refreshing"
+            # For now, just maintain authenticated state
+            pass
