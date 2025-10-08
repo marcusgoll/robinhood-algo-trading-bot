@@ -92,6 +92,7 @@ Stocks/
 │   ├── __init__.py
 │   ├── bot.py                # Core trading bot with circuit breakers
 │   ├── config.py             # Configuration management
+│   ├── error_handling/       # Centralized error handling framework
 │   ├── strategies/           # Trading strategies
 │   ├── utils/                # Utility functions
 │   └── api/                  # Robinhood API wrapper
