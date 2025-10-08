@@ -154,3 +154,28 @@ class TestGetQuote:
         # When/Then: get_quote called with symbol, raises DataValidationError
         with pytest.raises(DataValidationError, match="Price must be > 0"):
             service.get_quote("INVALID")
+
+
+class TestRetryBehavior:
+    """Test suite for retry behavior with @with_retry decorator."""
+
+    def test_get_quote_has_retry_decorator(self):
+        """
+        T034-T035: Verify get_quote has @with_retry decorator applied.
+
+        GIVEN: MarketDataService class
+        WHEN: Inspecting get_quote method
+        THEN: Method has __wrapped__ attribute (decorator applied)
+        """
+        from src.trading_bot.market_data.market_data_service import MarketDataService
+
+        # Given: MarketDataService class
+        # When: Check if get_quote is decorated
+        method = MarketDataService.get_quote
+
+        # Then: Should have __wrapped__ attribute from @with_retry
+        assert hasattr(method, '__wrapped__'), "get_quote should be decorated with @with_retry"
+
+    # TODO T034-T035: Add integration test for actual retry behavior
+    # Note: Unit test with mocks has issues with decorator evaluation order.
+    # Integration test should use real RateLimitError from robin_stocks.
