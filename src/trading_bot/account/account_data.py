@@ -9,12 +9,13 @@ Constitution v1.0.0:
 - §Risk_Management: Day trade count enforcement
 """
 
+import logging
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Callable, Dict, List, Optional, TypeVar
-import logging
-import time
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +99,7 @@ class AccountData:
             auth: RobinhoodAuth instance for authenticated API calls
         """
         self.auth = auth
-        self._cache: Dict[str, CacheEntry] = {}
+        self._cache: dict[str, CacheEntry] = {}
         logger.info("AccountData service initialized")
 
     def _is_cache_valid(self, key: str) -> bool:
@@ -145,7 +146,7 @@ class AccountData:
         )
         logger.debug(f"Cache updated: {key} (TTL: {ttl_seconds}s)")
 
-    def invalidate_cache(self, cache_type: Optional[str] = None) -> None:
+    def invalidate_cache(self, cache_type: str | None = None) -> None:
         """
         Invalidate cache (all or specific type).
 
@@ -212,12 +213,12 @@ class AccountData:
             try:
                 return float(profile['buying_power'])
             except (ValueError, TypeError) as e:
-                raise AccountDataError(f"Invalid buying_power value: {e}")
+                raise AccountDataError(f"Invalid buying_power value: {e}") from e
 
         # Apply retry with exponential backoff (1s, 2s, 4s)
         return self._retry_with_backoff(_fetch, max_attempts=3, base_delay=1.0)
 
-    def get_positions(self, use_cache: bool = True) -> List[Position]:
+    def get_positions(self, use_cache: bool = True) -> list[Position]:
         """
         Fetch all positions with P&L calculations.
 
@@ -242,7 +243,7 @@ class AccountData:
 
         return positions
 
-    def _fetch_positions(self) -> List[Position]:
+    def _fetch_positions(self) -> list[Position]:
         """
         Fetch positions from robin-stocks API with retry.
 
@@ -254,7 +255,7 @@ class AccountData:
         Raises:
             AccountDataError: If API response is invalid
         """
-        def _fetch() -> List[Position]:
+        def _fetch() -> list[Position]:
             import robin_stocks.robinhood as rh
 
             holdings = rh.account.build_holdings()
@@ -337,7 +338,7 @@ class AccountData:
                     last_updated=datetime.utcnow()
                 )
             except (ValueError, TypeError) as e:
-                raise AccountDataError(f"Invalid balance values: {e}")
+                raise AccountDataError(f"Invalid balance values: {e}") from e
 
         return self._retry_with_backoff(_fetch, max_attempts=3, base_delay=1.0)
 
@@ -390,7 +391,7 @@ class AccountData:
             try:
                 return int(profile['day_trade_count'])
             except (ValueError, TypeError) as e:
-                raise AccountDataError(f"Invalid day_trade_count value: {e}")
+                raise AccountDataError(f"Invalid day_trade_count value: {e}") from e
 
         return self._retry_with_backoff(_fetch, max_attempts=3, base_delay=1.0)
 
