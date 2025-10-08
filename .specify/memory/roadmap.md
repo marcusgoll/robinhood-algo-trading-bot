@@ -148,6 +148,22 @@
 
 <!-- Currently implementing -->
 
+### error-handling-framework
+- **Title**: API error handling framework
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Branch**: error-handling-framework
+- **Spec**: specs/error-handling-framework/spec.md
+- **Updated**: 2025-01-08
+- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
+- **Requirements**:
+  - Retry logic for API failures (§Risk_Management)
+  - Rate limit detection and exponential backoff
+  - Network error recovery
+  - Graceful shutdown on critical errors
+  - [PIGGYBACK: bot.py has basic error handling]
+
 ## Next
 
 <!-- Top 5-10 prioritized features (sorted by score) -->
@@ -160,19 +176,6 @@
 
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
-
-### error-handling-framework
-- **Title**: API error handling framework
-- **Area**: infra
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Retry logic for API failures (§Risk_Management)
-  - Rate limit detection and exponential backoff
-  - Network error recovery
-  - Graceful shutdown on critical errors
-  - [PIGGYBACK: bot.py has basic error handling]
 
 ### market-data-module
 - **Title**: Market data and trading hours
