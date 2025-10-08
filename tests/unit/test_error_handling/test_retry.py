@@ -265,8 +265,8 @@ def test_retry_overhead_less_than_100ms():
     """@with_retry overhead should be <100ms per attempt."""
     from trading_bot.error_handling import with_retry, RetryPolicy
 
-    # Given: A policy with no delay and no retries
-    policy = RetryPolicy(max_attempts=1, base_delay=0.0, jitter=False)
+    # Given: A policy with minimal delay and no retries
+    policy = RetryPolicy(max_attempts=1, base_delay=0.001, jitter=False)
 
     @with_retry(policy=policy)
     def fast_function():
