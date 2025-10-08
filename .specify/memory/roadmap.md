@@ -46,21 +46,23 @@
   - validate_startup.py pre-deploy validation script
   - Blocks startup if validation fails (§Pre_Deploy)
 
-## In Progress
-
-<!-- Currently implementing -->
-
 ### mode-switcher
 - **Title**: Paper/live trading mode switcher
 - **Area**: infra
 - **Role**: all
 - **Intra**: Yes
-- **Requirements**:
-  - Toggle between paper trading (simulation) and live trading (§Safety_First)
-  - Full simulator functionality with real-time data
-  - Performance analytics identical to live mode
-  - Separate config for each mode
-  - Visual indicator of current mode (CLI banner)
+- **Date**: 2025-10-07
+- **Commit**: fb93eea
+- **Delivered**:
+  - ModeSwitcher class for mode management
+  - Phase-based safety controls (blocks live in experience phase)
+  - Visual mode banners (paper vs live)
+  - Mode indicators ([PAPER] vs [⚠️  LIVE ⚠️])
+  - 20 unit tests covering all scenarios
+
+## In Progress
+
+<!-- Currently implementing -->
 
 ## Next
 
