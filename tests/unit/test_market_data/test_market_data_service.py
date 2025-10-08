@@ -131,3 +131,26 @@ class TestGetQuote:
 
         # Verify robin_stocks called correctly
         mock_get_latest_price.assert_called_once_with("AAPL", includeExtendedHours=True)
+
+    @patch('robin_stocks.robinhood.get_latest_price')
+    def test_get_quote_validates_price(self, mock_get_latest_price):
+        """
+        T032 [RED]: Test get_quote validates price using validate_quote.
+
+        GIVEN: MarketDataService initialized
+        WHEN: get_quote called with symbol that returns invalid price "0.0"
+        THEN: Raises DataValidationError from validate_quote
+        """
+        from src.trading_bot.market_data.exceptions import DataValidationError
+
+        # Mock robin_stocks.robinhood.get_latest_price to return ["0.0"] (invalid)
+        mock_get_latest_price.return_value = ["0.0"]
+
+        # Given: MarketDataService initialized with mock auth
+        from src.trading_bot.market_data.market_data_service import MarketDataService
+        mock_auth = Mock()
+        service = MarketDataService(auth=mock_auth)
+
+        # When/Then: get_quote called with symbol, raises DataValidationError
+        with pytest.raises(DataValidationError, match="Price must be > 0"):
+            service.get_quote("INVALID")
