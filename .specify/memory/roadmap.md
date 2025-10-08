@@ -60,20 +60,24 @@
   - Mode indicators ([PAPER] vs [⚠️  LIVE ⚠️])
   - 20 unit tests covering all scenarios
 
-## In Progress
-
-<!-- Currently implementing -->
-
 ### logging-system
 - **Title**: Structured logging system
 - **Area**: infra
 - **Role**: all
 - **Intra**: Yes
-- **Requirements**:
-  - Structured logging to file and console
-  - Separate logs for trades/errors/info (§Audit_Everything)
-  - Timestamp all events in UTC (§Data_Integrity)
-  - Log rotation for old logs
+- **Date**: 2025-10-07
+- **Commit**: 5ba3ca6
+- **Delivered**:
+  - TradingLogger class with structured logging
+  - Separate log files: trading_bot.log, trades.log, errors.log (§Audit_Everything)
+  - UTC timestamps on all logs (§Data_Integrity)
+  - Automatic log rotation (10MB max, 5 backups)
+  - Convenience functions: log_trade(), log_error()
+  - 25 unit tests covering all scenarios
+
+## In Progress
+
+<!-- Currently implementing -->
 
 ## Next
 
