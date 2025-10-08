@@ -179,7 +179,55 @@ Market data and trading hours module for Robinhood stock trading bot. Provides r
 ✅ T003 [P]: Create API contract specification
   - Evidence: specs/market-data-module/contracts/api.yaml already exists with Quote, MarketStatus, MarketDataConfig schemas
   - Verified: OpenAPI 3.0.0 spec with all required schemas
-  - Committed: Pending batch commit
+  - Committed: 6439da2
+
+### Phase 3.1: Data Models and Exceptions
+
+✅ T004 [RED]: Write failing test - Quote dataclass immutability
+  - Evidence: test_quote_is_immutable() fails (ModuleNotFoundError)
+  - File: tests/unit/test_market_data/test_data_models.py
+  - Committed: Pending
+
+✅ T005 [GREEN→T004]: Create Quote dataclass
+  - Evidence: Tests pass (3/3), Quote is frozen=True, uses Decimal for price
+  - File: src/trading_bot/market_data/data_models.py
+  - Committed: Pending
+
+✅ T006 [RED]: Write failing test - MarketStatus immutability
+  - Evidence: test included in T004 batch
+  - Committed: Pending
+
+✅ T007 [GREEN→T006]: Create MarketStatus dataclass
+  - Evidence: Tests pass, MarketStatus is frozen=True
+  - Committed: Pending
+
+✅ T008 [RED]: Write failing test - MarketDataConfig defaults
+  - Evidence: test included in T004 batch
+  - Committed: Pending
+
+✅ T009 [GREEN→T008]: Create MarketDataConfig dataclass
+  - Evidence: Tests pass, all defaults correct (retries=3, start=7, end=10, etc.)
+  - Committed: Pending
+
+✅ T010 [RED]: Write failing test - DataValidationError is NonRetriableError
+  - Evidence: test_data_validation_error_inheritance() fails
+  - File: tests/unit/test_market_data/test_exceptions.py
+  - Committed: Pending
+
+✅ T011 [GREEN→T010]: Create DataValidationError exception
+  - Evidence: Tests pass (2/2), inherits NonRetriableError
+  - File: src/trading_bot/market_data/exceptions.py
+  - REUSE: NonRetriableError from error_handling.exceptions
+  - Committed: Pending
+
+✅ T012 [RED]: Write failing test - TradingHoursError is NonRetriableError
+  - Evidence: test included in T010 batch
+  - Committed: Pending
+
+✅ T013 [GREEN→T012]: Create TradingHoursError exception
+  - Evidence: Tests pass, inherits NonRetriableError
+  - REUSE: NonRetriableError base class
+  - Committed: Pending
 
 ## Last Updated
-2025-10-08T14:51:00
+2025-10-08T15:00:00
