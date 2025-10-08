@@ -320,6 +320,107 @@ The bot uses a 4-phase progression system to safely transition from paper tradin
 
 ---
 
+## 📝 Logging System
+
+**Structured Logging (Constitution §Audit_Everything)**:
+
+The bot uses a comprehensive logging system with separate logs for different purposes:
+
+### Log Files
+
+All logs are stored in the `logs/` directory with automatic rotation:
+
+1. **`logs/trading_bot.log`** - General application logs
+   - Startup/shutdown events
+   - Configuration loading
+   - System status updates
+   - Debug information
+
+2. **`logs/trades.log`** - Trade execution audit trail (§Audit_Everything)
+   - All buy/sell orders
+   - Entry/exit prices
+   - Position sizes
+   - Strategy signals
+   - Profit/loss calculations
+
+3. **`logs/errors.log`** - Error and exception tracking
+   - API errors
+   - Validation failures
+   - Exception tracebacks
+   - Critical issues
+
+### Features
+
+- ✅ **UTC Timestamps** (§Data_Integrity) - All logs use ISO 8601 UTC format
+- ✅ **Log Rotation** - Automatic rotation at 10MB, keeps 5 backup files
+- ✅ **Structured Format** - Consistent formatting with timestamp, level, module, message
+- ✅ **Console + File** - Logs written to both console and files
+- ✅ **Audit Trail** - Complete trade history for compliance and analysis
+
+### Usage
+
+```python
+from src.trading_bot.logger import setup_logging, get_logger, log_trade, log_error
+
+# Initialize logging (call once at startup)
+setup_logging()
+
+# Get a logger for your module
+logger = get_logger(__name__)
+
+# Log general messages
+logger.info("Bot started successfully")
+logger.warning("Market volatility detected")
+logger.error("API connection failed")
+
+# Log trade executions (§Audit_Everything)
+log_trade(
+    action="BUY",
+    symbol="AAPL",
+    quantity=100,
+    price=150.50,
+    mode="PAPER",
+    strategy="Bull Flag",
+    stop_loss=148.00,
+    target=155.50
+)
+
+# Log errors with context
+try:
+    # ... some operation ...
+except Exception as e:
+    log_error(e, "During order placement")
+```
+
+### Log Format
+
+```
+2025-10-07 14:23:45 UTC | INFO     | trading_bot.bot | Bot initialized
+2025-10-07 14:23:46 UTC | INFO     | trading_bot.trades | BUY 100 AAPL @ 150.50 [PAPER]
+2025-10-07 14:23:47 UTC | ERROR    | trading_bot.errors | API timeout during order submission
+```
+
+### Testing Logging
+
+```bash
+# Test logging system
+python test_logging.py
+
+# View logs
+tail -f logs/trading_bot.log    # General logs
+tail -f logs/trades.log          # Trade executions
+tail -f logs/errors.log          # Errors only
+```
+
+### Log Rotation
+
+- **Max Size**: 10MB per file
+- **Backups**: 5 backup files kept (e.g., `trading_bot.log.1`, `trading_bot.log.2`)
+- **Automatic**: Old logs automatically rotated when size limit reached
+- **No Manual Cleanup**: System manages log files automatically
+
+---
+
 ## 🔒 Security
 
 **Constitution §Security Requirements**:
@@ -450,6 +551,17 @@ python validate_startup.py
 
 # Test configuration loading
 python test_config.py
+```
+
+### Logging
+```bash
+# Test logging system
+python test_logging.py
+
+# View logs in real-time
+tail -f logs/trading_bot.log
+tail -f logs/trades.log
+tail -f logs/errors.log
 ```
 
 ### Trading

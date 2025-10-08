@@ -64,6 +64,17 @@
 
 <!-- Currently implementing -->
 
+### logging-system
+- **Title**: Structured logging system
+- **Area**: infra
+- **Role**: all
+- **Intra**: Yes
+- **Requirements**:
+  - Structured logging to file and console
+  - Separate logs for trades/errors/info (§Audit_Everything)
+  - Timestamp all events in UTC (§Data_Integrity)
+  - Log rotation for old logs
+
 ## Next
 
 <!-- Top 5-10 prioritized features (sorted by score) -->
@@ -76,19 +87,6 @@
 
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
-
-### logging-system
-- **Title**: Structured logging system
-- **Area**: infra
-- **Role**: all
-- **Intra**: Yes
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 1.0 | **Score**: 2.50
-- **Requirements**:
-  - Structured logging to file and console
-  - Separate logs for trades/errors/info (§Audit_Everything)
-  - Timestamp all events in UTC (§Data_Integrity)
-  - Log rotation for old logs
-  - [PIGGYBACK: bot.py already has logging imports]
 
 ### safety-checks
 - **Title**: Pre-trade safety checks & risk management
