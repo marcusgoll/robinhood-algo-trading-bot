@@ -1,0 +1,144 @@
+{
+  "_comment": "Trading Bot Configuration - Constitution v1.0.0",
+  "_instructions": "Copy this file to config.json and customize your trading parameters",
+
+  "trading": {
+    "mode": "paper",
+    "comment_mode": "paper = simulation, live = real money (ONLY after thorough testing!)",
+
+    "hours": {
+      "start_time": "07:00",
+      "end_time": "10:00",
+      "timezone": "America/New_York",
+      "comment": "Trading window: 7am-10am EST (peak volatility period)"
+    }
+  },
+
+  "risk_management": {
+    "max_position_pct": 5.0,
+    "comment_max_position": "Maximum % of portfolio per position (Constitution §Risk_Management)",
+
+    "max_daily_loss_pct": 3.0,
+    "comment_max_daily_loss": "Circuit breaker: Max daily loss % (Constitution §Safety_First)",
+
+    "max_consecutive_losses": 3,
+    "comment_max_consecutive": "Circuit breaker: Stop trading after N consecutive losses",
+
+    "position_size_shares": 100,
+    "comment_position_size": "Starting position size in shares (proof phase)",
+
+    "stop_loss_pct": 2.0,
+    "comment_stop_loss": "Default stop loss percentage below entry",
+
+    "risk_reward_ratio": 2.0,
+    "comment_risk_reward": "Target profit = stop loss distance × this ratio"
+  },
+
+  "phase_progression": {
+    "current_phase": "experience",
+    "comment_phases": "experience → proof → trial → scaling",
+
+    "experience": {
+      "mode": "paper",
+      "max_trades_per_day": 999,
+      "comment": "Unlimited paper trading to learn"
+    },
+
+    "proof": {
+      "mode": "paper",
+      "max_trades_per_day": 1,
+      "min_sessions_required": 10,
+      "min_win_rate_pct": 55.0,
+      "comment": "Prove consistency with 1 trade/day"
+    },
+
+    "trial": {
+      "mode": "live",
+      "max_trades_per_day": 1,
+      "position_size_shares": 25,
+      "min_sessions_required": 20,
+      "comment": "Real money trial with small size"
+    },
+
+    "scaling": {
+      "mode": "live",
+      "max_trades_per_day": 3,
+      "position_size_shares": 100,
+      "scale_increment_shares": 25,
+      "comment": "Gradually increase size based on consistency"
+    }
+  },
+
+  "strategy": {
+    "name": "bull_flag_breakout",
+    "comment_strategy": "Bull flag micro pullback with breakout entry",
+
+    "entry": {
+      "min_pullback_candles": 1,
+      "max_pullback_candles": 3,
+      "max_retracement_pct": 33.3,
+      "require_volume_confirmation": true,
+      "vwap_filter": "above",
+      "comment": "Only enter when price above VWAP"
+    },
+
+    "exit": {
+      "use_trailing_stop": false,
+      "profit_target_multiple": 2.0,
+      "time_stop_minutes": 240,
+      "comment_time_stop": "Exit after 4 hours regardless of P&L"
+    }
+  },
+
+  "screening": {
+    "price_range": {
+      "min": 2.0,
+      "max": 20.0,
+      "comment": "Stock price filter range"
+    },
+
+    "volume": {
+      "min_relative_volume": 5.0,
+      "comment": "Minimum relative volume (5x average)"
+    },
+
+    "float": {
+      "max_float_shares_millions": 20.0,
+      "comment": "Maximum float size in millions of shares"
+    },
+
+    "performance": {
+      "min_daily_move_pct": 10.0,
+      "comment": "Minimum daily performance for consideration"
+    }
+  },
+
+  "indicators": {
+    "vwap": {
+      "enabled": true
+    },
+
+    "ema": {
+      "fast_period": 9,
+      "slow_period": 20
+    },
+
+    "macd": {
+      "fast_period": 12,
+      "slow_period": 26,
+      "signal_period": 9
+    }
+  },
+
+  "logging": {
+    "level": "INFO",
+    "comment_level": "DEBUG, INFO, WARNING, ERROR, CRITICAL",
+
+    "log_trades_to_csv": true,
+    "csv_path": "logs/trades.csv",
+
+    "rotate_logs": true,
+    "max_log_size_mb": 10,
+    "backup_count": 5
+  }
+}

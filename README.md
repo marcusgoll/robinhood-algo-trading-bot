@@ -45,13 +45,32 @@ This project follows strict development principles defined in [`.specify/memory/
    pip install -r requirements.txt
    ```
 
-4. **Configure environment**:
+4. **Configure credentials** (.env file):
    ```bash
    cp .env.example .env
-   # Edit .env with your Robinhood credentials
+   # Edit .env with your Robinhood credentials:
+   #   - ROBINHOOD_USERNAME (required)
+   #   - ROBINHOOD_PASSWORD (required)
+   #   - ROBINHOOD_MFA_SECRET (optional, for pyotp MFA)
+   #   - ROBINHOOD_DEVICE_TOKEN (optional, for faster auth)
    ```
 
-5. **Verify installation**:
+5. **Configure trading parameters** (config.json file):
+   ```bash
+   cp config.example.json config.json
+   # Edit config.json to customize:
+   #   - Trading hours (default: 7am-10am EST)
+   #   - Position sizes
+   #   - Risk limits
+   #   - Phase progression settings
+   ```
+
+6. **Test configuration**:
+   ```bash
+   python test_config.py  # Verify config loads correctly
+   ```
+
+7. **Verify installation**:
    ```bash
    pytest  # Run tests
    mypy src/  # Type checking
@@ -91,13 +110,46 @@ Stocks/
 
 ---
 
+## ⚙️ Configuration System
+
+**Dual Configuration (Constitution v1.0.0)**:
+
+### 1. Credentials (.env file)
+- **Purpose**: Sensitive authentication data (§Security)
+- **Location**: `.env` (gitignored, never commit!)
+- **Required**:
+  - `ROBINHOOD_USERNAME`
+  - `ROBINHOOD_PASSWORD`
+- **Optional**:
+  - `ROBINHOOD_MFA_SECRET` - For pyotp MFA automation
+  - `ROBINHOOD_DEVICE_TOKEN` - For faster authentication
+
+### 2. Trading Parameters (config.json)
+- **Purpose**: Trading strategy and risk settings
+- **Location**: `config.json` (gitignored, user-specific)
+- **Template**: `config.example.json` (committed, safe to share)
+- **Contains**:
+  - Trading hours (7am-10am EST default)
+  - Position sizes, stop losses, risk limits
+  - Phase progression settings
+  - Strategy parameters (bull flag, VWAP, EMA, MACD)
+  - Screening filters
+
+### Why Two Files?
+- **.env**: Secrets that **never** change (credentials)
+- **config.json**: Parameters you **frequently adjust** (position size, hours, phase)
+- Keeps sensitive data separate from trading strategy
+
+---
+
 ## 🔒 Security
 
 **Constitution §Security Requirements**:
 
 1. **Never commit credentials**:
    - All secrets in `.env` (gitignored)
-   - Use `.env.example` as template
+   - User configs in `config.json` (gitignored)
+   - Use `.env.example` and `config.example.json` as templates
 
 2. **API Key Safety**:
    - Store in environment variables
@@ -106,6 +158,7 @@ Stocks/
 
 3. **Robinhood Best Practices**:
    - Enable 2FA on account
+   - Use MFA secret with pyotp for automation
    - Use device token when possible
    - Respect API rate limits
 

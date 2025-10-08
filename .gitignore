@@ -13,6 +13,12 @@ credentials.json
 secrets.json
 
 # ============================================
+# CONFIGURATION - User-specific settings
+# ============================================
+config.json
+!config.example.json
+
+# ============================================
 # Python
 # ============================================
 # Byte-compiled / optimized / DLL files

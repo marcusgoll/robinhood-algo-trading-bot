@@ -24,6 +24,7 @@
 - **Title**: Feature name
 - **Area**: marketing|app|api|infra|design
 - **Role**: free|student|cfi|school|all
+- **Intra**: Yes|No
 - **Phase**: 0-12 (optional)
 - **Impact**: 1-5 | **Effort**: 1-5 | **Confidence**: 0-1 | **Score**: X.XX
 - **Requirements**:
@@ -50,6 +51,7 @@
 - **Title**: Feature name
 - **Area**: marketing|app|api
 - **Role**: student|cfi|school|all
+- **Intra**: Yes|No
 - **Impact**: 1-5 | **Effort**: 1-5 | **Confidence**: 0-1 | **Score**: X.XX
 - **Requirements**: [CLARIFY: questions] or brief bullets
 -->
