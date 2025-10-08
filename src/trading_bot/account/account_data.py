@@ -12,10 +12,13 @@ Constitution v1.0.0:
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 import logging
+import time
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar('T')
 
 
 @dataclass
@@ -187,9 +190,9 @@ class AccountData:
 
     def _fetch_buying_power(self) -> float:
         """
-        Fetch buying power from robin-stocks API.
+        Fetch buying power from robin-stocks API with retry.
 
-        T022: API integration for buying power.
+        T022/T036: API integration for buying power with exponential backoff.
 
         Returns:
             Buying power as float
@@ -197,15 +200,240 @@ class AccountData:
         Raises:
             AccountDataError: If API response is invalid
         """
-        import robin_stocks.robinhood as rh
+        def _fetch() -> float:
+            import robin_stocks.robinhood as rh
 
-        profile = rh.account.load_account_profile()
+            profile = rh.account.load_account_profile()
 
-        # Validate response
-        if not profile or 'buying_power' not in profile:
-            raise AccountDataError("Invalid API response: missing buying_power")
+            # Validate response
+            if not profile or 'buying_power' not in profile:
+                raise AccountDataError("Invalid API response: missing buying_power")
 
-        try:
-            return float(profile['buying_power'])
-        except (ValueError, TypeError) as e:
-            raise AccountDataError(f"Invalid buying_power value: {e}")
+            try:
+                return float(profile['buying_power'])
+            except (ValueError, TypeError) as e:
+                raise AccountDataError(f"Invalid buying_power value: {e}")
+
+        # Apply retry with exponential backoff (1s, 2s, 4s)
+        return self._retry_with_backoff(_fetch, max_attempts=3, base_delay=1.0)
+
+    def get_positions(self, use_cache: bool = True) -> List[Position]:
+        """
+        Fetch all positions with P&L calculations.
+
+        T033: Public API for positions with cache support.
+
+        Args:
+            use_cache: If True, use cached value if valid. If False, always fetch fresh.
+
+        Returns:
+            List of Position objects with P&L
+        """
+        cache_key = 'positions'
+
+        if use_cache and self._is_cache_valid(cache_key):
+            return self._cache[cache_key].value
+
+        logger.info(f"Fetching {cache_key} from API")
+        positions = self._fetch_positions()
+
+        # Update cache (60s TTL for volatile data)
+        self._update_cache(cache_key, positions, ttl_seconds=60)
+
+        return positions
+
+    def _fetch_positions(self) -> List[Position]:
+        """
+        Fetch positions from robin-stocks API with retry.
+
+        T033/T036: API integration for positions with exponential backoff.
+
+        Returns:
+            List of Position objects
+
+        Raises:
+            AccountDataError: If API response is invalid
+        """
+        def _fetch() -> List[Position]:
+            import robin_stocks.robinhood as rh
+
+            holdings = rh.account.build_holdings()
+
+            positions = []
+            for symbol, data in holdings.items():
+                try:
+                    position = Position(
+                        symbol=symbol,
+                        quantity=int(float(data['quantity'])),
+                        average_buy_price=Decimal(data['average_buy_price']),
+                        current_price=Decimal(data['price']),
+                        last_updated=datetime.utcnow()
+                    )
+                    positions.append(position)
+                except (ValueError, KeyError, TypeError) as e:
+                    logger.warning(f"Skipping invalid position {symbol}: {e}")
+                    continue
+
+            return positions
+
+        return self._retry_with_backoff(_fetch, max_attempts=3, base_delay=1.0)
+
+    def get_account_balance(self, use_cache: bool = True) -> AccountBalance:
+        """
+        Fetch account balance breakdown.
+
+        T034: Public API for account balance with cache support.
+
+        Args:
+            use_cache: If True, use cached value if valid. If False, always fetch fresh.
+
+        Returns:
+            AccountBalance object
+        """
+        cache_key = 'account_balance'
+
+        if use_cache and self._is_cache_valid(cache_key):
+            return self._cache[cache_key].value
+
+        logger.info(f"Fetching {cache_key} from API")
+        balance = self._fetch_account_balance()
+
+        # Update cache (60s TTL for volatile data)
+        self._update_cache(cache_key, balance, ttl_seconds=60)
+
+        return balance
+
+    def _fetch_account_balance(self) -> AccountBalance:
+        """
+        Fetch account balance from robin-stocks API with retry.
+
+        T034/T036: API integration for balance with exponential backoff.
+
+        Returns:
+            AccountBalance object
+
+        Raises:
+            AccountDataError: If API response is invalid
+        """
+        def _fetch() -> AccountBalance:
+            import robin_stocks.robinhood as rh
+
+            profile = rh.account.load_account_profile()
+
+            # Validate response
+            if not profile:
+                raise AccountDataError("Invalid API response: empty profile")
+
+            required_fields = ['cash', 'equity', 'buying_power']
+            for field in required_fields:
+                if field not in profile:
+                    raise AccountDataError(f"Invalid API response: missing {field}")
+
+            try:
+                return AccountBalance(
+                    cash=Decimal(profile['cash']),
+                    equity=Decimal(profile['equity']),
+                    buying_power=Decimal(profile['buying_power']),
+                    last_updated=datetime.utcnow()
+                )
+            except (ValueError, TypeError) as e:
+                raise AccountDataError(f"Invalid balance values: {e}")
+
+        return self._retry_with_backoff(_fetch, max_attempts=3, base_delay=1.0)
+
+    def get_day_trade_count(self, use_cache: bool = True) -> int:
+        """
+        Fetch day trade count (PDT tracking).
+
+        T035: Public API for day trade count with cache support.
+
+        Args:
+            use_cache: If True, use cached value if valid. If False, always fetch fresh.
+
+        Returns:
+            Day trade count as int (0-3)
+        """
+        cache_key = 'day_trade_count'
+
+        if use_cache and self._is_cache_valid(cache_key):
+            return self._cache[cache_key].value
+
+        logger.info(f"Fetching {cache_key} from API")
+        count = self._fetch_day_trade_count()
+
+        # Update cache (300s TTL = 5 minutes - stable data)
+        self._update_cache(cache_key, count, ttl_seconds=300)
+
+        return count
+
+    def _fetch_day_trade_count(self) -> int:
+        """
+        Fetch day trade count from robin-stocks API with retry.
+
+        T035/T036: API integration for day trade count with exponential backoff.
+
+        Returns:
+            Day trade count as int
+
+        Raises:
+            AccountDataError: If API response is invalid
+        """
+        def _fetch() -> int:
+            import robin_stocks.robinhood as rh
+
+            profile = rh.account.load_account_profile()
+
+            # Validate response
+            if not profile or 'day_trade_count' not in profile:
+                raise AccountDataError("Invalid API response: missing day_trade_count")
+
+            try:
+                return int(profile['day_trade_count'])
+            except (ValueError, TypeError) as e:
+                raise AccountDataError(f"Invalid day_trade_count value: {e}")
+
+        return self._retry_with_backoff(_fetch, max_attempts=3, base_delay=1.0)
+
+    def _retry_with_backoff(
+        self,
+        func: Callable[[], T],
+        max_attempts: int = 3,
+        base_delay: float = 1.0
+    ) -> T:
+        """
+        Retry a function with exponential backoff.
+
+        T036: Reusable retry logic for network resilience.
+
+        Args:
+            func: Function to retry (takes no args, returns T)
+            max_attempts: Maximum number of attempts (default: 3)
+            base_delay: Base delay in seconds (default: 1.0)
+
+        Returns:
+            Result from successful function call
+
+        Raises:
+            Last exception if all attempts fail
+
+        Pattern: 1s, 2s, 4s delays between retries
+        """
+        last_exception = None
+
+        for attempt in range(max_attempts):
+            try:
+                return func()
+            except Exception as e:
+                last_exception = e
+                if attempt < max_attempts - 1:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(
+                        f"Attempt {attempt + 1}/{max_attempts} failed: {e}. "
+                        f"Retrying in {delay}s..."
+                    )
+                    time.sleep(delay)
+                else:
+                    logger.error(f"All {max_attempts} attempts failed")
+
+        # Re-raise the last exception
+        raise last_exception  # type: ignore

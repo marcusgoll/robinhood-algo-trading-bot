@@ -284,7 +284,200 @@ class TestCacheLogic:
 
 class TestAPIFetching:
     """Test suite for robin-stocks API integration."""
-    pass
+
+    def test_fetch_positions_returns_list(self):
+        """
+        T026: Test get_positions returns list of Position objects.
+
+        GIVEN: API returns holdings
+        WHEN: get_positions called
+        THEN: Returns list with Position objects with P&L
+        """
+        from src.trading_bot.account.account_data import AccountData, Position
+
+        with patch('robin_stocks.robinhood.account.build_holdings') as mock_api:
+            mock_api.return_value = {
+                'AAPL': {
+                    'quantity': '10',
+                    'average_buy_price': '150.25',
+                    'price': '155.00',
+                    'equity': '1550.00'
+                }
+            }
+            mock_auth = Mock()
+
+            account = AccountData(auth=mock_auth)
+
+            # WHEN: get_positions called
+            positions = account.get_positions()
+
+            # THEN: Returns list with Position object
+            assert len(positions) == 1
+            assert isinstance(positions[0], Position)
+            assert positions[0].symbol == 'AAPL'
+            assert positions[0].quantity == 10
+            assert positions[0].profit_loss == Decimal("47.50")  # (155-150.25) * 10
+
+    def test_empty_positions_returns_empty_list(self):
+        """
+        T027: Test empty positions returns empty list.
+
+        GIVEN: API returns no holdings
+        WHEN: get_positions called
+        THEN: Returns empty list
+        """
+        from src.trading_bot.account.account_data import AccountData
+
+        with patch('robin_stocks.robinhood.account.build_holdings') as mock_api:
+            mock_api.return_value = {}
+            mock_auth = Mock()
+
+            account = AccountData(auth=mock_auth)
+
+            # WHEN: get_positions called
+            positions = account.get_positions()
+
+            # THEN: Returns empty list
+            assert positions == []
+            assert len(positions) == 0
+
+    def test_fetch_account_balance_from_api(self):
+        """
+        T028: Test get_account_balance returns AccountBalance object.
+
+        GIVEN: API returns account profile
+        WHEN: get_account_balance called
+        THEN: Returns AccountBalance with cash, equity, buying_power
+        """
+        from src.trading_bot.account.account_data import AccountData, AccountBalance
+
+        with patch('robin_stocks.robinhood.account.load_account_profile') as mock_api:
+            mock_api.return_value = {
+                'cash': '5000.00',
+                'equity': '12500.75',
+                'buying_power': '10000.50'
+            }
+            mock_auth = Mock()
+
+            account = AccountData(auth=mock_auth)
+
+            # WHEN: get_account_balance called
+            balance = account.get_account_balance()
+
+            # THEN: Returns AccountBalance object
+            assert isinstance(balance, AccountBalance)
+            assert balance.cash == Decimal("5000.00")
+            assert balance.equity == Decimal("12500.75")
+            assert balance.buying_power == Decimal("10000.50")
+
+    def test_fetch_day_trade_count_from_api(self):
+        """
+        T029: Test get_day_trade_count returns int (0-3).
+
+        GIVEN: API returns day_trade_count
+        WHEN: get_day_trade_count called
+        THEN: Returns int value
+        """
+        from src.trading_bot.account.account_data import AccountData
+
+        with patch('robin_stocks.robinhood.account.load_account_profile') as mock_api:
+            mock_api.return_value = {
+                'day_trade_count': '2',
+                'buying_power': '10000.00'
+            }
+            mock_auth = Mock()
+
+            account = AccountData(auth=mock_auth)
+
+            # WHEN: get_day_trade_count called
+            count = account.get_day_trade_count()
+
+            # THEN: Returns int
+            assert count == 2
+            assert isinstance(count, int)
+
+    def test_network_error_retries_with_backoff(self):
+        """
+        T030: Test network error triggers exponential backoff retry.
+
+        GIVEN: 2 network errors, then success
+        WHEN: get_buying_power called
+        THEN: Retried 3 times with backoff delays
+        """
+        from src.trading_bot.account.account_data import AccountData
+
+        with patch('robin_stocks.robinhood.account.load_account_profile') as mock_api:
+            with patch('time.sleep') as mock_sleep:
+                # GIVEN: 2 network errors, then success
+                mock_api.side_effect = [
+                    Exception("Network timeout"),
+                    Exception("Network timeout"),
+                    {'buying_power': '10000.50'}
+                ]
+                mock_auth = Mock()
+
+                account = AccountData(auth=mock_auth)
+
+                # WHEN: get_buying_power called (disable cache to force API call)
+                result = account.get_buying_power(use_cache=False)
+
+                # THEN: Retried 3 times, succeeded
+                assert result == 10000.50
+                assert mock_api.call_count == 3
+                assert mock_sleep.call_count == 2  # Slept after 1st and 2nd attempt
+                mock_sleep.assert_any_call(1.0)  # 1s after 1st failure
+                mock_sleep.assert_any_call(2.0)  # 2s after 2nd failure
+
+    def test_rate_limit_429_triggers_backoff(self):
+        """
+        T031: Test rate limit (429) triggers backoff.
+
+        GIVEN: Rate limit error, then success
+        WHEN: API call made
+        THEN: Backoff applied and retry succeeds
+        """
+        from src.trading_bot.account.account_data import AccountData
+
+        with patch('robin_stocks.robinhood.account.load_account_profile') as mock_api:
+            with patch('time.sleep') as mock_sleep:
+                # GIVEN: Rate limit, then success
+                rate_limit_error = Exception("429 Too Many Requests")
+                mock_api.side_effect = [
+                    rate_limit_error,
+                    {'buying_power': '10000.50'}
+                ]
+                mock_auth = Mock()
+
+                account = AccountData(auth=mock_auth)
+
+                # WHEN: get_buying_power called
+                result = account.get_buying_power(use_cache=False)
+
+                # THEN: Retry succeeded
+                assert result == 10000.50
+                assert mock_api.call_count == 2
+                assert mock_sleep.call_count == 1
+
+    def test_invalid_api_response_raises_error(self):
+        """
+        T032: Test invalid API response raises AccountDataError.
+
+        GIVEN: Malformed API response
+        WHEN: Fetch method called
+        THEN: AccountDataError raised with clear message
+        """
+        from src.trading_bot.account.account_data import AccountData, AccountDataError
+
+        with patch('robin_stocks.robinhood.account.load_account_profile') as mock_api:
+            # GIVEN: Missing buying_power field
+            mock_api.return_value = {'cash': '5000.00'}  # No buying_power
+            mock_auth = Mock()
+
+            account = AccountData(auth=mock_auth)
+
+            # WHEN/THEN: AccountDataError raised
+            with pytest.raises(AccountDataError, match="missing buying_power"):
+                account.get_buying_power(use_cache=False)
 
 
 class TestPLCalculations:
