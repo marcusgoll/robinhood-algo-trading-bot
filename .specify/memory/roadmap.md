@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-08 (authentication-module spec)
+**Last updated**: 2025-01-08 (authentication-module shipped)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -98,24 +98,32 @@
   - 85.86% code coverage
   - Full Constitution v1.0.0 compliance
 
-## In Progress
-
-<!-- Currently implementing -->
-
 ### authentication-module
 - **Title**: Robinhood authentication with MFA
 - **Area**: api
 - **Role**: all
 - **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Status**: Specification complete (2025-10-08)
-- **Requirements**:
-  - Login with MFA support using pyotp
-  - Session pickle file storage
-  - Auto-refresh token
-  - Logout handler
-  - Authentication error recovery
-  - [UNBLOCKED: environment-config shipped]
+- **Date**: 2025-01-08
+- **Release**: v1.0.0 - Full authentication with MFA, session management, token refresh
+- **Spec**: specs/authentication-module/
+- **Delivered**:
+  - RobinhoodAuth service with login/logout/refresh
+  - MFA support via pyotp TOTP
+  - Device token support (skip MFA)
+  - Session persistence (.robinhood.pickle with 600 permissions)
+  - Token refresh on 401 errors
+  - Exponential backoff retry logic (1s, 2s, 4s)
+  - Corrupt pickle fallback to re-authentication
+  - Credential masking in logs (§Security compliance)
+  - Bot integration (start/stop with auth)
+  - 16 unit tests + 3 integration tests (100% pass rate)
+  - Security audit passed (no HIGH/CRITICAL issues)
+  - Full Constitution v1.0.0 compliance
+  - Documentation: spec, plan, tasks, security-audit, deployment guide
+
+## In Progress
+
+<!-- Currently implementing -->
 
 ## Next
 
@@ -141,7 +149,7 @@
   - Get all positions with current P&L
   - Retrieve account balance
   - Check day trade count (§Risk_Management)
-  - [BLOCKED: authentication-module]
+  - [UNBLOCKED: authentication-module shipped]
 
 ### error-handling-framework
 - **Title**: API error handling framework
@@ -167,7 +175,7 @@
   - Fetch historical price data (for backtesting)
   - Check if market is open
   - Enforce 7am-10am EST trading window (block trades outside peak volatility)
-  - [BLOCKED: authentication-module]
+  - [UNBLOCKED: authentication-module shipped]
   - [MERGED: trading-hours-restriction]
 
 ### startup-sequence
@@ -241,7 +249,7 @@
   - Verify authentication status
   - Log session duration
   - Auto-reauth if token expires
-  - [BLOCKED: authentication-module]
+  - [UNBLOCKED: authentication-module shipped]
 
 ### order-management
 - **Title**: Order management foundation
@@ -254,7 +262,7 @@
   - Place limit sell orders with offset
   - Cancel all open orders function
   - Get order status and fill info
-  - [BLOCKED: authentication-module, safety-checks]
+  - [UNBLOCKED: authentication-module shipped, safety-checks shipped]
 
 ### performance-tracking
 - **Title**: Performance tracking and analytics
