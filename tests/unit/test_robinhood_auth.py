@@ -527,3 +527,57 @@ class TestSecurity:
         assert "DEVICE123ABC" not in all_logs
         # Should see masked version instead
         assert "****" in all_logs or "user****" in all_logs
+
+
+class TestNetworkResilience:
+    """Test suite for network error handling and retry logic."""
+
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    @patch('src.trading_bot.auth.robinhood_auth.time.sleep')  # Mock sleep to speed up test
+    def test_network_error_retries_with_backoff(self, mock_sleep, mock_path, mock_robin_stocks):
+        """
+        Test network error during login - retry with exponential backoff (T041).
+
+        GIVEN: robin_stocks.login() fails with network error on first 2 attempts
+        WHEN: RobinhoodAuth.login() called
+        THEN: Retries 3 times with exponential backoff (1s, 2s)
+              Succeeds on 3rd attempt
+              Logged retry attempts
+        """
+        # Given: No pickle file
+        mock_path.return_value.exists.return_value = False
+
+        # And: robin_stocks.login() fails twice then succeeds
+        mock_session = MagicMock()
+        mock_robin_stocks.login.side_effect = [
+            Exception("Network error: Connection timeout"),
+            Exception("Network error: Connection timeout"),
+            mock_session,  # Success on 3rd attempt
+        ]
+
+        # And: Config
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = None
+        config.robinhood_device_token = None
+
+        # When: RobinhoodAuth logs in
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth
+        auth = RobinhoodAuth(config)
+        result = auth.login()
+
+        # Then: Login eventually succeeded after retries
+        assert result is True
+        assert auth.is_authenticated() is True
+
+        # And: robin_stocks.login called 3 times
+        assert mock_robin_stocks.login.call_count == 3
+
+        # And: sleep called twice (for retries with exponential backoff)
+        assert mock_sleep.call_count == 2
+        # First retry: 1s delay
+        mock_sleep.assert_any_call(1.0)
+        # Second retry: 2s delay
+        mock_sleep.assert_any_call(2.0)
