@@ -46,3 +46,66 @@ class TestCredentialValidation:
         assert auth_config.mfa_secret is None
         assert auth_config.device_token is None
         assert auth_config.pickle_path == ".robinhood.pickle"
+
+    def test_missing_username_raises_error(self):
+        """
+        Test missing username raises ValueError.
+
+        GIVEN: Config with empty/None ROBINHOOD_USERNAME
+        WHEN: AuthConfig validation called
+        THEN: ValueError raised with clear message
+        """
+        # Given: Config with missing username
+        from unittest.mock import Mock
+        config = Mock()
+        config.robinhood_username = None
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = None
+        config.robinhood_device_token = None
+
+        # When/Then: AuthConfig creation raises ValueError
+        from src.trading_bot.auth.robinhood_auth import AuthConfig
+        with pytest.raises(ValueError, match="username"):
+            AuthConfig.from_config(config)
+
+    def test_missing_password_raises_error(self):
+        """
+        Test missing password raises ValueError.
+
+        GIVEN: Config with empty/None ROBINHOOD_PASSWORD
+        WHEN: AuthConfig validation called
+        THEN: ValueError raised with clear message
+        """
+        # Given: Config with missing password
+        from unittest.mock import Mock
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = None
+        config.robinhood_mfa_secret = None
+        config.robinhood_device_token = None
+
+        # When/Then: AuthConfig creation raises ValueError
+        from src.trading_bot.auth.robinhood_auth import AuthConfig
+        with pytest.raises(ValueError, match="password"):
+            AuthConfig.from_config(config)
+
+    def test_invalid_email_format_raises_error(self):
+        """
+        Test invalid email format raises ValueError.
+
+        GIVEN: ROBINHOOD_USERNAME is not a valid email (e.g., "notanemail")
+        WHEN: AuthConfig validation called
+        THEN: ValueError raised with "Invalid email format" message
+        """
+        # Given: Config with invalid email format
+        from unittest.mock import Mock
+        config = Mock()
+        config.robinhood_username = "notanemail"  # Not a valid email
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = None
+        config.robinhood_device_token = None
+
+        # When/Then: AuthConfig creation raises ValueError
+        from src.trading_bot.auth.robinhood_auth import AuthConfig
+        with pytest.raises(ValueError, match="Invalid email format"):
+            AuthConfig.from_config(config)
