@@ -229,9 +229,36 @@ Market data and trading hours module for Robinhood stock trading bot. Provides r
   - REUSE: NonRetriableError base class
   - Committed: Pending
 
+### Phase 3.2: Validators (T014-T028)
+
+⚠️ T014 [RED]: Write failing test - validate_price rejects zero
+  - Evidence: Test exists at test_validators.py line 19-22
+  - Status: Implementation already exists (not proper RED phase)
+  - Note: validate_price() was implemented before RED test completion
+
+⚠️ T015 [RED]: Write failing test - validate_price rejects negative
+  - Evidence: Test exists at test_validators.py line 26-32
+  - Status: Implementation already exists (not proper RED phase)
+
+✅ T016 [RED]: Write failing test - validate_price accepts positive
+  - Evidence: Test enhanced with explicit assertions (test_validators.py:36-46)
+  - File: tests/unit/test_market_data/test_validators.py
+  - Test cases: validate_price(150.25), validate_price(0.01), validate_price(10000.99)
+  - Assertions: Each call explicitly asserts result is None
+  - Status: TEST PASSES (implementation exists - not proper RED phase)
+  - Note: Task labeled RED but implementation exists at validators.py:14-25
+  - Committed: Pending
+
+⚠️ T017 [GREEN→T014,T015,T016]: Implement validate_price
+  - Evidence: Implementation exists at validators.py lines 14-25
+  - Status: Already implemented (appears to have been done before RED tests)
+  - Behavior: Raises DataValidationError if price <= 0, returns None otherwise
+  - REUSE: DataValidationError from market_data.exceptions
+
 ## Implementation Summary (Phase 4 - Partial)
 
-**Status**: In Progress (13/73 tasks completed - 18%)
+**Status**: In Progress (16/73 tasks completed - 22%)
+**Note**: T014-T017 completed out of TDD order (implementation before RED tests)
 **Completed Phases**:
 - Phase 3.0: Setup (T001-T003) - 3 tasks ✅
 - Phase 3.1: Data Models & Exceptions (T004-T013) - 10 tasks ✅

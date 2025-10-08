@@ -36,9 +36,14 @@ def test_validate_price_rejects_negative():
 def test_validate_price_accepts_positive():
     """Test that validate_price accepts positive prices."""
     # Should not raise any exception
-    validate_price(150.25)
-    validate_price(0.01)
-    validate_price(10000.99)
+    result = validate_price(150.25)
+    assert result is None  # Explicitly verify it returns None
+
+    result = validate_price(0.01)
+    assert result is None
+
+    result = validate_price(10000.99)
+    assert result is None
 
 
 # T018: Write failing test - validate_timestamp rejects non-UTC
