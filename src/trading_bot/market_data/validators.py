@@ -10,6 +10,55 @@ import pandas as pd
 from trading_bot.market_data.exceptions import DataValidationError
 
 
+# T028: Common validation helpers
+def _check_required_fields(data: Dict[str, Any], required_fields: list[str]) -> None:
+    """
+    Check that all required fields are present in data dictionary.
+
+    Args:
+        data: Dictionary to check
+        required_fields: List of required field names
+
+    Raises:
+        DataValidationError: If any required field is missing
+    """
+    for field in required_fields:
+        if field not in data:
+            raise DataValidationError(f"Missing required field: {field}")
+
+
+def _check_date_continuity(df: pd.DataFrame, date_column: str = 'date', max_gap_ratio: float = 0.1) -> None:
+    """
+    Check for excessive gaps in date series (for business days).
+
+    Args:
+        df: DataFrame with date column
+        date_column: Name of the date column
+        max_gap_ratio: Maximum allowed ratio of missing days (default 0.1 = 10%)
+
+    Raises:
+        DataValidationError: If gaps exceed threshold
+    """
+    df_sorted = df.sort_values(date_column)
+    dates = pd.to_datetime(df_sorted[date_column])
+
+    # Calculate expected number of days (accounting for weekends)
+    if len(dates) > 1:
+        date_range = pd.date_range(start=dates.iloc[0], end=dates.iloc[-1], freq='D')
+        # Filter to business days only (Mon-Fri)
+        business_days = date_range[date_range.dayofweek < 5]
+
+        # Allow some missing days for holidays (up to max_gap_ratio)
+        expected_days = len(business_days)
+        actual_days = len(dates)
+        gap_count = expected_days - actual_days
+
+        if gap_count > expected_days * max_gap_ratio:
+            raise DataValidationError(
+                f"Missing dates detected: {gap_count} gaps in {expected_days} expected business days"
+            )
+
+
 # T017: Implement validate_price
 def validate_price(price: float) -> None:
     """
@@ -69,11 +118,9 @@ def validate_quote(data: Dict[str, Any]) -> None:
     Raises:
         DataValidationError: If any required field is missing or invalid
     """
-    # Check required fields
+    # Check required fields using helper (T028)
     required_fields = ['symbol', 'price', 'timestamp', 'market_state']
-    for field in required_fields:
-        if field not in data:
-            raise DataValidationError(f"Missing required field: {field}")
+    _check_required_fields(data, required_fields)
 
     # Validate price
     validate_price(data['price'])
@@ -93,7 +140,7 @@ def validate_historical_data(df: pd.DataFrame) -> None:
     Raises:
         DataValidationError: If data is incomplete or invalid
     """
-    # Check required columns
+    # Check required columns (using dict-like interface for consistency with helper)
     required_columns = ['date', 'open', 'high', 'low', 'close', 'volume']
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
@@ -115,22 +162,5 @@ def validate_historical_data(df: pd.DataFrame) -> None:
     if (df['volume'] < 0).any():
         raise DataValidationError("Volume cannot be negative")
 
-    # Check for date continuity (detect gaps)
-    df_sorted = df.sort_values('date')
-    dates = pd.to_datetime(df_sorted['date'])
-
-    # Calculate expected number of days (accounting for weekends)
-    if len(dates) > 1:
-        date_range = pd.date_range(start=dates.iloc[0], end=dates.iloc[-1], freq='D')
-        # Filter to business days only (Mon-Fri)
-        business_days = date_range[date_range.dayofweek < 5]
-
-        # Allow some missing days for holidays (up to 10% gaps)
-        expected_days = len(business_days)
-        actual_days = len(dates)
-        gap_count = expected_days - actual_days
-
-        if gap_count > expected_days * 0.1:  # More than 10% missing
-            raise DataValidationError(
-                f"Missing dates detected: {gap_count} gaps in {expected_days} expected business days"
-            )
+    # Check for date continuity using helper (T028)
+    _check_date_continuity(df, date_column='date', max_gap_ratio=0.1)
