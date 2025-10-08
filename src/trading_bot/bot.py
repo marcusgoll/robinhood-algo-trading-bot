@@ -132,6 +132,13 @@ class TradingBot:
             self.auth = RobinhoodAuth(config)
             logger.info("Authentication module initialized")
 
+        # T044: Initialize account data module if authenticated
+        self.account_data: Optional[Any] = None
+        if self.auth is not None:
+            from src.trading_bot.account import AccountData
+            self.account_data = AccountData(auth=self.auth)
+            logger.info("Account data module initialized")
+
         # DEPRECATED: Old circuit breaker kept for backward compatibility
         self.circuit_breaker = CircuitBreaker(
             max_daily_loss_pct=max_daily_loss_pct,
@@ -147,7 +154,8 @@ class TradingBot:
         safety_config.max_position_pct = max_position_pct
         safety_config.trading_timezone = trading_timezone
 
-        self.safety_checks = SafetyChecks(safety_config)
+        # T052: Pass account_data to SafetyChecks for real buying power
+        self.safety_checks = SafetyChecks(safety_config, account_data=self.account_data)
 
         self.positions: Dict[str, Dict] = {}
         self.is_running: bool = False
@@ -241,14 +249,17 @@ class TradingBot:
         """
         Get current buying power from account.
 
-        Returns:
-            Current buying power (mocked for now, will integrate with account module)
+        T045: Returns real buying power from AccountData if available, otherwise fallback to mock.
 
-        TODO: Integrate with account-data-module when available
+        Returns:
+            Current buying power from AccountData or mock value
         """
-        # TODO: Replace with real Robinhood API call
-        # For now, return mock value for testing
-        return 10000.00  # $10k mock buying power
+        if self.account_data is None:
+            # Fallback for backward compatibility
+            logger.warning("AccountData not initialized, using mock value")
+            return 10000.00  # $10k mock buying power
+
+        return self.account_data.get_buying_power()
 
     def execute_trade(
         self,
@@ -322,6 +333,12 @@ class TradingBot:
             # TODO: Implement real Robinhood API call
             # Must implement with proper error handling (§Error_Handling)
             logger.warning("Real trading not yet implemented")
+
+        # T046: Invalidate account cache after trade execution
+        if self.account_data is not None:
+            self.account_data.invalidate_cache('buying_power')
+            self.account_data.invalidate_cache('positions')
+            logger.debug("Account cache invalidated after trade")
 
     def update_position(
         self,
