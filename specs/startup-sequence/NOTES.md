@@ -273,6 +273,10 @@ This feature formalizes the trading bot's startup sequence, transforming the cur
 - ✅ T001 [P]: Create test fixtures directory and base configuration files
 - ✅ T002 [P]: Create pytest configuration for startup tests
 
+### Phase 3.1: Core Data Structures
+- ✅ T003 [RED]: Write failing test: StartupStep tracks step status
+- ✅ T004 [GREEN→T003]: Implement StartupStep dataclass
+
 ## Last Updated
 
-2025-10-08T20:45:00Z
+2025-10-08T21:00:00Z
