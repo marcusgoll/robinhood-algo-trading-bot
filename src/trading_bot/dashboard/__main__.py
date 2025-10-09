@@ -48,6 +48,11 @@ def main() -> int:
         from ..auth.robinhood_auth import RobinhoodAuth
         auth = RobinhoodAuth(config=config)
 
+        # Log into Robinhood
+        logger.info("Attempting Robinhood login...")
+        auth.login()
+        logger.info("Robinhood login successful")
+
         # Log dashboard launch
         logger.info(
             "dashboard.launched",
@@ -92,6 +97,26 @@ def main() -> int:
         )
         print("\n\nWarning: Dashboard interrupted by user")
         return 130
+
+    except Exception as e:
+        # Check if authentication error
+        if "AuthenticationError" in type(e).__name__ or "authentication" in str(e).lower():
+            logger.error(
+                "dashboard.auth_failed",
+                extra={
+                    "event": "dashboard.auth_failed",
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                },
+                exc_info=True,
+            )
+            print(f"\nError: Authentication failed: {e}")
+            print("\nPlease check your environment variables:")
+            print("  - ROBINHOOD_USERNAME (email address)")
+            print("  - ROBINHOOD_PASSWORD")
+            print("  - ROBINHOOD_MFA_SECRET (optional, for TOTP MFA)")
+            print("  - ROBINHOOD_DEVICE_TOKEN (optional)")
+            return 2
 
     except Exception as e:
         logger.error(
