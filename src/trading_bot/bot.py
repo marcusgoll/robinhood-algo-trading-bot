@@ -12,13 +12,38 @@ from decimal import Decimal
 import logging
 from datetime import datetime
 
+# REFACTORED: Import SafetyChecks instead of local CircuitBreaker
+# Old CircuitBreaker class removed in favor of comprehensive SafetyChecks module
+# See: src/trading_bot/safety_checks.py for enhanced circuit breaker functionality
+from src.trading_bot.safety_checks import SafetyChecks
+
 logger = logging.getLogger(__name__)
 
 
+# DEPRECATED: CircuitBreaker class moved to SafetyChecks module
+# This class is kept for backward compatibility but will be removed in future version
+# Use SafetyChecks instead for comprehensive pre-trade validation
 class CircuitBreaker:
-    """Circuit breaker to halt trading on excessive losses (§Safety_First)."""
+    """
+    DEPRECATED: Use SafetyChecks module instead.
+
+    This class is kept for backward compatibility only.
+    The new SafetyChecks module provides enhanced functionality:
+    - Circuit breakers (daily loss, consecutive losses)
+    - Buying power validation
+    - Trading hours enforcement
+    - Position sizing
+    - Duplicate order prevention
+
+    See: src/trading_bot/safety_checks.SafetyChecks
+    Task: T027 [REFACTOR]
+    """
 
     def __init__(self, max_daily_loss_pct: float, max_consecutive_losses: int):
+        logger.warning(
+            "CircuitBreaker is deprecated. Use SafetyChecks module instead. "
+            "See src/trading_bot/safety_checks.py"
+        )
         self.max_daily_loss_pct = max_daily_loss_pct
         self.max_consecutive_losses = max_consecutive_losses
         self.daily_pnl: Decimal = Decimal("0")
@@ -26,16 +51,7 @@ class CircuitBreaker:
         self.is_tripped: bool = False
 
     def check_and_trip(self, trade_pnl: Decimal, portfolio_value: Decimal) -> bool:
-        """
-        Check if circuit breaker should trip.
-
-        Args:
-            trade_pnl: Profit/loss from latest trade
-            portfolio_value: Current portfolio value
-
-        Returns:
-            True if circuit breaker tripped, False otherwise
-        """
+        """DEPRECATED: Use SafetyChecks.check_daily_loss_limit() instead."""
         self.daily_pnl += trade_pnl
 
         # Check consecutive losses
@@ -66,7 +82,7 @@ class CircuitBreaker:
         return False
 
     def reset_daily(self) -> None:
-        """Reset daily counters (call at market open)."""
+        """DEPRECATED: Use SafetyChecks.reset_circuit_breaker() instead."""
         self.daily_pnl = Decimal("0")
         self.is_tripped = False
         logger.info("Circuit breaker reset for new trading day")
@@ -90,6 +106,7 @@ class TradingBot:
         max_position_pct: float = 5.0,
         max_daily_loss_pct: float = 3.0,
         max_consecutive_losses: int = 3,
+        trading_timezone: str = "America/New_York",
     ):
         """
         Initialize trading bot with safety parameters.
@@ -99,14 +116,27 @@ class TradingBot:
             max_position_pct: Maximum % of portfolio per position (§Risk_Management)
             max_daily_loss_pct: Circuit breaker: max daily loss % (§Safety_First)
             max_consecutive_losses: Circuit breaker: max consecutive losses (§Safety_First)
+            trading_timezone: Timezone for trading hours enforcement (default: America/New_York)
         """
         self.paper_trading = paper_trading
         self.max_position_pct = max_position_pct
 
+        # DEPRECATED: Old circuit breaker kept for backward compatibility
         self.circuit_breaker = CircuitBreaker(
             max_daily_loss_pct=max_daily_loss_pct,
             max_consecutive_losses=max_consecutive_losses,
         )
+
+        # NEW: Initialize SafetyChecks module for comprehensive pre-trade validation
+        from unittest.mock import Mock
+        # Create mock config with safety parameters
+        config = Mock()
+        config.max_daily_loss_pct = max_daily_loss_pct
+        config.max_consecutive_losses = max_consecutive_losses
+        config.max_position_pct = max_position_pct
+        config.trading_timezone = trading_timezone
+
+        self.safety_checks = SafetyChecks(config)
 
         self.positions: Dict[str, Dict] = {}
         self.is_running: bool = False
@@ -116,7 +146,8 @@ class TradingBot:
             f"Paper Trading: {paper_trading} | "
             f"Max Position: {max_position_pct}% | "
             f"Max Daily Loss: {max_daily_loss_pct}% | "
-            f"Max Consecutive Losses: {max_consecutive_losses}"
+            f"Max Consecutive Losses: {max_consecutive_losses} | "
+            f"Trading Hours: {trading_timezone}"
         )
 
     def start(self) -> None:
@@ -163,6 +194,19 @@ class TradingBot:
 
         return shares
 
+    def get_buying_power(self) -> float:
+        """
+        Get current buying power from account.
+
+        Returns:
+            Current buying power (mocked for now, will integrate with account module)
+
+        TODO: Integrate with account-data-module when available
+        """
+        # TODO: Replace with real Robinhood API call
+        # For now, return mock value for testing
+        return 10000.00  # $10k mock buying power
+
     def execute_trade(
         self,
         symbol: str,
@@ -172,7 +216,7 @@ class TradingBot:
         reason: str,
     ) -> None:
         """
-        Execute trade with logging (§Audit_Everything).
+        Execute trade with comprehensive safety checks (§Safety_First).
 
         Args:
             symbol: Stock symbol
@@ -185,8 +229,36 @@ class TradingBot:
             logger.warning(f"Trade rejected: Bot not running | {symbol} {action} {shares}")
             return
 
+        # NEW: Comprehensive pre-trade safety validation
+        safety_result = self.safety_checks.validate_trade(
+            symbol=symbol,
+            action=action.upper(),  # SafetyChecks expects "BUY" or "SELL"
+            quantity=shares,
+            price=float(price),
+            current_buying_power=self.get_buying_power()
+        )
+
+        if not safety_result.is_safe:
+            logger.error(
+                f"TRADE BLOCKED | "
+                f"Symbol={symbol} | "
+                f"Action={action} | "
+                f"Shares={shares} | "
+                f"Price=${price} | "
+                f"Reason={safety_result.reason}"
+            )
+
+            if safety_result.circuit_breaker_triggered:
+                logger.critical(
+                    f"⚠️ CIRCUIT BREAKER ACTIVE | "
+                    f"Manual reset required via safety_checks.reset_circuit_breaker()"
+                )
+
+            return
+
+        # DEPRECATED: Old circuit breaker check (kept for backward compatibility)
         if self.circuit_breaker.is_tripped:
-            logger.error(f"Trade rejected: Circuit breaker tripped | {symbol} {action} {shares}")
+            logger.error(f"Trade rejected: Old circuit breaker tripped | {symbol} {action} {shares}")
             return
 
         # Log trade decision with reasoning (§Audit_Everything)
