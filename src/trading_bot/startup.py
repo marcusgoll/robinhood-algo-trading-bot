@@ -320,6 +320,51 @@ class StartupOrchestrator:
         if self.dry_run:
             print("[DRY RUN] Exiting without starting trading loop")
 
+    def _verify_health(self) -> None:
+        """Verify all components are initialized and ready.
+
+        Checks that all required components have been initialized and
+        have status="ready" in component_states.
+
+        Raises:
+            RuntimeError: If any component is missing or not ready
+
+        T031 [GREEN→T030]: Implement _verify_health() method
+        """
+        step = StartupStep(name="Verifying component health", status="running")
+        self.steps.append(step)
+
+        try:
+            # Check all components initialized
+            required_components = ["logging", "mode_switcher", "circuit_breaker", "trading_bot"]
+            for component in required_components:
+                if component not in self.component_states:
+                    raise RuntimeError(f"Component {component} not initialized")
+                if self.component_states[component].get("status") != "ready":
+                    raise RuntimeError(f"Component {component} not ready")
+
+            step.status = "success"
+        except Exception as e:
+            step.status = "failed"
+            step.error_message = str(e)
+            self.errors.append(f"Health check failed: {e}")
+            raise
+
+    def _cleanup_on_failure(self) -> None:
+        """Gracefully clean up resources on startup failure.
+
+        T033 [GREEN→T032]: Implement _cleanup_on_failure() method
+        """
+        try:
+            # Close logging handlers if initialized
+            if hasattr(self, 'startup_logger'):
+                for handler in self.startup_logger.handlers[:]:
+                    handler.close()
+                    self.startup_logger.removeHandler(handler)
+        except Exception as e:
+            # Log cleanup errors but don't raise
+            print(f"Warning: Cleanup error: {e}")
+
     def _format_json_output(self, result: StartupResult) -> str:
         """Format startup result as JSON for machine-readable output.
 
