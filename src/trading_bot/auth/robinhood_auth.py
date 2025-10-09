@@ -180,29 +180,10 @@ class RobinhoodAuth:
         Raises:
             AuthenticationError: If authentication fails
         """
-        # T021: Try to restore session from pickle first
-        pickle_path = Path(self.auth_config.pickle_path)
-        if pickle_path.exists():
-            try:
-                with open(pickle_path, 'rb') as f:
-                    self._session = pickle.load(f)
-                self._authenticated = True
-                logger.info(f"Session restored from cache for {mask_username(self.auth_config.username)}")
-                return True
-            except Exception as e:
-                # T015: Corrupt pickle - fall back to credentials
-                logger.warning(f"Cached session corrupted, re-authenticating for {mask_username(self.auth_config.username)}")
-                pass
+        # T021: Session restoration handled by robin_stocks via pickle_name parameter
+        # robin_stocks will automatically load cached session if available and valid
 
-        # T020: If device token exists, use login_with_device_token() first
-        if self.auth_config.device_token:
-            try:
-                return self.login_with_device_token()
-            except AuthenticationError:
-                # Device token and MFA both failed - propagate error
-                raise
-
-        # T022: Credentials-based login (fallback when no device token)
+        # T022: Credentials-based login with MFA support
         if not rh:
             raise AuthenticationError("robin_stocks library not available")
 
@@ -222,12 +203,15 @@ class RobinhoodAuth:
         try:
             # Define login function for retry wrapper
             def _do_login() -> Any:
-                # Call rh.login()
-                # Note: Actual robin_stocks API may require different parameters
-                if mfa_code:
-                    result = rh.login(username, password, mfa_code=mfa_code)
-                else:
-                    result = rh.login(username, password)
+                # Call rh.login() - let robin_stocks handle session caching
+                # pickle_name parameter allows session reuse across bot restarts
+                result = rh.login(
+                    username=username,
+                    password=password,
+                    mfa_code=mfa_code,
+                    store_session=True,
+                    pickle_name=self.auth_config.pickle_path
+                )
 
                 if not result:
                     raise AuthenticationError("Invalid credentials or authentication failed")
@@ -237,18 +221,6 @@ class RobinhoodAuth:
             self._session = _retry_with_backoff(_do_login, max_attempts=3, base_delay=1.0)
 
             self._authenticated = True
-
-            # T014: Save session to pickle with 600 permissions
-            try:
-                with open(pickle_path, 'wb') as f:
-                    pickle.dump(self._session, f)
-                os.chmod(pickle_path, 0o600)
-                logger.info(f"Session saved to cache for {mask_username(username)}")
-            except Exception:
-                # Non-critical: If pickle save fails, continue with authenticated session
-                logger.warning(f"Failed to save session cache for {mask_username(username)}")
-                pass
-
             logger.info(f"Authentication successful for {mask_username(username)}")
             return True
 
