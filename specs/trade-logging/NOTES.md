@@ -1,0 +1,58 @@
+# Feature: trade-logging
+
+## Overview
+Enhanced trade logging system that extends the existing logging framework with structured, queryable trade execution data. Enables Claude Code-measurable analytics for strategy performance analysis, compliance auditing, and decision audit trails.
+
+## Research Findings
+
+### Finding 1: Existing Logging System
+Source: `src/trading_bot/logger.py`
+- Current implementation: Basic text-based logging to `logs/trades.log`
+- Format: `BUY 100 shares of AAPL @ $150.50 [PAPER]`
+- Limitation: Not queryable, no structured data, difficult to analyze
+- Decision: Build on existing framework, add structured JSON logging
+
+### Finding 2: Constitution Requirements
+Source: `.spec-flow/memory/constitution.md`
+- §Audit_Everything: Every trade decision must be logged with reasoning
+- §Data_Integrity: All timestamps in UTC, validate market data
+- §Safety_First: Comprehensive audit trail for compliance
+- Decision: Must maintain backwards compatibility with existing audit requirements
+
+### Finding 3: Claude Code Measurement
+Source: `spec-template.md` HEART metrics section
+- Requirement: All metrics must be Claude Code-measurable (SQL, logs, Lighthouse)
+- Implication: Need structured logs (JSON format) for grep/jq queries
+- Decision: Dual logging - human-readable text + machine-readable JSON
+
+### Finding 4: Similar Patterns
+Source: Project structure analysis
+- No existing structured logging for trades
+- No database for trade history
+- Gaps: Performance analytics, strategy comparison, backtest validation
+- Decision: File-based structured logging (no database dependency for v1)
+
+## System Components Analysis
+**Reusable (from existing codebase)**:
+- `TradingLogger` class (base framework)
+- `UTCFormatter` (timestamp handling)
+- `log_trade()` function (hook point for enhancement)
+
+**New Components Needed**:
+- `TradeRecord` dataclass (typed trade data structure)
+- `StructuredTradeLogger` (JSON logging)
+- `TradeQueryHelper` (analytics queries)
+
+**Rationale**: System-first approach ensures consistency with existing logging framework and maintains backwards compatibility.
+
+## Feature Classification
+- UI screens: false (no UI components)
+- Improvement: true (enhances existing logging)
+- Measurable: true (strategy performance metrics)
+- Deployment impact: false (code-only, no platform changes)
+
+## Checkpoints
+- Phase 0 (Spec-flow): 2025-10-09
+
+## Last Updated
+2025-10-09T00:00:00Z
