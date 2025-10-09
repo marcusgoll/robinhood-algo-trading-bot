@@ -8,11 +8,12 @@ Enforces Constitution v1.0.0:
 
 Provides:
 - StartupStep: Dataclass for tracking initialization steps
+- StartupResult: Dataclass for aggregating startup sequence data
 - StartupOrchestrator: Coordinates startup sequence
 """
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal, Optional, List, Dict
 
 
 @dataclass
@@ -29,3 +30,29 @@ class StartupStep:
     status: Literal["pending", "running", "success", "failed"]
     error_message: Optional[str] = None
     duration_seconds: float = 0.0
+
+
+@dataclass
+class StartupResult:
+    """Aggregates all startup sequence data.
+
+    Attributes:
+        status: Overall startup status (ready/blocked)
+        mode: Trading mode (paper/live)
+        phase: Current phase (experience/proof_of_concept/etc)
+        steps: List of StartupStep objects tracking progress
+        errors: List of error messages
+        warnings: List of warning messages
+        component_states: Dict of component name -> state dict
+        startup_duration_seconds: Total time for startup sequence
+        timestamp: ISO 8601 UTC timestamp of completion
+    """
+    status: Literal["ready", "blocked"]
+    mode: str
+    phase: str
+    steps: List[StartupStep]
+    errors: List[str]
+    warnings: List[str]
+    component_states: Dict[str, Dict]
+    startup_duration_seconds: float
+    timestamp: str  # ISO 8601 UTC
