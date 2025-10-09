@@ -85,3 +85,28 @@ class StartupOrchestrator:
         self.warnings: List[str] = []
         self.component_states: Dict[str, Dict] = {}
         self.start_time: Optional[float] = None
+
+    def _load_config(self) -> 'Config':
+        """Load configuration from environment and JSON files.
+
+        Returns:
+            Loaded Config instance
+
+        Raises:
+            Exception: If configuration loading fails
+        """
+        from .config import Config
+
+        step = StartupStep(name="Loading configuration", status="running")
+        self.steps.append(step)
+
+        try:
+            config = Config.from_env_and_json()
+            step.status = "success"
+            self.config = config
+            return config
+        except Exception as e:
+            step.status = "failed"
+            step.error_message = str(e)
+            self.errors.append(f"Configuration loading failed: {e}")
+            raise
