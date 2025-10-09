@@ -110,3 +110,36 @@ class StartupOrchestrator:
             step.error_message = str(e)
             self.errors.append(f"Configuration loading failed: {e}")
             raise
+
+    def _validate_config(self) -> Tuple[bool, List[str], List[str]]:
+        """Validate configuration settings.
+
+        Returns:
+            Tuple of (is_valid, errors, warnings)
+
+        Raises:
+            Exception: If validation fails unexpectedly
+        """
+        from .validator import ConfigValidator
+
+        step = StartupStep(name="Validating configuration", status="running")
+        self.steps.append(step)
+
+        try:
+            validator = ConfigValidator(self.config)
+            is_valid, errors, warnings = validator.validate_all(test_api=False)
+
+            if is_valid:
+                step.status = "success"
+            else:
+                step.status = "failed"
+                step.error_message = "; ".join(errors)
+                self.errors.extend(errors)
+
+            self.warnings.extend(warnings)
+            return is_valid, errors, warnings
+        except Exception as e:
+            step.status = "failed"
+            step.error_message = str(e)
+            self.errors.append(f"Validation failed: {e}")
+            raise
