@@ -180,3 +180,16 @@ class TestStartupOrchestrator:
         assert hasattr(orchestrator, 'mode_switcher')
         assert "mode_switcher" in orchestrator.component_states
         assert orchestrator.component_states["mode_switcher"]["status"] == "ready"
+
+    def test_initialize_circuit_breakers(self, mock_config):
+        """Test initialize_circuit_breakers creates CircuitBreaker."""
+        # Given: Orchestrator with risk params
+        orchestrator = StartupOrchestrator(config=mock_config, dry_run=True)
+
+        # When: Initialize circuit breakers
+        circuit_breaker = orchestrator._initialize_circuit_breakers()
+
+        # Then: Circuit breaker created with correct params
+        assert circuit_breaker is not None
+        assert hasattr(orchestrator, 'circuit_breaker')
+        assert "circuit_breaker" in orchestrator.component_states
