@@ -12,11 +12,10 @@ Feature: trade-logging
 Tasks: T018-T021 [GREEN] - Implement StructuredTradeLogger
 """
 
-from pathlib import Path
-from datetime import datetime, timezone
-import threading
 import sys
-from typing import Optional
+import threading
+from datetime import UTC, datetime
+from pathlib import Path
 
 from .trade_record import TradeRecord
 
@@ -91,7 +90,7 @@ class StructuredTradeLogger:
             - ISO 8601 naming: Enables natural sorting (ls, glob)
             - Automatic rotation: New file created at midnight UTC
         """
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         return self.log_dir / f"{today}.jsonl"
 
     def log_trade(self, record: TradeRecord) -> None:

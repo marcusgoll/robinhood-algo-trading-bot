@@ -12,10 +12,9 @@ Feature: trade-logging
 Tasks: T009-T013 [GREEN] - Implement TradeRecord dataclass
 """
 
-from dataclasses import dataclass, asdict
-from decimal import Decimal
-from typing import Optional
 import json
+from dataclasses import asdict, dataclass
+from decimal import Decimal
 
 
 @dataclass
@@ -43,30 +42,30 @@ class TradeRecord:
     # Execution Context (FR-003)
     order_id: str               # Unique order identifier
     execution_mode: str         # "PAPER" | "LIVE"
-    account_id: Optional[str]   # Robinhood account ID (if live)
+    account_id: str | None   # Robinhood account ID (if live)
 
     # Strategy Metadata (FR-004)
     strategy_name: str          # "bull-flag-breakout" | "manual" | etc.
     entry_type: str             # "breakout" | "pullback" | "reversal" | etc.
-    stop_loss: Optional[Decimal]  # Stop loss price (if set)
-    target: Optional[Decimal]    # Profit target price (if set)
+    stop_loss: Decimal | None  # Stop loss price (if set)
+    target: Decimal | None    # Profit target price (if set)
 
     # Decision Audit Trail (FR-005, §Audit_Everything)
     decision_reasoning: str     # Why this trade was taken
     indicators_used: list[str]  # ["VWAP", "EMA-9", "MACD"] etc.
-    risk_reward_ratio: Optional[float]  # Planned R:R (e.g., 2.0 for 2:1)
+    risk_reward_ratio: float | None  # Planned R:R (e.g., 2.0 for 2:1)
 
     # Outcome Tracking (FR-006)
-    outcome: Optional[str]      # "win" | "loss" | "breakeven" | "open"
-    profit_loss: Optional[Decimal]  # Realized P&L (if closed)
-    hold_duration_seconds: Optional[int]  # Time in trade
-    exit_timestamp: Optional[str]  # When position closed (ISO 8601 UTC)
-    exit_reasoning: Optional[str]   # Why position was exited
+    outcome: str | None      # "win" | "loss" | "breakeven" | "open"
+    profit_loss: Decimal | None  # Realized P&L (if closed)
+    hold_duration_seconds: int | None  # Time in trade
+    exit_timestamp: str | None  # When position closed (ISO 8601 UTC)
+    exit_reasoning: str | None   # Why position was exited
 
     # Performance Metrics (FR-007)
-    slippage: Optional[Decimal]     # Difference from expected price
-    commission: Optional[Decimal]   # Trading fees
-    net_profit_loss: Optional[Decimal]  # P&L - commission
+    slippage: Decimal | None     # Difference from expected price
+    commission: Decimal | None   # Trading fees
+    net_profit_loss: Decimal | None  # P&L - commission
 
     # Compliance & Audit (NFR-002, §Audit_Everything)
     session_id: str             # Links to trading session

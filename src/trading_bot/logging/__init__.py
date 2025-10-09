@@ -10,12 +10,11 @@ Constitution v1.0.0:
 """
 
 # T009-T013 [GREEN]: TradeRecord implemented and tested
-from .trade_record import TradeRecord
+# T026-T029 [GREEN]: TradeQueryHelper implemented and tested
+from .query_helper import TradeQueryHelper
 
 # T018-T021 [GREEN]: StructuredTradeLogger implemented and tested
 from .structured_logger import StructuredTradeLogger
-
-# T026-T029 [GREEN]: TradeQueryHelper implemented and tested
-from .query_helper import TradeQueryHelper
+from .trade_record import TradeRecord
 
 __all__ = ['TradeRecord', 'StructuredTradeLogger', 'TradeQueryHelper']

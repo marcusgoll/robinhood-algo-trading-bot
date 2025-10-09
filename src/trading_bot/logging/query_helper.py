@@ -12,11 +12,11 @@ Feature: trade-logging
 Tasks: T026-T029 [GREEN] - Implement TradeQueryHelper with streaming queries
 """
 
-from pathlib import Path
-from datetime import datetime, date
-from typing import Optional, Generator
 import json
+from collections.abc import Generator
+from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 
 from .trade_record import TradeRecord
 
@@ -110,7 +110,7 @@ class TradeQueryHelper:
         if not file_path.exists():
             return
 
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
                 if not line:  # Skip empty lines
@@ -126,7 +126,7 @@ class TradeQueryHelper:
                             trade_dict[field] = Decimal(trade_dict[field])
 
                     yield TradeRecord(**trade_dict)
-                except (json.JSONDecodeError, TypeError, ValueError) as e:
+                except (json.JSONDecodeError, TypeError, ValueError):
                     # Skip malformed lines (defensive programming)
                     continue
 
@@ -213,8 +213,8 @@ class TradeQueryHelper:
     def query_by_symbol(
         self,
         symbol: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        start_date: str | None = None,
+        end_date: str | None = None
     ) -> list[TradeRecord]:
         """Query trades for a specific symbol with optional date filtering.
 
@@ -295,7 +295,7 @@ class TradeQueryHelper:
         # Filter by symbol
         return [trade for trade in all_trades if trade.symbol == symbol]
 
-    def calculate_win_rate(self, trades: Optional[list[TradeRecord]] = None) -> float:
+    def calculate_win_rate(self, trades: list[TradeRecord] | None = None) -> float:
         """Calculate win rate percentage from closed trades.
 
         Win rate formula: (wins / total_closed_trades) * 100
