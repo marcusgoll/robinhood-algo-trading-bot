@@ -208,6 +208,31 @@ class TestStartupOrchestrator:
         assert "trading_bot" in orchestrator.component_states
         assert orchestrator.component_states["trading_bot"]["is_running"] == False
 
+    def test_display_summary_shows_config(self, mock_config, capsys):
+        """Test display_summary shows startup configuration summary.
+
+        T024 [RED]: Write failing test for _display_summary()
+        - Given: Successful startup
+        - When: orchestrator._display_summary()
+        - Then: Assert stdout contains "STARTUP COMPLETE", "Current Phase", "Circuit Breaker: Active"
+        """
+        # Given: Orchestrator with successful startup
+        orchestrator = StartupOrchestrator(config=mock_config, dry_run=True)
+
+        # When: Display summary
+        orchestrator._display_summary()
+
+        # Then: Assert stdout contains expected sections
+        captured = capsys.readouterr()
+        assert "STARTUP COMPLETE" in captured.out
+        assert "Ready to trade" in captured.out
+        assert "Current Phase: experience" in captured.out
+        assert "Max Trades Today: 999" in captured.out
+        assert "Circuit Breaker: Active" in captured.out
+        assert "Max Loss: 3.0%" in captured.out
+        assert "Max Consecutive: 3" in captured.out
+        assert "[DRY RUN] Exiting without starting trading loop" in captured.out
+
     def test_json_output_format(self, mock_config):
         """Test JSON output format matches schema."""
         import json

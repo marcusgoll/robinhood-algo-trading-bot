@@ -68,12 +68,16 @@ def mock_config() -> Mock:
     config.phase_progression = Mock()
     config.phase_progression.current_phase = "experience"
 
+    # Mock phase-specific config (experience phase)
+    config.phase_progression.experience = Mock()
+    config.phase_progression.experience.max_trades_per_day = 999
+
     config.risk_management = Mock()
     config.risk_management.max_daily_loss_pct = 3.0
     config.risk_management.max_consecutive_losses = 3
     config.risk_management.max_position_pct = 5.0
 
-    # Phase progression
+    # Phase progression (for backward compatibility)
     config.current_phase = "experience"
     config.max_trades_per_day = 999
 
