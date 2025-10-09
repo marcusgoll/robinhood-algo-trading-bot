@@ -115,3 +115,22 @@ class TestStartupOrchestrator:
         assert orchestrator.warnings == []
         assert orchestrator.component_states == {}
         assert orchestrator.start_time is None
+
+    def test_load_config_success(self, valid_env_file, valid_config_file, monkeypatch, tmp_path):
+        """Test load_config successfully loads configuration."""
+        # Given: Valid .env and config.json files
+        # Monkeypatch to use test environment
+        monkeypatch.setenv("ROBINHOOD_USERNAME", "test_user")
+        monkeypatch.setenv("ROBINHOOD_PASSWORD", "test_pass")
+
+        # When: Load config
+        orchestrator = StartupOrchestrator(config=None, dry_run=True)
+        config = orchestrator._load_config()
+
+        # Then: Config loaded successfully
+        assert config is not None
+        assert config.robinhood_username == "test_user"
+        assert config.robinhood_password == "test_pass"
+        assert len(orchestrator.steps) == 1
+        assert orchestrator.steps[0].name == "Loading configuration"
+        assert orchestrator.steps[0].status == "success"
