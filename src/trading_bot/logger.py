@@ -234,6 +234,41 @@ class TradingLogger:
 
         return logging.getLogger("trading_bot.errors")
 
+    @staticmethod
+    def get_startup_logger() -> logging.Logger:
+        """Get logger for startup sequence.
+
+        Creates a separate startup.log file for initialization audit trail.
+
+        Returns:
+            Logger instance configured for startup logging
+        """
+        from pathlib import Path
+        from logging.handlers import RotatingFileHandler
+
+        logger = logging.getLogger("startup")
+
+        # Avoid duplicate handlers
+        if logger.handlers:
+            return logger
+
+        # Create startup log handler
+        startup_log_path = Path("logs") / "startup.log"
+        startup_log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        handler = RotatingFileHandler(
+            startup_log_path,
+            maxBytes=10 * 1024 * 1024,  # 10MB
+            backupCount=5
+        )
+        handler.setFormatter(UTCFormatter(
+            '%(asctime)s - %(levelname)s - %(message)s'
+        ))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+
+        return logger
+
 
 def setup_logging(logs_dir: Optional[Path] = None) -> None:
     """
