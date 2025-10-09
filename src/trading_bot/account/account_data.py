@@ -319,22 +319,29 @@ class AccountData:
         def _fetch() -> AccountBalance:
             import robin_stocks.robinhood as rh
 
-            profile = rh.account.load_account_profile()
+            # Get account profile for cash and buying power
+            account_profile = rh.account.load_account_profile()
+            if not account_profile:
+                raise AccountDataError("Invalid API response: empty account profile")
 
-            # Validate response
-            if not profile:
-                raise AccountDataError("Invalid API response: empty profile")
+            # Get portfolio profile for equity
+            portfolio_profile = rh.profiles.load_portfolio_profile()
+            if not portfolio_profile:
+                raise AccountDataError("Invalid API response: empty portfolio profile")
 
-            required_fields = ['cash', 'equity', 'buying_power']
-            for field in required_fields:
-                if field not in profile:
-                    raise AccountDataError(f"Invalid API response: missing {field}")
+            # Validate required fields
+            if 'cash' not in account_profile:
+                raise AccountDataError("Invalid API response: missing cash")
+            if 'buying_power' not in account_profile:
+                raise AccountDataError("Invalid API response: missing buying_power")
+            if 'equity' not in portfolio_profile:
+                raise AccountDataError("Invalid API response: missing equity in portfolio")
 
             try:
                 return AccountBalance(
-                    cash=Decimal(profile['cash']),
-                    equity=Decimal(profile['equity']),
-                    buying_power=Decimal(profile['buying_power']),
+                    cash=Decimal(account_profile['cash']),
+                    equity=Decimal(portfolio_profile['equity']),
+                    buying_power=Decimal(account_profile['buying_power']),
                     last_updated=datetime.utcnow()
                 )
             except (ValueError, TypeError) as e:
