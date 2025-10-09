@@ -525,8 +525,8 @@ class TestSecurity:
         assert "super_secret_password" not in all_logs
         assert "BASE32SECRETKEY" not in all_logs
         assert "DEVICE123ABC" not in all_logs
-        # Should see masked version instead
-        assert "****" in all_logs or "user****" in all_logs
+        # Should see masked version instead (use*** from mask_username)
+        assert "use***" in all_logs or "***" in all_logs
 
 
 class TestNetworkResilience:

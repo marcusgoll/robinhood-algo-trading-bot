@@ -17,6 +17,9 @@ import os
 import logging
 import time
 from typing import Optional, Any, Callable, TypeVar
+import dotenv
+
+from ..utils.security import mask_username, mask_password, mask_mfa_secret, mask_device_token
 
 logger = logging.getLogger(__name__)
 
@@ -76,16 +79,6 @@ def _retry_with_backoff(
     raise last_exception  # type: ignore
 
 
-def _mask_credential(value: str) -> str:
-    """Mask a credential for logging (§Security)."""
-    if not value:
-        return "****"
-    if "@" in value:
-        # Email: user****@example.com
-        parts = value.split("@")
-        return f"{parts[0][:4]}****@{parts[1]}"
-    # Other credentials: show first 4 chars
-    return f"{value[:4]}****" if len(value) > 4 else "****"
 
 
 class AuthenticationError(Exception):
@@ -179,7 +172,7 @@ class RobinhoodAuth:
 
     def login(self) -> bool:
         """
-        Authenticate with Robinhood.
+        Authenticate with Robinhood (T020).
 
         Returns:
             True if login successful
@@ -194,14 +187,22 @@ class RobinhoodAuth:
                 with open(pickle_path, 'rb') as f:
                     self._session = pickle.load(f)
                 self._authenticated = True
-                logger.info(f"Session restored from cache for {_mask_credential(self.auth_config.username)}")
+                logger.info(f"Session restored from cache for {mask_username(self.auth_config.username)}")
                 return True
             except Exception as e:
                 # T015: Corrupt pickle - fall back to credentials
-                logger.warning(f"Cached session corrupted, re-authenticating for {_mask_credential(self.auth_config.username)}")
+                logger.warning(f"Cached session corrupted, re-authenticating for {mask_username(self.auth_config.username)}")
                 pass
 
-        # T022: Credentials-based login
+        # T020: If device token exists, use login_with_device_token() first
+        if self.auth_config.device_token:
+            try:
+                return self.login_with_device_token()
+            except AuthenticationError:
+                # Device token and MFA both failed - propagate error
+                raise
+
+        # T022: Credentials-based login (fallback when no device token)
         if not robin_stocks:
             raise AuthenticationError("robin_stocks library not available")
 
@@ -209,7 +210,7 @@ class RobinhoodAuth:
         username = self.auth_config.username
         password = self.auth_config.password
 
-        logger.info(f"Authenticating user {_mask_credential(username)}")
+        logger.info(f"Authenticating user {mask_username(username)}")
 
         # T023: Handle MFA if configured
         mfa_code = None
@@ -225,8 +226,6 @@ class RobinhoodAuth:
                 # Note: Actual robin_stocks API may require different parameters
                 if mfa_code:
                     result = robin_stocks.login(username, password, mfa_code=mfa_code)
-                elif self.auth_config.device_token:
-                    result = robin_stocks.login(username, password, device_token=self.auth_config.device_token)
                 else:
                     result = robin_stocks.login(username, password)
 
@@ -244,13 +243,13 @@ class RobinhoodAuth:
                 with open(pickle_path, 'wb') as f:
                     pickle.dump(self._session, f)
                 os.chmod(pickle_path, 0o600)
-                logger.info(f"Session saved to cache for {_mask_credential(username)}")
+                logger.info(f"Session saved to cache for {mask_username(username)}")
             except Exception:
                 # Non-critical: If pickle save fails, continue with authenticated session
-                logger.warning(f"Failed to save session cache for {_mask_credential(username)}")
+                logger.warning(f"Failed to save session cache for {mask_username(username)}")
                 pass
 
-            logger.info(f"Authentication successful for {_mask_credential(username)}")
+            logger.info(f"Authentication successful for {mask_username(username)}")
             return True
 
         except AuthenticationError:
@@ -286,3 +285,112 @@ class RobinhoodAuth:
             # TODO: Add logging - "Token expired, refreshing"
             # For now, just maintain authenticated state
             pass
+
+    def save_device_token_to_env(self, device_token: str) -> None:
+        """
+        Save device token to .env file (T018).
+
+        Args:
+            device_token: Device token to save
+
+        Constitution v1.0.0:
+            §Security: Device tokens persisted to .env for reuse
+        """
+        dotenv.set_key(".env", "DEVICE_TOKEN", device_token)
+        logger.info("Device token saved to .env file")
+
+    def login_with_device_token(self) -> bool:
+        """
+        Authenticate with device token, fallback to MFA if invalid (T019).
+
+        Returns:
+            True if login successful
+
+        Raises:
+            AuthenticationError: If authentication fails
+
+        Constitution v1.0.0:
+            §Security: Device token tried first, MFA fallback if expired
+        """
+        if not robin_stocks:
+            raise AuthenticationError("robin_stocks library not available")
+
+        # Get credentials
+        username = self.auth_config.username
+        password = self.auth_config.password
+        device_token = self.auth_config.device_token
+
+        logger.info(f"Attempting login with device token for {mask_username(username)}")
+
+        # Try login with device token first (single attempt, no retry for invalid token)
+        try:
+            result = robin_stocks.login(username, password, device_token=device_token)
+            if not result:
+                raise AuthenticationError("Device token authentication failed")
+
+            self._session = result
+            self._authenticated = True
+
+            # Save session to pickle
+            pickle_path = Path(self.auth_config.pickle_path)
+            try:
+                with open(pickle_path, 'wb') as f:
+                    pickle.dump(self._session, f)
+                os.chmod(pickle_path, 0o600)
+                logger.info(f"Session saved to cache for {mask_username(username)}")
+            except Exception:
+                logger.warning(f"Failed to save session cache for {mask_username(username)}")
+                pass
+
+            logger.info(f"Device token authentication successful for {mask_username(username)}")
+            return True
+
+        except Exception as e:
+            # Device token invalid - fallback to MFA
+            logger.warning(f"Device token authentication failed: {e}. Falling back to MFA...")
+
+            # Generate MFA code if configured
+            if not self.auth_config.mfa_secret or not pyotp:
+                raise AuthenticationError("Device token invalid and MFA not configured")
+
+            totp = pyotp.TOTP(self.auth_config.mfa_secret)
+            mfa_code = totp.now()
+
+            try:
+                result = robin_stocks.login(username, password, mfa_code=mfa_code)
+                if not result:
+                    raise AuthenticationError("MFA authentication failed")
+
+                self._session = result
+                self._authenticated = True
+
+                # Save session to pickle
+                pickle_path = Path(self.auth_config.pickle_path)
+                try:
+                    with open(pickle_path, 'wb') as f:
+                        pickle.dump(self._session, f)
+                    os.chmod(pickle_path, 0o600)
+                    logger.info(f"Session saved to cache for {mask_username(username)}")
+                except Exception:
+                    logger.warning(f"Failed to save session cache for {mask_username(username)}")
+                    pass
+
+                # Extract new device token from session if available
+                new_device_token = None
+                if hasattr(self._session, 'get') and callable(self._session.get):
+                    new_device_token = self._session.get('device_token')
+                elif isinstance(self._session, dict):
+                    new_device_token = self._session.get('device_token')
+
+                # Save new device token to .env
+                if new_device_token:
+                    self.save_device_token_to_env(new_device_token)
+                    logger.info(f"New device token saved after MFA authentication for {mask_username(username)}")
+
+                logger.info(f"MFA authentication successful for {mask_username(username)}")
+                return True
+
+            except AuthenticationError:
+                raise
+            except Exception as e:
+                raise AuthenticationError(f"MFA authentication failed: {e}")
