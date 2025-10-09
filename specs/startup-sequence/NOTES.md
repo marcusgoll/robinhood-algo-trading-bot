@@ -419,6 +419,75 @@ max_trades = phase_config.max_trades_per_day
 - 6a6511f: test(T024): RED - add failing test for _display_summary()
 - fbfa7ef: feat(T025): GREEN - implement _display_summary() method
 
+### Phase 3.5: Main Orchestration
+- ✅ T028 [RED]: Write failing test for run() method
+- ✅ T029 [GREEN→T028]: Implement run() method
+
+## Implementation Notes (T028-T029)
+
+**TDD Approach**: RED-GREEN cycle for main orchestration run() method
+- T028 [RED]: Test failed with `AttributeError: 'StartupOrchestrator' object has no attribute 'run'`
+- T029 [GREEN]: Implementation added, test passed (16/16 tests passing)
+
+**Key Components Added**:
+1. `StartupOrchestrator.run()` - Main orchestration method coordinating all initialization steps
+2. `StartupOrchestrator._create_blocked_result()` - Helper method to create blocked results on error
+3. Imported `datetime` and `timezone` for ISO 8601 timestamp generation
+
+**Run Method Flow**:
+1. Display banner (if not json_output)
+2. Load configuration
+3. Validate configuration (return blocked if invalid)
+4. Initialize logging system
+5. Initialize mode switcher
+6. Initialize circuit breakers
+7. Initialize trading bot
+8. Verify component health
+9. Display summary (if not json_output)
+10. Return StartupResult with status="ready" or "blocked"
+
+**Error Handling**:
+- Catches all exceptions in try-except block
+- Calls `_cleanup_on_failure()` to close logger handlers
+- Returns blocked StartupResult with error message
+- Tracks startup duration even on failure
+
+**Test Coverage**: 1 additional test passing (16 total in test_startup.py)
+- test_run_success_path verifies complete startup sequence
+- All 6+ initialization steps executed and tracked
+- StartupResult populated with all required fields
+- Component states verified for all 4 components
+
+**Configuration Fixes**:
+- Fixed references to use actual Config structure (paper_trading, current_phase, max_daily_loss_pct, etc.)
+- Replaced nested attributes (config.trading.mode → config.paper_trading)
+- Updated all initialization methods to use direct Config attributes
+
+**Pattern Used**: Dependency-ordered initialization
+```python
+self.start_time = time.time()
+try:
+    # Execute startup sequence
+    config = self._load_config()
+    is_valid, errors, warnings = self._validate_config()
+    if not is_valid:
+        return self._create_blocked_result("Validation failed")
+    self._initialize_logging()
+    self._initialize_mode_switcher()
+    self._initialize_circuit_breakers()
+    self._initialize_bot()
+    self._verify_health()
+    # Create success result
+    return StartupResult(status="ready", ...)
+except Exception as e:
+    self._cleanup_on_failure()
+    return self._create_blocked_result(str(e), duration)
+```
+
+**Commits**:
+- 962465c: test(T028): RED - add failing test for run() method
+- 03472d6: feat(T029): GREEN - implement run() method for startup orchestration
+
 ## Implementation Notes (T030-T031)
 
 **TDD Approach**: RED-GREEN cycle for health verification
@@ -464,6 +533,67 @@ except Exception as e:
 - c9d7a8a: test(T030): RED - add failing test for _verify_health()
 - 75fcbd7: feat(T031): GREEN - implement _verify_health() method
 
+## Implementation Notes (T032-T035)
+
+**TDD Approach**: RED-GREEN cycle for error handling and cleanup methods
+- T032 [RED]: Test failed with `AttributeError: 'StartupOrchestrator' object has no attribute '_cleanup_on_failure'`
+- T033 [GREEN]: Implementation added, test passed
+- T034 [RED]: Test failed with `AssertionError: assert 'Missing credentials' in []` (error not in errors list)
+- T035 [GREEN]: Implementation fixed to add error_message to errors list, test passed
+
+**Key Components Added**:
+1. `StartupOrchestrator._cleanup_on_failure()` - Gracefully closes logger handlers on startup failure
+2. `StartupOrchestrator._create_blocked_result()` - Creates blocked StartupResult with error information
+3. Tests: `test_cleanup_on_failure_closes_logger` and `test_create_blocked_result_includes_error_message`
+
+**Cleanup Logic (_cleanup_on_failure)**:
+- Closes all startup_logger handlers if logger initialized
+- Removes handlers from logger to prevent resource leaks
+- Catches and prints cleanup errors but doesn't raise (fail gracefully)
+- Called in run() method exception handler before returning blocked result
+
+**Blocked Result Creation (_create_blocked_result)**:
+- Adds error_message to self.errors list (if not already present)
+- Returns StartupResult with status="blocked"
+- Includes mode ("paper" or "live" based on config.paper_trading)
+- Includes phase (from config.current_phase)
+- Includes startup_duration_seconds and ISO 8601 timestamp
+- Safe attribute access using hasattr() checks for config
+
+**Test Coverage**: 2 additional tests passing (16 total in test_startup.py)
+- test_cleanup_on_failure_closes_logger verifies logger handlers closed
+- test_create_blocked_result_includes_error_message validates error added to errors list
+- All tests verify proper resource cleanup and error tracking
+
+**Error Handling Pattern**: Consistent with Constitution §Safety_First
+- Fail-fast on critical errors (no partial initialization)
+- Clean up resources properly on failure (prevent leaks)
+- Provide clear error messages in blocked results
+- Never continue trading if startup blocked
+
+**Config Attribute Fix**:
+- Fixed mode access: Changed from `self.config.trading.mode` to `self.config.paper_trading`
+- Fixed phase access: Changed from `self.config.phase_progression.current_phase` to `self.config.current_phase`
+- Added hasattr() checks to prevent AttributeError when config not fully initialized
+
+**Pattern Used**: Resource cleanup with try-except
+```python
+def _cleanup_on_failure(self) -> None:
+    try:
+        if hasattr(self, 'startup_logger'):
+            for handler in self.startup_logger.handlers[:]:
+                handler.close()
+                self.startup_logger.removeHandler(handler)
+    except Exception as e:
+        print(f"Warning: Cleanup error: {e}")
+```
+
+**Evidence of TDD**:
+- T032 RED: Test output shows `AttributeError: 'StartupOrchestrator' object has no attribute '_cleanup_on_failure'`
+- T033 GREEN: Test passed after implementation
+- T034 RED: Test output shows `AssertionError: assert 'Missing credentials' in []`
+- T035 GREEN: Test passed after fixing error_message handling
+
 ## Last Updated
 
-2025-10-09T06:00:00Z
+2025-10-09T06:01:00Z
