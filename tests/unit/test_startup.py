@@ -193,3 +193,17 @@ class TestStartupOrchestrator:
         assert circuit_breaker is not None
         assert hasattr(orchestrator, 'circuit_breaker')
         assert "circuit_breaker" in orchestrator.component_states
+
+    def test_initialize_bot(self, mock_config):
+        """Test initialize_bot creates TradingBot."""
+        # Given: Orchestrator with paper trading config
+        orchestrator = StartupOrchestrator(config=mock_config, dry_run=True)
+
+        # When: Initialize bot
+        bot = orchestrator._initialize_bot()
+
+        # Then: Bot created with correct settings
+        assert bot is not None
+        assert hasattr(orchestrator, 'bot')
+        assert "trading_bot" in orchestrator.component_states
+        assert orchestrator.component_states["trading_bot"]["is_running"] == False
