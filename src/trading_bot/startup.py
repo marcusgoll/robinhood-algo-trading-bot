@@ -13,7 +13,11 @@ Provides:
 """
 
 from dataclasses import dataclass
-from typing import Literal, Optional, List, Dict
+from typing import Literal, Optional, List, Dict, Tuple, TYPE_CHECKING
+import time
+
+if TYPE_CHECKING:
+    from .config import Config
 
 
 @dataclass
@@ -56,3 +60,28 @@ class StartupResult:
     component_states: Dict[str, Dict]
     startup_duration_seconds: float
     timestamp: str  # ISO 8601 UTC
+
+
+class StartupOrchestrator:
+    """Orchestrates startup sequence initialization.
+
+    Coordinates loading, validation, and initialization of all
+    trading bot components in dependency order.
+    """
+
+    def __init__(self, config: Optional['Config'], dry_run: bool = False, json_output: bool = False):
+        """Initialize orchestrator.
+
+        Args:
+            config: Configuration instance (None to load from env)
+            dry_run: If True, validate but don't start trading loop
+            json_output: If True, output JSON instead of text
+        """
+        self.config = config
+        self.dry_run = dry_run
+        self.json_output = json_output
+        self.steps: List[StartupStep] = []
+        self.errors: List[str] = []
+        self.warnings: List[str] = []
+        self.component_states: Dict[str, Dict] = {}
+        self.start_time: Optional[float] = None
