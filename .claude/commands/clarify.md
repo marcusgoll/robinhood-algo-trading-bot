@@ -6,7 +6,7 @@ Clarify ambiguities in specification: $ARGUMENTS
 
 ## MENTAL MODEL
 
-**Workflow**: specify -> clarify -> plan -> tasks -> analyze -> implement -> optimize -> debug -> preview -> phase-1-ship -> validate-staging -> phase-2-ship
+**Workflow**:\spec-flow -> clarify -> plan -> tasks -> analyze -> implement -> optimize -> debug -> preview -> phase-1-ship -> validate-staging -> phase-2-ship
 
 **State machine:**
 - Load spec -> Scan ambiguities -> Prioritize -> Choose mode -> Ask questions -> Update spec -> Suggest next
@@ -503,7 +503,7 @@ fi
 echo ""
 
 # Update NOTES.md with Phase 0.5 checkpoint
-source .specify/templates/notes-update-template.sh
+source \spec-flow/templates/notes-update-template.sh
 
 update_notes_checkpoint "$FEATURE_DIR" "0.5" "Clarify" \
   "Questions answered: $RESOLVED_COUNT" \
@@ -537,3 +537,4 @@ else
   echo "  → /flow continue"
 fi
 ```
+

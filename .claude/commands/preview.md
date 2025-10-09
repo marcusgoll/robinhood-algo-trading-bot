@@ -6,7 +6,7 @@ Preview feature: $ARGUMENTS
 
 ## MENTAL MODEL
 
-**Workflow**: specify → clarify → plan → tasks → analyze → implement → optimize → **preview** → phase-1-ship → validate-staging → phase-2-ship
+**Workflow**:\spec-flow → clarify → plan → tasks → analyze → implement → optimize → **preview** → phase-1-ship → validate-staging → phase-2-ship
 
 **What this does**:
 - Generates testing checklist from spec.md
@@ -1088,7 +1088,7 @@ echo ""
 echo "Updating NOTES.md..."
 
 # Source the template
-source .specify/templates/notes-update-template.sh
+source \spec-flow/templates/notes-update-template.sh
 
 TESTED_BROWSERS=$(grep -A 6 "## Browser Testing" "$CHECKLIST_FILE" | grep "\[x\]" | wc -l || echo 0)
 CHECKLIST_TOKENS=$(cat "$CHECKLIST_FILE" | wc -w)
@@ -1244,3 +1244,4 @@ if ls "$FEATURE_DIR"/axe-*.json 1> /dev/null 2>&1; then
 fi
 echo ""
 ```
+

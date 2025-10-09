@@ -83,7 +83,7 @@ if [ ! -f "$TOKENS_FILE" ]; then
   mkdir -p "$DESIGN_SYSTEM_DIR/proposals"
 
   # Validate templates exist
-  TEMPLATE_DIR=".specify/templates/design-system"
+  TEMPLATE_DIR="\spec-flow/templates/design-system"
   required_templates=(
     "$TEMPLATE_DIR/tokens.json"
     "$TEMPLATE_DIR/ui-inventory.md"
@@ -94,7 +94,7 @@ if [ ! -f "$TOKENS_FILE" ]; then
   for template in "${required_templates[@]}"; do
     if [ ! -f "$template" ]; then
       echo "❌ Missing template: $template"
-      echo "Design system templates required in .specify/templates/design-system/"
+      echo "Design system templates required in \spec-flow/templates/design-system/"
       exit 1
     fi
   done
@@ -202,7 +202,7 @@ if [ ${#MISSING_KEYS[@]} -gt 0 ]; then
     echo "    - $key"
   done
   echo ""
-  echo "Compare with template: .specify/templates/design-system/tokens.json"
+  echo "Compare with template: \spec-flow/templates/design-system/tokens.json"
   exit 1
 fi
 
@@ -1349,3 +1349,4 @@ Or iterate:
 6. Clear error messages with fix examples
 
 **Result**: No polished screen reaches production without 100% design system compliance.
+

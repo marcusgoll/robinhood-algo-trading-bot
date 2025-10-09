@@ -6,7 +6,7 @@ Manage the CFIPros roadmap: $ARGUMENTS
 
 ## MENTAL MODEL
 
-**Workflow**: roadmap -> specify -> clarify -> plan -> tasks -> implement -> optimize -> ship
+**Workflow**: roadmap ->\spec-flow -> clarify -> plan -> tasks -> implement -> optimize -> ship
 
 **State machine:**
 - Parse intent -> Execute action -> Auto-sort -> Return summary
@@ -21,15 +21,15 @@ Manage the CFIPros roadmap: $ARGUMENTS
 
 Check if roadmap exists, create from template if missing:
 ```bash
-if [ ! -f ".specify/memory/roadmap.md" ]; then
-  mkdir -p .specify/memory
-  cp .specify/templates/roadmap-template.md .specify/memory/roadmap.md
+if [ ! -f "\spec-flow/memory/roadmap.md" ]; then
+  mkdir -p \spec-flow/memory
+  cp \spec-flow/templates/roadmap-template.md \spec-flow/memory/roadmap.md
 fi
 ```
 
 ## CONTEXT
 
-**Location**: `.specify/memory/roadmap.md`
+**Location**: `\spec-flow/memory/roadmap.md`
 
 **Sections** (priority order):
 1. Shipped (done)
@@ -118,7 +118,7 @@ Create split features? (Y/n)
    - Trigger auto-sort
 
 4. If "n": Add original feature as-is with warning tag
-   - Add `[LARGE: consider splitting before /specify]` to requirements
+   - Add `[LARGE: consider splitting before \spec-flow]` to requirements
 
 **Example split:**
 ```
@@ -187,8 +187,8 @@ Default: B
 **QUICK BRAINSTORM** (2-3 tool calls):
 
 **Step 1 - CFIPros Context:**
-- Read `.specify/memory/constitution.md` (mission)
-- Read `.specify/memory/roadmap.md` (existing features)
+- Read `\spec-flow/memory/constitution.md` (mission)
+- Read `\spec-flow/memory/roadmap.md` (existing features)
 
 **Step 2 - Focused Research:**
 - WebSearch: "[user-specified topic] features 2025" (if args provided)
@@ -223,8 +223,8 @@ Which to add? (1,2,3, all, skip)
 **Phase 1: RESEARCH**
 
 **Step 1 - CFIPros Context:**
-- Read `.specify/memory/constitution.md` (mission: AKTR→ACS extraction for aviation education)
-- Read `.specify/memory/roadmap.md` (existing features, identify gaps)
+- Read `\spec-flow/memory/constitution.md` (mission: AKTR→ACS extraction for aviation education)
+- Read `\spec-flow/memory/roadmap.md` (existing features, identify gaps)
 - Glob `specs/*/spec.md` (patterns, user flows, reusable infra)
 
 **Step 2 - Industry Research:**
@@ -340,20 +340,20 @@ Confirm? (yes/no)
 - Trigger auto-sort for specified section (see AUTO-SORT LOGIC)
 - Show updated section summary
 
-### 6. SPECIFY HANDOFF
+### 6.\spec-flow HANDOFF
 
-**Parse**: "specify [slug]" or "create spec for [slug]"
+**Parse**: \spec-flow [slug]" or "create spec for [slug]"
 
 **Execute:**
 - Check if specs/[slug]/ exists
 - Extract requirements from roadmap item
-- Show `/specify` command with context:
+- Show `\spec-flow` command with context:
 
 ```
-Run: /specify [slug]
+Run: \spec-flow [slug]
 
-/specify will:
-1. Read .specify/memory/roadmap.md
+\spec-flow will:
+1. Read \spec-flow/memory/roadmap.md
 2. Find [slug] in roadmap
 3. Extract requirements as context
 4. Generate spec in specs/[slug]/spec.md
@@ -419,7 +419,7 @@ Backlog Top 3:
 2. [slug-2] (Score: N.NN) - [title]
 3. [slug-3] (Score: N.NN) - [title]
 
-💡 Next: /roadmap clarify [slug] OR /specify [slug]
+💡 Next: /roadmap clarify [slug] OR \spec-flow [slug]
 ```
 
 **If auto-split created:**
@@ -436,7 +436,7 @@ Backlog Top 5:
 2. [other-slug] (Score: N.NN) - [title]
 3. [slug-2] (Score: N.NN) - [title] [BLOCKED]
 
-💡 Next: /specify [slug-1] (ship basic version first)
+💡 Next: \spec-flow [slug-1] (ship basic version first)
 ```
 
 **If clarifications offered:**
@@ -455,3 +455,4 @@ Default: B
 
 [Waiting for selection]
 ```
+

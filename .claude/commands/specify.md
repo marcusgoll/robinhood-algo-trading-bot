@@ -6,7 +6,7 @@ Create specification for: $ARGUMENTS
 
 ## MENTAL MODEL
 
-**Workflow**: specify -> clarify -> plan -> tasks -> analyze -> implement -> optimize -> debug -> preview -> phase-1-ship -> validate-staging -> phase-2-ship
+**Workflow**: spec-flow -> clarify -> plan -> tasks -> analyze -> implement -> optimize -> debug -> preview -> phase-1-ship -> validate-staging -> phase-2-ship
 
 **State machine:**
 - Validate input -> Check git -> Feature classification -> Check roadmap -> Research -> Generate spec -> Update roadmap -> Suggest next
@@ -30,16 +30,16 @@ Create specification for: $ARGUMENTS
 
 **Path constants:**
 ```bash
-ROADMAP_FILE=".specify/memory/roadmap.md"
-CONSTITUTION_FILE=".specify/memory/constitution.md"
-INSPIRATIONS_FILE=".specify/memory/design-inspirations.md"
+ROADMAP_FILE=".spec-flow/memory/roadmap.md"
+CONSTITUTION_FILE=".spec-flow/memory/constitution.md"
+INSPIRATIONS_FILE=".spec-flow/memory/design-inspirations.md"
 UI_INVENTORY_FILE="design/systems/ui-inventory.md"
 BUDGETS_FILE="design/systems/budgets.md"
 
-SPEC_TEMPLATE=".specify/templates/spec-template.md"
-HEART_TEMPLATE=".specify/templates/heart-metrics-template.md"
-SCREENS_TEMPLATE=".specify/templates/screens-yaml-template.yaml"
-VISUALS_TEMPLATE=".specify/templates/visuals-readme-template.md"
+SPEC_TEMPLATE=".spec-flow/templates/spec-template.md"
+HEART_TEMPLATE=".spec-flow/templates/heart-metrics-template.md"
+SCREENS_TEMPLATE=".spec-flow/templates/screens-yaml-template.yaml"
+VISUALS_TEMPLATE=".spec-flow/templates/visuals-readme-template.md"
 ```
 
 **Context management:**
@@ -55,7 +55,7 @@ COMPACT_THRESHOLD=50000  # Planning quality degrades above 50k tokens
 # Check arguments provided
 if [ -z "$ARGUMENTS" ]; then
   echo "Error: Feature name required"
-  echo "Usage: /specify [feature-name]"
+  echo "Usage: /spec-flow [feature-name]"
   exit 1
 fi
 
@@ -105,13 +105,13 @@ if [ -n "$(git status --porcelain)" ]; then
   echo "Options:"
   echo "  A) Stash changes (git stash)"
   echo "  B) Commit changes first"
-  echo "  C) Abort /specify"
+  echo "  C) Abort /spec-flow"
   echo ""
   read -p "Choice (A/B/C): " choice
 
   case $choice in
     A|a) git stash ;;
-    B|b) echo "Commit your changes, then re-run /specify"; exit 1 ;;
+    B|b) echo "Commit your changes, then re-run /spec-flow"; exit 1 ;;
     C|c) echo "Aborted"; exit 0 ;;
     *) echo "Invalid choice, aborting"; exit 1 ;;
   esac
@@ -136,7 +136,7 @@ fi
 # 4. Check spec directory doesn't exist
 if [ -d "specs/${SLUG}" ]; then
   echo "Error: Spec directory 'specs/${SLUG}/' already exists"
-  echo "Run: /specify [different-name]"
+  echo "Run: /spec-flow [different-name]"
   exit 1
 fi
 ```
@@ -155,7 +155,7 @@ REQUIRED_TEMPLATES=(
 for template in "${REQUIRED_TEMPLATES[@]}"; do
   if [ ! -f "$template" ]; then
     echo "Error: Missing required template: $template"
-    echo "Run: git checkout main -- .specify/templates/"
+    echo "Run: git checkout main -- .spec-flow/templates/"
     exit 1
   fi
 done
@@ -190,7 +190,7 @@ cat > $NOTES_FILE <<EOF
 [Populated during system component check]
 
 ## Checkpoints
-- Phase 0 (Specify): $(date -I)
+- Phase 0 (Spec-flow): $(date -I)
 
 ## Last Updated
 $(date -Iseconds)
@@ -607,7 +607,7 @@ if [ "$FROM_ROADMAP" = true ]; then
 
 Branch: ${SLUG}
 Spec: specs/${SLUG}/spec.md
-Updated after /specify completed"
+Updated after /spec-flow completed"
 
     echo "✅ Roadmap updated: ${SLUG} now in In Progress"
   else
@@ -633,7 +633,7 @@ fi
 # Build commit message based on what exists
 COMMIT_MSG="design:spec: add ${SLUG} specification
 
-Phase 0: Specify
+Phase 0: Spec-flow
 - User scenarios (Given/When/Then)
 - Requirements documented"
 
@@ -705,7 +705,7 @@ git commit -m "$COMMIT_MSG"
 
 ```bash
 # Rollback function
-rollback_specify() {
+rollback_spec_flow() {
   echo "⚠️  Spec generation failed. Rolling back changes..."
 
   # 1. Return to original branch
@@ -728,8 +728,8 @@ rollback_specify() {
   exit 1
 }
 
-# Usage: trap rollback_specify on errors
-# Example: [ -f "$SPEC_TEMPLATE" ] || rollback_specify "Missing template"
+# Usage: trap rollback_spec_flow on errors
+# Example: [ -f "$SPEC_TEMPLATE" ] || rollback_spec_flow "Missing template"
 ```
 
 ## AUTO-COMPACTION
@@ -745,7 +745,7 @@ In `/flow` mode, auto-compaction runs after specification:
 ```
 
 **When to compact:**
-- Auto: After `/specify` in `/flow` mode
+- Auto: After `/spec-flow` in `/flow` mode
 - Manual: If context >`$COMPACT_THRESHOLD` tokens before `/clarify` or `/plan`
 - Rationale: Planning quality degrades above 50k tokens (empirical observation)
 

@@ -6,7 +6,7 @@
 
 **When to use**: After `/phase-1-ship` completes and deploys to staging environment. This is the quality gate before `/phase-2-ship` to production.
 
-**Workflow position**: `specify → clarify → plan → tasks → analyze → implement → optimize → debug → preview → phase-1-ship → **validate-staging** → phase-2-ship`
+**Workflow position**: \spec-flow → clarify → plan → tasks → analyze → implement → optimize → debug → preview → phase-1-ship → **validate-staging** → phase-2-ship`
 
 ---
 
@@ -1094,3 +1094,4 @@ if grep -q "❌ Blocked" "$VALIDATION_REPORT"; then
   exit 1
 fi
 ```
+

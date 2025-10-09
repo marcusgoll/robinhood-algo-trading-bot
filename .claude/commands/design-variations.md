@@ -34,7 +34,7 @@ MOCK_DIR="apps/web/mock/$SLUG"
 # Validate feature exists
 if [ ! -d "$FEATURE_DIR" ]; then
   echo "❌ Feature not found: $FEATURE_DIR"
-  echo "Run /specify first"
+  echo "Run \spec-flow first"
   exit 1
 fi
 
@@ -48,7 +48,7 @@ required_files=(
 for file in "${required_files[@]}"; do
   if [ ! -f "$file" ]; then
     echo "❌ Missing: $file"
-    echo "Run /specify to generate required design artifacts"
+    echo "Run \spec-flow to generate required design artifacts"
     exit 1
   fi
 done
@@ -116,7 +116,7 @@ ALLOWED_COMPONENTS=($(grep "^## " "$UI_INVENTORY" | sed 's/## //'))
 ```bash
 # 1. Read Jobs principles
 echo "📐 Applying Jobs Principles..."
-cat .specify/memory/design-philosophy.md
+cat \spec-flow/memory/design-philosophy.md
 
 # 2. Define constraints
 PRIMARY_ACTION=$(grep "primary_action:" "$SCREENS_YAML" | head -1 | sed 's/.*: //')
@@ -563,13 +563,13 @@ export default function CompareVariants() {
 
 ```bash
 # Check template exists
-if [ ! -f ".specify/templates/design-crit-template.md" ]; then
-  echo "❌ Missing: .specify/templates/design-crit-template.md"
+if [ ! -f "\spec-flow/templates/design-crit-template.md" ]; then
+  echo "❌ Missing: \spec-flow/templates/design-crit-template.md"
   exit 1
 fi
 
 # Copy template
-cp ".specify/templates/design-crit-template.md" "$FEATURE_DIR/design/crit.md"
+cp "\spec-flow/templates/design-crit-template.md" "$FEATURE_DIR/design/crit.md"
 
 # Fill with dynamic data from screens.yaml
 sed -i "s/{{FEATURE_SLUG}}/$SLUG/g" "$FEATURE_DIR/design/crit.md"
@@ -687,7 +687,7 @@ Guidance (Jobs Principles):
 - One primary CTA per screen (no button soup)
 - Jobs checklist (run validation):
   ```bash
-  bash .specify/scripts/verify-design-principles.sh
+  bash \spec-flow/scripts/verify-design-principles.sh
   ```
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -721,7 +721,7 @@ This will:
 - [ ] Primary action describable in ≤5 words?
 - [ ] All variants ≤2 clicks to complete primary action?
 - [ ] Zero tooltips needed (design is obvious)?
-- [ ] Spacing on 8px grid (run: `bash .specify/scripts/verify-design-principles.sh`)?
+- [ ] Spacing on 8px grid (run: `bash \spec-flow/scripts/verify-design-principles.sh`)?
 - [ ] Transitions 200-300ms?
 - [ ] At least 2 variants break from conventional patterns?
 - [ ] Real copy from copy.md (no Lorem Ipsum)
@@ -752,3 +752,4 @@ This will:
 **Phase**: 1 of 3 (Variations → Functional → Polish)
 **Command Version**: 1.0
 **Last Updated**: 2025-10-05
+

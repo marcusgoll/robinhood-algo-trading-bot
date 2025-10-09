@@ -14,7 +14,7 @@ This command runs AFTER `/phase-2-ship` has successfully deployed to production 
 Execute the finalization script to update all documentation:
 
 ```bash
-bash .specify/scripts/bash/finalize.sh
+bash \spec-flow/scripts/bash/finalize.sh
 ```
 
 ## What the Script Does
@@ -146,3 +146,4 @@ bash .specify/scripts/bash/finalize.sh
 - Documentation-only (no deployment risk)
 - Can skip for internal features if documentation not needed
 - Errors in milestone management don't block documentation updates
+

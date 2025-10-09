@@ -1442,7 +1442,7 @@ After completing optimization, update NOTES.md with Phase 5 checkpoint:
 
 ```bash
 # Source the template
-source .specify/templates/notes-update-template.sh
+source \spec-flow/templates/notes-update-template.sh
 
 # Collect optimization results
 PERF_STATUS=$(grep -q "Performance: ✅" "$OPTIMIZATION_REPORT" && echo "All targets met" || echo "Issues found")
@@ -1484,3 +1484,4 @@ Brief summary:
 - 📋 Code Quality: Senior review passed, tests passing XX% coverage
 - ⚠️  Blockers: N issues found (fix before /preview) OR 0 (ready for /preview)
 - Next: `/preview` (manual UI/UX testing before shipping) (or /compact if threshold exceeded)
+

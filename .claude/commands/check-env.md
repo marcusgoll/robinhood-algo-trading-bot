@@ -102,7 +102,7 @@ if ! command -v doppler &>/dev/null; then
   echo "  curl -Ls https://cli.doppler.com/install.sh | sh  (Linux)"
   echo ""
   echo "Or run setup:"
-  echo "  bash .specify/commands/setup-doppler.sh"
+  echo "  bash \spec-flow/commands/setup-doppler.sh"
   exit 1
 fi
 
@@ -158,7 +158,7 @@ if [ "$MISSING_CONFIGS" = true ]; then
   echo "❌ Missing Doppler configs"
   echo ""
   echo "Run setup to create configs:"
-  echo "  bash .specify/commands/setup-doppler.sh"
+  echo "  bash \spec-flow/commands/setup-doppler.sh"
   echo ""
   exit 1
 fi
@@ -483,3 +483,4 @@ Add to Vercel:
 Add to Railway:
   railway variables set [VAR_NAME]=[value] --environment staging
 ```
+

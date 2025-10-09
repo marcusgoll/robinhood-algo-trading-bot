@@ -800,7 +800,7 @@ Or iterate:
 **Jobs Perfection Checklist (manual verification required):**
 - [ ] Time test: 5 users ALL <10s to complete primary action, 0 questions asked
 - [ ] Simplicity: ≤2 clicks to complete primary action, no tooltips needed
-- [ ] Details: Spacing audit passes (8px grid, run `bash .specify/scripts/verify-design-principles.sh`)
+- [ ] Details: Spacing audit passes (8px grid, run `bash \spec-flow/scripts/verify-design-principles.sh`)
 - [ ] Details: Animation audit passes (200-300ms transitions with easing)
 - [ ] Focus: One primary CTA per screen (no button soup)
 - [ ] Innovation: Beats control in A/B test (or explain hypothesis in analytics.md)
@@ -838,3 +838,4 @@ Or iterate:
 **Phase**: 2 of 3 (Variations → Functional → **Polish**)
 **Command Version**: 1.0
 **Last Updated**: 2025-10-05
+

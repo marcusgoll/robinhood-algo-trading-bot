@@ -10,7 +10,7 @@ description: Automated staging→production promotion with versioning and releas
 
 **When to use**: After `/validate-staging` passes with all checks green. This is the final step to ship features to production.
 
-**Workflow position**: `specify → clarify → plan → tasks → analyze → implement → optimize → debug → preview → phase-1-ship → validate-staging → **phase-2-ship**`
+**Workflow position**: \spec-flow → clarify → plan → tasks → analyze → implement → optimize → debug → preview → phase-1-ship → validate-staging → **phase-2-ship**`
 
 ---
 
@@ -94,7 +94,7 @@ fi
 SPEC_FILE="$FEATURE_DIR/spec.md"
 SHIP_REPORT="$FEATURE_DIR/ship-report.md"
 NOTES_FILE="$FEATURE_DIR/NOTES.md"
-ROADMAP_FILE=".specify/memory/roadmap.md"
+ROADMAP_FILE="\spec-flow/memory/roadmap.md"
 
 # Initialize production URLs
 GITHUB_REPO="cfipros/monorepo"
@@ -109,7 +109,57 @@ echo ""
 
 ---
 
-### Phase 2.2: VALIDATE STAGING PASSED
+### Phase 2.2: CHECK REMOTE REPOSITORY
+
+```bash
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Checking Remote Repository Configuration"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Check if remote origin exists
+if ! git remote -v | grep -q "origin"; then
+  echo "❌ No remote repository configured"
+  echo ""
+  echo "Phase 2 Ship requires a remote repository with production workflow."
+  echo ""
+  echo "This appears to be a local-only project."
+  echo ""
+  echo "Options:"
+  echo "  1. Add remote repository:"
+  echo "     git remote add origin <repository-url>"
+  echo "     git push -u origin main"
+  echo ""
+  echo "  2. For local-only deployment:"
+  echo "     Manually deploy your feature to production environment"
+  echo "     See project documentation for deployment instructions"
+  echo ""
+  echo "  3. Update project configuration:"
+  echo "     See .spec-flow/memory/constitution.md (Project Configuration section)"
+  exit 1
+fi
+
+# Check if GitHub CLI is available for workflow dispatch
+if ! command -v gh &> /dev/null; then
+  echo "⚠️  GitHub CLI (gh) not found"
+  echo ""
+  echo "Phase 2 Ship requires GitHub CLI for workflow dispatch."
+  echo ""
+  echo "Install GitHub CLI:"
+  echo "  macOS: brew install gh"
+  echo "  Windows: winget install GitHub.cli"
+  echo "  Linux: See https://github.com/cli/cli#installation"
+  exit 1
+fi
+
+echo "✅ Remote repository configured"
+echo "✅ GitHub CLI available"
+echo ""
+```
+
+---
+
+### Phase 2.3: VALIDATE STAGING PASSED
 
 ```bash
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -866,7 +916,7 @@ echo "Updating NOTES.md with deployment metadata..."
 echo ""
 
 # Source the template
-source .specify/templates/notes-update-template.sh
+source \spec-flow/templates/notes-update-template.sh
 
 # Add Phase 8 (Production) checkpoint
 update_notes_checkpoint "$FEATURE_DIR" "8" "Ship to Production" \
@@ -1096,7 +1146,7 @@ echo "3. Celebrate! 🎉"
 echo ""
 
 echo "---"
-echo "**Workflow complete**: specify → ... → optimize → preview → phase-1-ship → validate-staging → phase-2-ship ✅"
+echo "**Workflow complete**:\spec-flow → ... → optimize → preview → phase-1-ship → validate-staging → phase-2-ship ✅"
 echo ""
 ```
 
@@ -1256,5 +1306,6 @@ https://github.com/cfipros/monorepo/releases/new?tag=v[X.Y.Z]
 3. Celebrate! 🎉
 
 ---
-**Workflow complete**: specify → ... → optimize → preview → phase-1-ship → validate-staging → phase-2-ship ✅
+**Workflow complete**:\spec-flow → ... → optimize → preview → phase-1-ship → validate-staging → phase-2-ship ✅
 ```
+
