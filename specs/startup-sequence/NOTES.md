@@ -299,6 +299,10 @@ This feature formalizes the trading bot's startup sequence, transforming the cur
 - ✅ T021 [GREEN→T020]: Implement _initialize_bot() - Creates TradingBot with all parameters
 
 ### Phase 3.4: Display and Output Formatting
+- ✅ T022 [RED]: Write failing test for _display_banner() - Added test expecting PAPER TRADING banner output
+- ✅ T023 [GREEN→T022]: Implement _display_banner() method - Displays mode and phase with formatted banner
+- ✅ T024 [RED]: Test _display_summary() - Added failing test for startup summary display
+- ✅ T025 [GREEN→T024]: Implement _display_summary() - Shows completion message, phase, max trades, circuit breaker status
 - ✅ T026 [RED]: Test _format_json_output() - Added failing test for JSON output formatting
 - ✅ T027 [GREEN→T026]: Implement _format_json_output() - Returns JSON string with all required fields
 
@@ -357,6 +361,64 @@ This feature formalizes the trading bot's startup sequence, transforming the cur
 - Automated health checks
 - Integration with external tools
 
+## Implementation Notes (T022-T023)
+
+**TDD Approach**: RED-GREEN cycle for display banner
+- T022 [RED]: Test failed with `AttributeError: 'StartupOrchestrator' object has no attribute '_display_banner'`
+- T023 [GREEN]: Implementation added, test passed immediately
+
+**Key Components Added**:
+1. `StartupOrchestrator._display_banner()` - Displays startup banner with mode information
+2. Pattern reused: mode_switcher.py display_mode_banner() approach (line 141)
+
+**Banner Output**:
+- 60-character width separator lines
+- Title: "ROBINHOOD TRADING BOT - STARTUP SEQUENCE"
+- Mode display: "PAPER TRADING (Simulation - No Real Money)" or "LIVE TRADING (Real Money)"
+- Conditional mode based on config.trading.mode
+
+**Test Coverage**: 1 additional test passing (12 total)
+- test_display_banner_paper_mode verifies banner contains correct text
+- Captures stdout using pytest's capsys fixture
+- Validates PAPER TRADING mode display
+
+**Design Decision**: Simple print() statements for console output
+- No logging (banner is user-facing, not audit trail)
+- No JSON mode (only displayed in text mode)
+- Consistent with mode_switcher.py banner pattern
+
+## Implementation Notes (T024-T025)
+
+**TDD Approach**: RED-GREEN cycle for display summary
+- T024 [RED]: Test failed with `AttributeError: 'StartupOrchestrator' object has no attribute '_display_summary'`
+- T025 [GREEN]: Implementation added, all tests passed (12/12)
+
+**Key Components Added**:
+1. `StartupOrchestrator._display_summary()` - Displays startup completion summary with config details
+2. Updated `tests/conftest.py` - Added phase-specific mock config (phase_progression.experience)
+
+**Summary Output**:
+- Completion message: "STARTUP COMPLETE - Ready to trade"
+- Current phase display from config.phase_progression.current_phase
+- Max trades today from phase-specific config (getattr pattern)
+- Circuit breaker status with max_daily_loss_pct and max_consecutive_losses
+- DRY RUN indicator when dry_run=True
+
+**Test Coverage**: 1 additional test passing (12 total in test_startup.py)
+- test_display_summary_shows_config verifies all summary sections
+- Captures stdout using pytest's capsys fixture
+- Validates STARTUP COMPLETE, Current Phase, Circuit Breaker, DRY RUN messages
+
+**Pattern Used**: Dynamic phase config access via getattr()
+```python
+phase_config = getattr(self.config.phase_progression, self.config.phase_progression.current_phase)
+max_trades = phase_config.max_trades_per_day
+```
+
+**Commits**:
+- 6a6511f: test(T024): RED - add failing test for _display_summary()
+- fbfa7ef: feat(T025): GREEN - implement _display_summary() method
+
 ## Last Updated
 
-2025-10-09T02:15:00Z
+2025-10-09T02:30:00Z
