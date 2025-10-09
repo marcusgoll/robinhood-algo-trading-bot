@@ -234,11 +234,47 @@ Stocks/
 - **Purpose**: Sensitive authentication data (§Security)
 - **Location**: `.env` (gitignored, never commit!)
 - **Required**:
-  - `ROBINHOOD_USERNAME`
-  - `ROBINHOOD_PASSWORD`
-- **Optional**:
-  - `ROBINHOOD_MFA_SECRET` - For pyotp MFA automation
-  - `ROBINHOOD_DEVICE_TOKEN` - For faster authentication
+  - `ROBINHOOD_USERNAME` - Your Robinhood account email
+  - `ROBINHOOD_PASSWORD` - Your Robinhood account password
+- **Optional (Recommended)**:
+  - `ROBINHOOD_MFA_SECRET` - Base32-encoded TOTP secret for automated MFA (16 characters, A-Z2-7)
+  - `ROBINHOOD_DEVICE_TOKEN` - Device token for faster authentication (auto-populated after first login with MFA)
+
+### Credentials Setup (T032)
+
+**First-Time Setup**:
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` and add your credentials:
+   ```bash
+   ROBINHOOD_USERNAME=your_email@example.com
+   ROBINHOOD_PASSWORD=your_secure_password
+   ROBINHOOD_MFA_SECRET=ABCDEFGHIJKLMNOP  # Optional: 16-char base32 secret
+   DEVICE_TOKEN=                           # Leave empty - auto-populated
+   ```
+
+3. **MFA Secret Setup** (Optional but recommended):
+   - Enable 2FA in Robinhood app (Settings → Security → Two-Factor Authentication)
+   - During setup, you'll see a QR code and a secret key
+   - Copy the **secret key** (16 uppercase characters/numbers) into `ROBINHOOD_MFA_SECRET`
+   - This allows the bot to generate MFA codes automatically using `pyotp`
+
+**Device Token Auto-Population**:
+- On first successful authentication with MFA, the bot automatically saves a device token to `.env`
+- Device tokens allow faster authentication without MFA on subsequent logins
+- If device token becomes invalid (e.g., after password change), the bot automatically falls back to MFA
+- New device token is saved to `.env` after successful MFA fallback
+- **Security**: Device tokens are stored with 600 permissions (owner read/write only)
+
+**Credential Security**:
+- Credentials are **never** logged in plaintext (§Security)
+- Usernames masked in logs: `use***@example.com`
+- Passwords/MFA secrets never logged (even masked)
+- Device tokens partially masked: `1a2b3c4d***`
+- All masking handled by `utils.security` module
 
 ### 2. Trading Parameters (config.json)
 - **Purpose**: Trading strategy and risk settings
