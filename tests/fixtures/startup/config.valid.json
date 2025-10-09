@@ -1,0 +1,9 @@
+{
+  "trading": {"mode": "paper"},
+  "phase_progression": {"current_phase": "experience"},
+  "risk_management": {
+    "max_daily_loss_pct": 3.0,
+    "max_consecutive_losses": 3,
+    "max_position_pct": 5.0
+  }
+}
