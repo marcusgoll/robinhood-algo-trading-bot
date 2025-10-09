@@ -166,3 +166,17 @@ class TestStartupOrchestrator:
         assert orchestrator.steps[0].name == "Initializing logging system"
         assert orchestrator.steps[0].status == "success"
         assert "logging" in orchestrator.component_states
+
+    def test_initialize_mode_switcher(self, mock_config):
+        """Test initialize_mode_switcher creates ModeSwitcher."""
+        # Given: Orchestrator with paper mode config
+        orchestrator = StartupOrchestrator(config=mock_config, dry_run=True)
+
+        # When: Initialize mode switcher
+        mode_switcher = orchestrator._initialize_mode_switcher()
+
+        # Then: Mode switcher created
+        assert mode_switcher is not None
+        assert hasattr(orchestrator, 'mode_switcher')
+        assert "mode_switcher" in orchestrator.component_states
+        assert orchestrator.component_states["mode_switcher"]["status"] == "ready"
