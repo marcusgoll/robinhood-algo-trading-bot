@@ -15,7 +15,7 @@ from .trade_record import TradeRecord
 # T018-T021 [GREEN]: StructuredTradeLogger implemented and tested
 from .structured_logger import StructuredTradeLogger
 
-# Coming in future tasks:
-# from .query_helper import TradeQueryHelper
+# T026-T029 [GREEN]: TradeQueryHelper implemented and tested
+from .query_helper import TradeQueryHelper
 
-__all__ = ['TradeRecord', 'StructuredTradeLogger']
+__all__ = ['TradeRecord', 'StructuredTradeLogger', 'TradeQueryHelper']
