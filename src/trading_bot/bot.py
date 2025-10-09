@@ -10,7 +10,10 @@ Enforces Constitution v1.0.0 principles:
 from typing import Dict, List, Optional, Any
 from decimal import Decimal
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
+import hashlib
+import uuid
 
 # REFACTORED: Import SafetyChecks instead of local CircuitBreaker
 # Old CircuitBreaker class removed in favor of comprehensive SafetyChecks module
@@ -19,6 +22,9 @@ from src.trading_bot.safety_checks import SafetyChecks
 
 # T038: Authentication module integration
 from src.trading_bot.auth import RobinhoodAuth, AuthenticationError
+
+# T030-T034: Structured logging integration
+from src.trading_bot.logging import StructuredTradeLogger, TradeRecord
 
 logger = logging.getLogger(__name__)
 
@@ -160,13 +166,27 @@ class TradingBot:
         self.positions: Dict[str, Dict] = {}
         self.is_running: bool = False
 
+        # T030: Initialize StructuredTradeLogger for dual logging (text + JSONL)
+        self.structured_logger = StructuredTradeLogger(log_dir=Path("logs"))
+
+        # T030: Generate session_id for trade tracking
+        self.session_id = str(uuid.uuid4())
+
+        # T030: Bot version for reproducibility
+        self.bot_version = "1.0.0"
+
+        # T030: Config hash for audit trail
+        config_str = f"{paper_trading}_{max_position_pct}_{max_daily_loss_pct}_{max_consecutive_losses}"
+        self.config_hash = hashlib.sha256(config_str.encode()).hexdigest()[:16]
+
         logger.info(
             f"TradingBot initialized | "
             f"Paper Trading: {paper_trading} | "
             f"Max Position: {max_position_pct}% | "
             f"Max Daily Loss: {max_daily_loss_pct}% | "
             f"Max Consecutive Losses: {max_consecutive_losses} | "
-            f"Trading Hours: {trading_timezone}"
+            f"Trading Hours: {trading_timezone} | "
+            f"Session ID: {self.session_id}"
         )
 
     def start(self) -> None:
@@ -315,7 +335,52 @@ class TradingBot:
             logger.error(f"Trade rejected: Old circuit breaker tripped | {symbol} {action} {shares}")
             return
 
-        # Log trade decision with reasoning (§Audit_Everything)
+        # T032: Build TradeRecord for structured logging
+        order_id = str(uuid.uuid4())
+        timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+        total_value = price * shares
+
+        trade_record = TradeRecord(
+            # Core Trade Data
+            timestamp=timestamp,
+            symbol=symbol,
+            action=action.upper(),
+            quantity=shares,
+            price=price,
+            total_value=total_value,
+            # Execution Context
+            order_id=order_id,
+            execution_mode="PAPER" if self.paper_trading else "LIVE",
+            account_id=None,  # TODO: Get from RobinhoodAuth when live trading
+            # Strategy Metadata
+            strategy_name="manual",  # Manual trade execution
+            entry_type="manual",
+            stop_loss=None,
+            target=None,
+            # Decision Audit Trail
+            decision_reasoning=reason,
+            indicators_used=[],
+            risk_reward_ratio=None,
+            # Outcome Tracking (filled at exit)
+            outcome="open",
+            profit_loss=None,
+            hold_duration_seconds=None,
+            exit_timestamp=None,
+            exit_reasoning=None,
+            # Performance Metrics
+            slippage=None,
+            commission=None,
+            net_profit_loss=None,
+            # Compliance & Audit
+            session_id=self.session_id,
+            bot_version=self.bot_version,
+            config_hash=self.config_hash,
+        )
+
+        # T034: Log to structured logger (JSONL)
+        self.structured_logger.log_trade(trade_record)
+
+        # Log trade decision with reasoning (§Audit_Everything) - Text logging maintained
         logger.info(
             f"TRADE EXECUTED | "
             f"Symbol={symbol} | "
@@ -324,7 +389,8 @@ class TradingBot:
             f"Price=${price} | "
             f"Paper={self.paper_trading} | "
             f"Reason={reason} | "
-            f"Timestamp={datetime.utcnow().isoformat()}"
+            f"Timestamp={timestamp} | "
+            f"Order ID={order_id}"
         )
 
         if self.paper_trading:
