@@ -61,7 +61,7 @@ def main() -> int:
         account_data = AccountData(auth=auth)
 
         # Initialize TradeQueryHelper
-        trade_helper = TradeQueryHelper(log_file=Path("logs/trades-structured.jsonl"))
+        trade_helper = TradeQueryHelper(log_dir=Path("logs"))
 
         # Load targets (optional)
         targets = load_targets()
@@ -90,7 +90,7 @@ def main() -> int:
                 "exit_reason": "keyboard_interrupt",
             },
         )
-        print("\n\n⚠️  Dashboard interrupted by user")
+        print("\n\nWarning: Dashboard interrupted by user")
         return 130
 
     except Exception as e:
@@ -103,7 +103,7 @@ def main() -> int:
             },
             exc_info=True,
         )
-        print(f"\n❌ Dashboard error: {e}")
+        print(f"\nError: Dashboard error: {e}")
         return 1
 
 
