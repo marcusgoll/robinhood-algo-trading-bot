@@ -68,6 +68,21 @@ class StartupOrchestrator:
 
     Coordinates loading, validation, and initialization of all
     trading bot components in dependency order.
+
+    Enforces Constitution v1.0.0:
+    - Safety_First: All safety systems initialized before trading
+    - Pre_Deploy: Comprehensive validation before trading begins
+    - Security: Credentials validated, never logged
+
+    Attributes:
+        config: Configuration instance (None to load from env)
+        dry_run: If True, validate but don't start trading loop
+        json_output: If True, output JSON instead of text
+        steps: List of StartupStep objects tracking progress
+        errors: List of error messages encountered
+        warnings: List of warning messages
+        component_states: Dict of component name to state dict
+        start_time: Timestamp when startup sequence began
     """
 
     def __init__(self, config: Optional['Config'], dry_run: bool = False, json_output: bool = False):

@@ -84,6 +84,116 @@ This project follows strict development principles defined in [`.specify/memory/
 
 ---
 
+## Usage
+
+### Starting the Bot
+
+Run the trading bot with the startup sequence:
+
+```bash
+# Normal startup - runs full startup sequence and enters trading loop
+python -m src.trading_bot
+
+# Dry run - validate configuration without starting trading loop
+python -m src.trading_bot --dry-run
+
+# JSON output - machine-readable output for automation
+python -m src.trading_bot --json
+```
+
+### Startup Sequence
+
+The bot follows a structured startup sequence that:
+1. Displays startup banner with mode and phase information
+2. Loads configuration from .env and config.json
+3. Validates all configuration parameters
+4. Initializes logging system (logs/startup.log)
+5. Initializes mode switcher (paper/live mode management)
+6. Initializes circuit breakers (risk management)
+7. Initializes trading bot components
+8. Verifies all components are ready
+9. Displays startup summary or JSON output
+
+If any step fails, the bot will exit with an appropriate error message and exit code.
+
+### Exit Codes
+
+- 0: Success (startup complete, ready for trading)
+- 1: Configuration error (missing credentials, invalid config)
+- 2: Validation error (phase-mode conflict, invalid settings)
+- 3: Initialization failure (component setup failed)
+- 130: Interrupted by user (Ctrl+C)
+
+---
+
+## Troubleshooting
+
+### Common Startup Errors
+
+#### Error: Missing .env file
+**Symptom**: Bot fails with "Missing .env file" error
+
+**Remediation**:
+```bash
+# Copy the example file and add your credentials
+cp .env.example .env
+# Edit .env and add:
+# - ROBINHOOD_USERNAME=your_username
+# - ROBINHOOD_PASSWORD=your_password
+```
+
+#### Error: Invalid config.json
+**Symptom**: Bot fails with JSON parsing error or "Invalid configuration" error
+
+**Remediation**:
+```bash
+# Validate JSON syntax
+python -m json.tool config.json
+
+# If invalid, copy from example and reconfigure
+cp config.example.json config.json
+# Edit config.json with valid values
+```
+
+#### Error: Phase-mode conflict
+**Symptom**: "Cannot use live trading in 'experience' phase" error
+
+**Remediation**:
+Edit config.json and either:
+- Change mode to paper: `"mode": "paper"`
+- OR change phase to proof/trial/scaling: `"current_phase": "proof"`
+
+#### Error: Filesystem permissions
+**Symptom**: "Failed to create directories" or "Permission denied" error
+
+**Remediation**:
+```bash
+# Check directory permissions
+ls -la logs/ data/ backtests/
+
+# Create directories manually with proper permissions
+mkdir -p logs data backtests
+chmod 755 logs data backtests
+```
+
+#### Error: Component initialization failure
+**Symptom**: "Component X initialization failed" error
+
+**Remediation**:
+1. Check logs/startup.log for detailed error information
+2. Verify all dependencies installed: `pip install -r requirements.txt`
+3. Ensure .env and config.json are valid
+4. Run dry run to isolate issue: `python -m src.trading_bot --dry-run`
+
+### Debugging Tips
+
+1. **Check startup log**: Always review `logs/startup.log` for detailed initialization steps
+2. **Use dry run mode**: Test configuration without starting trading loop
+3. **Validate configuration**: Run `python validate_startup.py` before starting bot
+4. **Check exit codes**: Use exit code to identify error category (config vs validation vs initialization)
+
+---
+
 ## 📁 Project Structure
 
 ```
