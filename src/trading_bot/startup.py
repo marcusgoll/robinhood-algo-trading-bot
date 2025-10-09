@@ -15,6 +15,7 @@ Provides:
 from dataclasses import dataclass
 from typing import Literal, Optional, List, Dict, Tuple, TYPE_CHECKING
 import time
+import json
 
 if TYPE_CHECKING:
     from .config import Config
@@ -273,3 +274,24 @@ class StartupOrchestrator:
             step.error_message = str(e)
             self.errors.append(f"Trading bot initialization failed: {e}")
             raise
+
+    def _format_json_output(self, result: StartupResult) -> str:
+        """Format startup result as JSON for machine-readable output.
+
+        Args:
+            result: StartupResult instance to format
+
+        Returns:
+            JSON string with formatted startup result
+        """
+        output = {
+            "status": result.status,
+            "mode": result.mode,
+            "phase": result.phase,
+            "startup_duration_seconds": result.startup_duration_seconds,
+            "timestamp": result.timestamp,
+            "components": result.component_states,
+            "errors": result.errors,
+            "warnings": result.warnings
+        }
+        return json.dumps(output, indent=2)
