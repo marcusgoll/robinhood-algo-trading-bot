@@ -6,6 +6,46 @@ Constitution v1.0.0 - §Audit_Everything
 
 ## Recent Updates
 
+### 2025-01-09: Trade Logging Module (In Progress)
+
+**Feature**: Structured trade logging with JSONL format for audit compliance
+
+**Status**: 🔄 TDD RED PHASE COMPLETE
+
+**Current Progress**:
+- ✅ T009 [GREEN]: TradeRecord dataclass created with validation
+- ✅ T010 [GREEN]: Symbol validation (uppercase, 1-5 chars, alphanumeric)
+- ✅ T011 [GREEN]: Numeric constraint validation (quantity, price)
+- ✅ T012 [GREEN]: to_json() serialization (Decimal → string)
+- ✅ T013 [GREEN]: to_jsonl_line() compact format
+- ✅ T014 [RED]: Write test: StructuredTradeLogger creates daily JSONL files (FAILING)
+- ✅ T015 [RED]: Write test: StructuredTradeLogger appends records (FAILING)
+- ✅ T016 [RED]: Write test: StructuredTradeLogger handles concurrent writes (FAILING)
+- ✅ T017 [RED]: Write test: StructuredTradeLogger write latency <5ms (FAILING)
+
+**Test Results (RED Phase)**:
+```
+tests/unit/test_structured_logger.py::test_logger_creates_daily_jsonl_file FAILED
+tests/unit/test_structured_logger.py::test_logger_appends_to_existing_file FAILED
+tests/unit/test_structured_logger.py::test_logger_handles_concurrent_writes FAILED
+tests/unit/test_structured_logger.py::test_logger_write_performance FAILED
+
+Error: ModuleNotFoundError: No module named 'src.trading_bot.logging.structured_logger'
+```
+
+**Next Steps**:
+- T018-T021 [GREEN]: Implement StructuredTradeLogger to make tests pass
+- T022-T025: Integration tests
+- T026-T030: Performance testing and optimization
+
+**Constitution Compliance**:
+- §Audit_Everything: JSONL format for structured audit trail
+- §Data_Integrity: Atomic file writes, validation before logging
+- §Testing_Requirements: TDD approach (RED → GREEN → REFACTOR)
+- NFR-003: <5ms write latency requirement
+
+---
+
 ### 2025-01-08: Authentication Module Complete
 
 **Feature**: Robinhood authentication with MFA support, session management, and token refresh
