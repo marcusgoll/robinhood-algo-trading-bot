@@ -594,6 +594,136 @@ def _cleanup_on_failure(self) -> None:
 - T034 RED: Test output shows `AssertionError: assert 'Missing credentials' in []`
 - T035 GREEN: Test passed after fixing error_message handling
 
+### Phase 3.7: Entry Point & CLI
+- ✅ T036 [RED]: Write failing test for parse_arguments()
+- ✅ T037 [GREEN→T036]: Implement parse_arguments() function
+- ✅ T038 [RED]: Write failing test for main() function
+- ✅ T039 [GREEN→T038]: Implement main() function
+- ✅ T040 [P]: Add __main__.py for python -m invocation (parallel)
+
+## Implementation Notes (T036-T040)
+
+**TDD Approach**: Complete RED-GREEN cycle for CLI entry point
+- T036 [RED]: Test failed with `ModuleNotFoundError: No module named 'trading_bot'`
+- T037 [GREEN]: Implementation added (parse_arguments()), tests passed (4/4)
+- T038 [RED]: Tests failed with mock patching errors (Config not at module level)
+- T039 [GREEN]: Fixed mock paths, all tests passed (6/6 main tests)
+- T040 [P]: Parallel implementation of __main__.py for module invocation
+
+**Key Components Added**:
+1. `src/trading_bot/main.py` - Main entry point with CLI argument parsing
+2. `src/trading_bot/__main__.py` - Module invocation support (python -m trading_bot)
+3. `tests/unit/test_main.py` - Comprehensive test suite (10 tests total)
+
+**parse_arguments() Function**:
+- Returns: argparse.Namespace with dry_run (bool) and json (bool) flags
+- Arguments:
+  - `--dry-run`: Run startup validation without entering trading loop
+  - `--json`: Output status as JSON for machine parsing
+- Help text includes usage examples
+- Default: Both flags False
+
+**main() Function Exit Codes**:
+- 0: Success (startup complete, ready for trading)
+- 1: Configuration error (missing credentials, invalid config)
+- 2: Validation error (phase-mode conflict, invalid settings)
+- 3: Initialization failure (component setup failed)
+- 130: Interrupted by user (Ctrl+C / KeyboardInterrupt)
+
+**Error Handling Logic**:
+- Catches KeyboardInterrupt and returns 130 (standard SIGINT exit code)
+- Catches generic Exception and returns 1 (fatal error)
+- Prints errors to stdout in non-JSON mode
+- Suppresses error printing in JSON mode (orchestrator handles output)
+- Determines exit code based on error message keywords:
+  - "configuration" or "credentials" → exit code 1
+  - "validation" or "phase-mode" → exit code 2
+  - Other errors → exit code 3
+
+**Test Coverage**: 10 tests passing in test_main.py
+- 4 tests for parse_arguments():
+  - test_parse_arguments_dry_run (--dry-run flag)
+  - test_parse_arguments_json_output (--json flag)
+  - test_parse_arguments_both_flags (both flags)
+  - test_parse_arguments_no_flags (defaults)
+- 6 tests for main():
+  - test_main_exit_code_success (exit code 0)
+  - test_main_exit_code_configuration_error (exit code 1)
+  - test_main_exit_code_validation_error (exit code 2)
+  - test_main_exit_code_keyboard_interrupt (exit code 130)
+  - test_main_prints_errors_non_json_mode (stdout error printing)
+  - test_main_no_error_print_json_mode (JSON mode suppresses errors)
+
+**Module Invocation Support**:
+- `python -m src.trading_bot --help` displays help text
+- `python -m src.trading_bot --dry-run` runs dry run validation
+- `python -m src.trading_bot --json` outputs JSON status
+- `python -m src.trading_bot` runs full startup and enters trading loop
+
+**Integration with StartupOrchestrator**:
+- main() creates Config from environment and config.json
+- Passes config, dry_run, json_output flags to StartupOrchestrator
+- Calls orchestrator.run() to execute full startup sequence
+- Handles StartupResult status ("ready" vs "blocked")
+- Returns appropriate exit code based on result
+
+**Import Path Fix**:
+- Tests use `from src.trading_bot.main import parse_arguments, main`
+- Mock patches use full module paths: `src.trading_bot.config.Config`, `src.trading_bot.startup.StartupOrchestrator`
+- Fixed `from typing import Namespace` → `argparse.Namespace` (Python 3.11 compatibility)
+
+**Pattern Used**: Argument parsing + error handling
+```python
+def main() -> int:
+    try:
+        args = parse_arguments()
+        config = Config.from_env_and_json()
+        orchestrator = StartupOrchestrator(
+            config=config,
+            dry_run=args.dry_run,
+            json_output=args.json
+        )
+        result = orchestrator.run()
+
+        if result.status == "ready":
+            return 0  # Success
+        else:
+            # Print errors if not JSON mode
+            # Determine exit code from error messages
+            return 1/2/3
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Startup interrupted by user")
+        return 130
+    except Exception as e:
+        print(f"\n❌ Fatal error: {e}")
+        return 1
+```
+
+**Evidence of TDD**:
+- T036 RED: ModuleNotFoundError because main.py didn't exist
+- T037 GREEN: All 4 parse_arguments tests passed after implementation
+- T038 RED: All 6 main() tests initially failed (module doesn't have Config at top level)
+- T039 GREEN: Fixed mock paths, all 6 main() tests passed
+- T040 [P]: __main__.py added in parallel, verified with `python -m src.trading_bot --help`
+
+**Files Created**:
+- `D:\Coding\Stocks\src\trading_bot\main.py` (125 lines)
+- `D:\Coding\Stocks\src\trading_bot\__main__.py` (18 lines)
+- `D:\Coding\Stocks\tests\unit\test_main.py` (240 lines)
+
+**Verification Commands**:
+```bash
+# All tests pass
+pytest tests/unit/test_main.py -v --no-cov
+# 10 passed in 0.14s
+
+# Module invocation works
+python -m src.trading_bot --help
+# Displays help text with --dry-run and --json options
+```
+
+**Next Tasks**: Phase 3.8 Integration Testing (T041-T050)
+
 ## Last Updated
 
-2025-10-09T06:01:00Z
+2025-10-09T06:30:00Z
