@@ -8,7 +8,8 @@ Tests:
 """
 
 import pytest
-from src.trading_bot.startup import StartupStep, StartupResult
+from src.trading_bot.startup import StartupStep, StartupResult, StartupOrchestrator
+from src.trading_bot.config import Config
 
 
 class TestStartupStep:
@@ -90,3 +91,27 @@ class TestStartupResult:
         )
         assert result_blocked.status == "blocked"
         assert "Validation failed" in result_blocked.errors
+
+
+class TestStartupOrchestrator:
+    """Tests for StartupOrchestrator class."""
+
+    def test_orchestrator_init(self, mock_config):
+        """Test Orchestrator initializes with config."""
+        # Given: Valid Config instance
+        # When: Create orchestrator
+        orchestrator = StartupOrchestrator(
+            config=mock_config,
+            dry_run=True,
+            json_output=False
+        )
+
+        # Then: Assert all fields initialized correctly
+        assert orchestrator.config == mock_config
+        assert orchestrator.dry_run == True
+        assert orchestrator.json_output == False
+        assert orchestrator.steps == []
+        assert orchestrator.errors == []
+        assert orchestrator.warnings == []
+        assert orchestrator.component_states == {}
+        assert orchestrator.start_time is None
