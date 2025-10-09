@@ -58,3 +58,39 @@ def get_current_time_in_tz(timezone: str) -> datetime:
     """
     tz = pytz.timezone(timezone)
     return datetime.now(tz)
+
+
+def is_market_open(check_time: Optional[datetime] = None) -> bool:
+    """
+    Check if US stock market is open at the given time.
+
+    Market hours: Monday-Friday, 9:30 AM - 4:00 PM Eastern Time (ET).
+    Handles Daylight Saving Time (DST) transitions automatically using pytz.
+
+    Args:
+        check_time: Optional datetime to check (defaults to current time if not provided)
+
+    Returns:
+        True if market is open, False otherwise (weekends, outside trading hours)
+
+    Pattern: Timezone-aware checking with DST support via pytz
+    Task: T017 [status-dashboard]
+    """
+    et_tz = pytz.timezone("America/New_York")
+    current = check_time if check_time is not None else datetime.now(et_tz)
+
+    # Ensure current has timezone info
+    if current.tzinfo is None:
+        current = et_tz.localize(current)
+    else:
+        current = current.astimezone(et_tz)
+
+    # Check if weekday (0=Monday, 4=Friday)
+    if current.weekday() > 4:  # 5=Saturday, 6=Sunday
+        return False
+
+    # Market hours: 9:30 AM - 4:00 PM ET
+    market_open = current.replace(hour=9, minute=30, second=0, microsecond=0)
+    market_close = current.replace(hour=16, minute=0, second=0, microsecond=0)
+
+    return market_open <= current < market_close

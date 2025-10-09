@@ -23,10 +23,12 @@ def parse_arguments() -> argparse.Namespace:
 
     Returns:
         Namespace with parsed arguments:
+        - mode (str): Operation mode (trade, dashboard)
         - dry_run (bool): Run validation without entering trading loop
         - json (bool): Output status as JSON for machine parsing
 
     T037 [GREEN→T036]: Implementation for parse_arguments() test
+    T026 [P]: Added dashboard subcommand support
     """
     parser = argparse.ArgumentParser(
         description="Robinhood Trading Bot - Automated trading system",
@@ -35,8 +37,16 @@ def parse_arguments() -> argparse.Namespace:
 Examples:
   %(prog)s --dry-run        Validate startup without trading
   %(prog)s --json           Machine-readable JSON output
+  %(prog)s dashboard        Launch CLI dashboard
   %(prog)s                  Normal startup and trading
         """
+    )
+    parser.add_argument(
+        "mode",
+        nargs="?",
+        default="trade",
+        choices=["trade", "dashboard"],
+        help="Operation mode: trade (default) or dashboard"
     )
     parser.add_argument(
         "--dry-run",
@@ -72,6 +82,11 @@ def main() -> int:
     """
     try:
         args = parse_arguments()
+
+        # Handle dashboard mode
+        if args.mode == "dashboard":
+            from .dashboard.__main__ import main as dashboard_main
+            return dashboard_main()
 
         # Load configuration
         from .config import Config
