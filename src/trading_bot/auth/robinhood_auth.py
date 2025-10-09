@@ -26,10 +26,10 @@ logger = logging.getLogger(__name__)
 T = TypeVar('T')
 
 try:
-    import robin_stocks
+    import robin_stocks.robinhood as rh
     robin_stocks_available = True
 except ImportError:
-    robin_stocks = None
+    rh = None
     robin_stocks_available = False
 
 try:
@@ -203,7 +203,7 @@ class RobinhoodAuth:
                 raise
 
         # T022: Credentials-based login (fallback when no device token)
-        if not robin_stocks:
+        if not rh:
             raise AuthenticationError("robin_stocks library not available")
 
         # Prepare login parameters
@@ -222,12 +222,12 @@ class RobinhoodAuth:
         try:
             # Define login function for retry wrapper
             def _do_login() -> Any:
-                # Call robin_stocks.login()
+                # Call rh.login()
                 # Note: Actual robin_stocks API may require different parameters
                 if mfa_code:
-                    result = robin_stocks.login(username, password, mfa_code=mfa_code)
+                    result = rh.login(username, password, mfa_code=mfa_code)
                 else:
-                    result = robin_stocks.login(username, password)
+                    result = rh.login(username, password)
 
                 if not result:
                     raise AuthenticationError("Invalid credentials or authentication failed")
@@ -262,8 +262,8 @@ class RobinhoodAuth:
     def logout(self) -> None:
         """Logout and clear session."""
         # T016: Logout implementation
-        if robin_stocks:
-            robin_stocks.logout()
+        if rh:
+            rh.logout()
 
         self._authenticated = False
         self._session = None
@@ -312,7 +312,7 @@ class RobinhoodAuth:
         Constitution v1.0.0:
             §Security: Device token tried first, MFA fallback if expired
         """
-        if not robin_stocks:
+        if not rh:
             raise AuthenticationError("robin_stocks library not available")
 
         # Get credentials
@@ -324,7 +324,7 @@ class RobinhoodAuth:
 
         # Try login with device token first (single attempt, no retry for invalid token)
         try:
-            result = robin_stocks.login(username, password, device_token=device_token)
+            result = rh.login(username, password, device_token=device_token)
             if not result:
                 raise AuthenticationError("Device token authentication failed")
 
@@ -357,7 +357,7 @@ class RobinhoodAuth:
             mfa_code = totp.now()
 
             try:
-                result = robin_stocks.login(username, password, mfa_code=mfa_code)
+                result = rh.login(username, password, mfa_code=mfa_code)
                 if not result:
                     raise AuthenticationError("MFA authentication failed")
 
