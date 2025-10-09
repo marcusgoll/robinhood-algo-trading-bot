@@ -275,6 +275,51 @@ class StartupOrchestrator:
             self.errors.append(f"Trading bot initialization failed: {e}")
             raise
 
+    def _display_banner(self) -> None:
+        """Display startup banner with mode and phase information.
+
+        Shows:
+        - Bot title
+        - Trading mode (PAPER or LIVE)
+        - Clear safety warnings
+
+        Pattern: Reuses mode_switcher.py display_mode_banner() approach (line 141)
+        T023 [GREEN]: Implementation for _display_banner() test
+        """
+        mode_display = "PAPER TRADING (Simulation - No Real Money)" if self.config.trading.mode == "paper" else "LIVE TRADING (Real Money)"
+
+        print("=" * 60)
+        print("         ROBINHOOD TRADING BOT - STARTUP SEQUENCE")
+        print("=" * 60)
+        print(f"Mode: {mode_display}")
+        print("=" * 60)
+        print()
+
+    def _display_summary(self) -> None:
+        """Display startup completion summary with configuration details.
+
+        Shows:
+        - Startup completion message
+        - Current phase and phase-specific settings
+        - Circuit breaker status and limits
+        - Dry run indicator (if applicable)
+
+        T025 [GREEN]: Implementation for _display_summary() test
+        """
+        print("=" * 60)
+        print("✅ STARTUP COMPLETE - Ready to trade")
+        print("=" * 60)
+        print(f"Current Phase: {self.config.phase_progression.current_phase}")
+
+        # Get phase-specific config
+        phase_config = getattr(self.config.phase_progression, self.config.phase_progression.current_phase)
+        print(f"Max Trades Today: {phase_config.max_trades_per_day}")
+        print(f"Circuit Breaker: Active (Max Loss: {self.config.risk_management.max_daily_loss_pct}%, Max Consecutive: {self.config.risk_management.max_consecutive_losses})")
+        print()
+
+        if self.dry_run:
+            print("[DRY RUN] Exiting without starting trading loop")
+
     def _format_json_output(self, result: StartupResult) -> str:
         """Format startup result as JSON for machine-readable output.
 
