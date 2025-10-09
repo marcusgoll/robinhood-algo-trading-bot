@@ -393,3 +393,28 @@ class TestStartupOrchestrator:
 
         # Then: Assert logger handlers closed and removed
         assert len(orchestrator.startup_logger.handlers) == 0
+
+    def test_create_blocked_result_includes_error_message(self, mock_config):
+        """Test create_blocked_result returns blocked result with error.
+
+        T034 [RED]: Write failing test for _create_blocked_result()
+        - Given: Validation failure with error="Missing credentials"
+        - When: result = orchestrator._create_blocked_result("Missing credentials")
+        - Then: Assert result.status == "blocked", "Missing credentials" in result.errors
+        """
+        from datetime import datetime, timezone
+
+        # Given: Orchestrator with validation failure
+        orchestrator = StartupOrchestrator(config=mock_config, dry_run=True)
+        error_message = "Missing credentials"
+
+        # When: Create blocked result
+        result = orchestrator._create_blocked_result(error_message, duration=1.5)
+
+        # Then: Assert blocked status and error included
+        assert result.status == "blocked"
+        assert error_message in result.errors
+        assert result.mode == "paper"
+        assert result.phase == "experience"
+        assert result.startup_duration_seconds == 1.5
+        assert len(result.timestamp) > 0  # ISO 8601 format
