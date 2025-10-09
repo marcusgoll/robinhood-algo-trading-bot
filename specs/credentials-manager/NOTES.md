@@ -142,5 +142,27 @@ Secure credentials management system for Robinhood trading bot. Provides secure 
 - File: src/trading_bot/config.py (lines 39, 116)
 - Verification: Field properly typed, defaults to None, loaded via os.getenv()
 
+**✅ T004-T007 [GREEN]: Write tests for credential masking utilities** (2025-10-08)
+- Created tests/unit/test_utils/test_security.py with 15 comprehensive tests
+- Status: All tests PASSED immediately (implementation exists from T001)
+- Skipped RED phase - tests auto-passed to GREEN
+- Test coverage breakdown:
+  - T004: test_mask_username_standard_format() + 3 edge cases (empty, short email, non-email)
+  - T005: test_mask_password() + 3 edge cases (empty, short, long passwords)
+  - T006: test_mask_mfa_secret() + 2 edge cases (empty, invalid format)
+  - T007: test_mask_device_token() + 3 edge cases (short, empty, exactly 8 chars)
+- Test pattern: AAA (Arrange-Act-Assert) with clear failure messages
+- All tests verify Constitution v1.0.0 §Security compliance
+- File: tests/unit/test_utils/test_security.py (189 lines)
+- Directory: tests/unit/test_utils/ (new structure created)
+- Test results: 15/15 PASSED in 0.98s
+- Coverage: src/trading_bot/utils/security.py now at 100% coverage
+
+**Test Assertions Verified**:
+- mask_username("john@example.com") == "joh***@example.com" ✓
+- mask_password(any) == "*****" ✓
+- mask_mfa_secret("ABCDEFGHIJKLMNOP") == "****" ✓
+- mask_device_token("1a2b3c4d5e6f7g8h") == "1a2b3c4d***" ✓
+
 ## Last Updated
-2025-10-08T23:47:12-05:00
+2025-10-08T23:57:00-05:00
