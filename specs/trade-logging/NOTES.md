@@ -148,5 +148,26 @@ Files Modified:
 - src/trading_bot/logging/__init__.py (updated exports)
 - tests/fixtures/trade_fixtures.py (updated to return TradeRecord instances)
 
+## Implementation Progress (T022-T025: TradeQueryHelper RED Phase)
+- ✅ T022 [RED]: Write test: TradeQueryHelper queries by date range (FAILING - ModuleNotFoundError)
+- ✅ T023 [RED]: Write test: TradeQueryHelper queries by symbol (FAILING - ModuleNotFoundError)
+- ✅ T024 [RED]: Write test: TradeQueryHelper calculates win rate (FAILING - ModuleNotFoundError)
+- ✅ T025 [RED]: Write test: TradeQueryHelper query performance <500ms (FAILING - ModuleNotFoundError)
+
+## Test Results (T022-T025)
+All 4 tests FAILING as expected (RED phase):
+- test_query_by_date_range: FAILED (ModuleNotFoundError)
+- test_query_by_symbol: FAILED (ModuleNotFoundError)
+- test_calculate_win_rate: FAILED (ModuleNotFoundError)
+- test_query_performance_at_scale: FAILED (ModuleNotFoundError)
+
+Expected Error: `ModuleNotFoundError: No module named 'src.trading_bot.logging.query_helper'`
+
+Files Created:
+- tests/unit/test_query_helper.py (NEW - 266 lines)
+
+Next Steps:
+- T026-T029 [GREEN]: Implement TradeQueryHelper to make tests pass
+
 ## Last Updated
-2025-10-09T09:00:00Z
+2025-10-09T14:32:00Z
