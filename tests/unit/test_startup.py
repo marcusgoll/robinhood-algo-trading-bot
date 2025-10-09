@@ -149,3 +149,20 @@ class TestStartupOrchestrator:
         assert len(orchestrator.steps) == 1
         assert orchestrator.steps[0].name == "Validating configuration"
         assert orchestrator.steps[0].status == "success"
+
+    def test_initialize_logging_creates_startup_log(self, mock_config, tmp_logs_dir, monkeypatch):
+        """Test initialize_logging creates startup.log file."""
+        # Given: Orchestrator with config pointing to tmp logs dir
+        mock_config.logs_dir = str(tmp_logs_dir)
+        orchestrator = StartupOrchestrator(config=mock_config, dry_run=True)
+
+        # When: Initialize logging
+        orchestrator._initialize_logging()
+
+        # Then: startup.log exists
+        startup_log = tmp_logs_dir / "startup.log"
+        assert startup_log.exists()
+        assert len(orchestrator.steps) == 1
+        assert orchestrator.steps[0].name == "Initializing logging system"
+        assert orchestrator.steps[0].status == "success"
+        assert "logging" in orchestrator.component_states

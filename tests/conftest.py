@@ -53,13 +53,25 @@ def mock_config() -> Mock:
     config.trading_end_time = "10:00"
     config.trading_timezone = "America/New_York"
 
-    # Risk parameters
+    # Risk parameters (nested objects for T013-T021)
     config.max_position_pct = 5.0
     config.max_daily_loss_pct = 3.0
     config.max_consecutive_losses = 3
     config.position_size_shares = 100
     config.stop_loss_pct = 2.0
     config.risk_reward_ratio = 2.0
+
+    # Mock nested objects for phase and trading
+    config.trading = Mock()
+    config.trading.mode = "paper"
+
+    config.phase_progression = Mock()
+    config.phase_progression.current_phase = "experience"
+
+    config.risk_management = Mock()
+    config.risk_management.max_daily_loss_pct = 3.0
+    config.risk_management.max_consecutive_losses = 3
+    config.risk_management.max_position_pct = 5.0
 
     # Phase progression
     config.current_phase = "experience"
