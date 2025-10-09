@@ -51,7 +51,7 @@ Task: T029 [REFACTOR]
 import json
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 import pytz
 
@@ -108,16 +108,20 @@ class SafetyChecks:
     From: plan.md [ARCHITECTURE DECISIONS]
     """
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, account_data: Optional[Any] = None) -> None:
         """
         Initialize safety checks with configuration.
 
+        T051: Accept optional AccountData for real buying power validation.
+
         Args:
             config: Configuration object with risk parameters
+            account_data: Optional AccountData instance for fetching real buying power
 
         From: spec.md Technical Design
         """
         self.config = config
+        self.account_data = account_data
 
         # Circuit breaker state
         self._circuit_breaker_active = False
@@ -137,10 +141,12 @@ class SafetyChecks:
         action: str,  # "BUY" or "SELL"
         quantity: int,
         price: float,
-        current_buying_power: float
+        current_buying_power: Optional[float] = None
     ) -> SafetyResult:
         """
         Validate trade against all safety checks.
+
+        T052: Fetch buying power from AccountData if not provided.
 
         Orchestrates all validation checks in fail-safe sequence.
 
@@ -149,7 +155,7 @@ class SafetyChecks:
             action: Trade action ("BUY" or "SELL")
             quantity: Number of shares
             price: Price per share
-            current_buying_power: Available buying power from account
+            current_buying_power: Available buying power (fetched from AccountData if None)
 
         Returns:
             SafetyResult with is_safe, reason, circuit_breaker_triggered
@@ -159,8 +165,16 @@ class SafetyChecks:
 
         From: spec.md Requirements FR-001 through FR-007
         Pattern: Fail-safe (any failure blocks trade)
-        Task: T026 [GREEN→T016,T017], T039 (input validation)
+        Task: T026 [GREEN→T016,T017], T039 (input validation), T052 (AccountData integration)
         """
+        # T052: Fetch buying power from AccountData if not provided
+        if current_buying_power is None and self.account_data is not None:
+            current_buying_power = self.account_data.get_buying_power()
+
+        # If still None, use default (backward compatibility)
+        if current_buying_power is None:
+            current_buying_power = 10000.00  # Default fallback
+
         # Input validation (T039)
         if not symbol or not symbol.isalnum():
             raise ValueError(f"Invalid symbol: {symbol}. Must be alphanumeric.")

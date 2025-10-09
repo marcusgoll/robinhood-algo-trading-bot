@@ -7,7 +7,7 @@ Enforces Constitution v1.0.0 principles:
 - §Code_Quality: Type hints, clear logic
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from decimal import Decimal
 import logging
 from datetime import datetime
@@ -16,6 +16,9 @@ from datetime import datetime
 # Old CircuitBreaker class removed in favor of comprehensive SafetyChecks module
 # See: src/trading_bot/safety_checks.py for enhanced circuit breaker functionality
 from src.trading_bot.safety_checks import SafetyChecks
+
+# T038: Authentication module integration
+from src.trading_bot.auth import RobinhoodAuth, AuthenticationError
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +105,7 @@ class TradingBot:
     def __init__(
         self,
         *,
+        config: Optional[Any] = None,
         paper_trading: bool = True,
         max_position_pct: float = 5.0,
         max_daily_loss_pct: float = 3.0,
@@ -112,6 +116,7 @@ class TradingBot:
         Initialize trading bot with safety parameters.
 
         Args:
+            config: Optional Config instance for authentication (§Security)
             paper_trading: If True, simulate trades without real money (§Safety_First)
             max_position_pct: Maximum % of portfolio per position (§Risk_Management)
             max_daily_loss_pct: Circuit breaker: max daily loss % (§Safety_First)
@@ -120,6 +125,19 @@ class TradingBot:
         """
         self.paper_trading = paper_trading
         self.max_position_pct = max_position_pct
+
+        # T038: Initialize authentication if config provided
+        self.auth: Optional[RobinhoodAuth] = None
+        if config is not None:
+            self.auth = RobinhoodAuth(config)
+            logger.info("Authentication module initialized")
+
+        # T044: Initialize account data module if authenticated
+        self.account_data: Optional[Any] = None
+        if self.auth is not None:
+            from src.trading_bot.account import AccountData
+            self.account_data = AccountData(auth=self.auth)
+            logger.info("Account data module initialized")
 
         # DEPRECATED: Old circuit breaker kept for backward compatibility
         self.circuit_breaker = CircuitBreaker(
@@ -130,13 +148,14 @@ class TradingBot:
         # NEW: Initialize SafetyChecks module for comprehensive pre-trade validation
         from unittest.mock import Mock
         # Create mock config with safety parameters
-        config = Mock()
-        config.max_daily_loss_pct = max_daily_loss_pct
-        config.max_consecutive_losses = max_consecutive_losses
-        config.max_position_pct = max_position_pct
-        config.trading_timezone = trading_timezone
+        safety_config = Mock()
+        safety_config.max_daily_loss_pct = max_daily_loss_pct
+        safety_config.max_consecutive_losses = max_consecutive_losses
+        safety_config.max_position_pct = max_position_pct
+        safety_config.trading_timezone = trading_timezone
 
-        self.safety_checks = SafetyChecks(config)
+        # T052: Pass account_data to SafetyChecks for real buying power
+        self.safety_checks = SafetyChecks(safety_config, account_data=self.account_data)
 
         self.positions: Dict[str, Dict] = {}
         self.is_running: bool = False
@@ -151,17 +170,49 @@ class TradingBot:
         )
 
     def start(self) -> None:
-        """Start the trading bot (§Safety_First: manual start required)."""
+        """
+        Start the trading bot (§Safety_First: manual start required).
+
+        T038: Authenticates with Robinhood before starting if auth configured.
+        T039: Raises RuntimeError if authentication fails (§Safety_First).
+        """
         if self.circuit_breaker.is_tripped:
             logger.error("Cannot start: Circuit breaker is tripped")
             raise RuntimeError("Circuit breaker is tripped - manual reset required")
+
+        # T038-T039: Authenticate before starting bot
+        if self.auth is not None:
+            try:
+                logger.info("Authenticating with Robinhood...")
+                self.auth.login()
+                logger.info("Authentication successful")
+            except AuthenticationError as e:
+                logger.error(f"Authentication failed: {e}")
+                raise RuntimeError(
+                    f"Authentication failed - check credentials: {e}"
+                ) from e
 
         self.is_running = True
         logger.info("Trading bot started")
 
     def stop(self) -> None:
-        """Emergency stop (§Safety_First: kill switch)."""
+        """
+        Emergency stop (§Safety_First: kill switch).
+
+        T040: Logs out of Robinhood session on shutdown.
+        """
         self.is_running = False
+
+        # T040: Logout on bot shutdown
+        if self.auth is not None:
+            try:
+                logger.info("Logging out of Robinhood...")
+                self.auth.logout()
+                logger.info("Logout successful")
+            except Exception as e:
+                # Non-critical: Log error but don't block shutdown
+                logger.warning(f"Logout error (non-critical): {e}")
+
         logger.warning("Trading bot stopped (manual kill switch)")
 
     def calculate_position_size(
@@ -198,14 +249,17 @@ class TradingBot:
         """
         Get current buying power from account.
 
-        Returns:
-            Current buying power (mocked for now, will integrate with account module)
+        T045: Returns real buying power from AccountData if available, otherwise fallback to mock.
 
-        TODO: Integrate with account-data-module when available
+        Returns:
+            Current buying power from AccountData or mock value
         """
-        # TODO: Replace with real Robinhood API call
-        # For now, return mock value for testing
-        return 10000.00  # $10k mock buying power
+        if self.account_data is None:
+            # Fallback for backward compatibility
+            logger.warning("AccountData not initialized, using mock value")
+            return 10000.00  # $10k mock buying power
+
+        return self.account_data.get_buying_power()
 
     def execute_trade(
         self,
@@ -279,6 +333,12 @@ class TradingBot:
             # TODO: Implement real Robinhood API call
             # Must implement with proper error handling (§Error_Handling)
             logger.warning("Real trading not yet implemented")
+
+        # T046: Invalidate account cache after trade execution
+        if self.account_data is not None:
+            self.account_data.invalidate_cache('buying_power')
+            self.account_data.invalidate_cache('positions')
+            logger.debug("Account cache invalidated after trade")
 
     def update_position(
         self,

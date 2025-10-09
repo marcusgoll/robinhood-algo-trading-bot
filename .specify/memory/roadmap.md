@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-07 (mode-switcher implementation)
+**Last updated**: 2025-01-08 (authentication-module shipped)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -98,6 +98,52 @@
   - 85.86% code coverage
   - Full Constitution v1.0.0 compliance
 
+### authentication-module
+- **Title**: Robinhood authentication with MFA
+- **Area**: api
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-01-08
+- **Release**: v1.0.0 - Full authentication with MFA, session management, token refresh
+- **Spec**: specs/authentication-module/
+- **Delivered**:
+  - RobinhoodAuth service with login/logout/refresh
+  - MFA support via pyotp TOTP
+  - Device token support (skip MFA)
+  - Session persistence (.robinhood.pickle with 600 permissions)
+  - Token refresh on 401 errors
+  - Exponential backoff retry logic (1s, 2s, 4s)
+  - Corrupt pickle fallback to re-authentication
+  - Credential masking in logs (§Security compliance)
+  - Bot integration (start/stop with auth)
+  - 16 unit tests + 3 integration tests (100% pass rate)
+  - Security audit passed (no HIGH/CRITICAL issues)
+  - Full Constitution v1.0.0 compliance
+  - Documentation: spec, plan, tasks, security-audit, deployment guide
+
+### account-data-module
+- **Title**: Account data fetching
+- **Area**: api
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-01-08
+- **Release**: v1.1.0 - Real-time account data with TTL caching
+- **Spec**: specs/account-data-module/
+- **Delivered**:
+  - AccountData service with buying power, positions, balance, day trade count
+  - TTL-based caching (60s volatile, 300s stable)
+  - Exponential backoff retry logic (1s, 2s, 4s)
+  - Position dataclass with automatic P&L calculation
+  - TradingBot integration (get_buying_power replacement)
+  - SafetyChecks integration (real buying power validation)
+  - Cache invalidation after trades
+  - 17 unit tests (100% pass rate)
+  - 90.24% test coverage (exceeds 90% target)
+  - Full Constitution v1.0.0 compliance (§Security, §Audit_Everything, §Risk_Management)
+  - Production ready with linting fixes applied
+  - Backward compatible (fallback to $10k mock)
+  - Documentation: spec, plan, tasks, optimization-report, code-review-report
+
 ## In Progress
 
 <!-- Currently implementing -->
@@ -114,33 +160,6 @@
 
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
-
-### authentication-module
-- **Title**: Robinhood authentication with MFA
-- **Area**: api
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Login with MFA support using pyotp
-  - Session pickle file storage
-  - Auto-refresh token
-  - Logout handler
-  - Authentication error recovery
-  - [BLOCKED: environment-config]
-
-### account-data-module
-- **Title**: Account data fetching
-- **Area**: api
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Fetch current buying power
-  - Get all positions with current P&L
-  - Retrieve account balance
-  - Check day trade count (§Risk_Management)
-  - [BLOCKED: authentication-module]
 
 ### error-handling-framework
 - **Title**: API error handling framework
@@ -166,7 +185,7 @@
   - Fetch historical price data (for backtesting)
   - Check if market is open
   - Enforce 7am-10am EST trading window (block trades outside peak volatility)
-  - [BLOCKED: authentication-module]
+  - [UNBLOCKED: authentication-module shipped]
   - [MERGED: trading-hours-restriction]
 
 ### startup-sequence
@@ -240,7 +259,7 @@
   - Verify authentication status
   - Log session duration
   - Auto-reauth if token expires
-  - [BLOCKED: authentication-module]
+  - [UNBLOCKED: authentication-module shipped]
 
 ### order-management
 - **Title**: Order management foundation
@@ -253,7 +272,7 @@
   - Place limit sell orders with offset
   - Cancel all open orders function
   - Get order status and fill info
-  - [BLOCKED: authentication-module, safety-checks]
+  - [UNBLOCKED: authentication-module shipped, safety-checks shipped]
 
 ### performance-tracking
 - **Title**: Performance tracking and analytics

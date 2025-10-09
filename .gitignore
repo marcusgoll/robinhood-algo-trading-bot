@@ -11,6 +11,8 @@
 *.key
 credentials.json
 secrets.json
+.robinhood.pickle
+*.pickle
 
 # ============================================
 # CONFIGURATION - User-specific settings

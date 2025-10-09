@@ -1,0 +1,313 @@
+# robin-stocks API Contract Reference
+# Account Data Module Integration
+
+# This file documents the robin-stocks API endpoints used by AccountData service.
+# robin-stocks wraps the unofficial Robinhood API.
+
+# Reference: https://robin-stocks.readthedocs.io/en/latest/functions.html
+
+---
+
+# Account Profile Endpoint
+endpoint: robin_stocks.robinhood.account.load_account_profile()
+description: Fetch account profile with buying power, equity, and day trade count
+method: GET (wrapped by robin-stocks)
+authentication: Required (uses RobinhoodAuth session)
+
+request:
+  parameters: none
+
+response:
+  type: dict
+  schema:
+    buying_power:
+      type: string
+      example: "10500.25"
+      description: Available buying power for trades
+
+    equity:
+      type: string
+      example: "12500.75"
+      description: Total account equity (cash + positions market value)
+
+    cash:
+      type: string
+      example: "5000.00"
+      description: Cash balance
+
+    day_trade_count:
+      type: string
+      example: "1"
+      description: Number of day trades in rolling 5-day period (0-3 for non-PDT)
+
+    account_number:
+      type: string
+      example: "ABC12345"
+      description: Account number (DO NOT LOG - PII)
+
+    # Additional fields exist but not used by AccountData module
+
+errors:
+  - status: 401
+    description: Unauthorized (token expired, need re-auth)
+    handling: Trigger RobinhoodAuth.refresh_token()
+
+  - status: 429
+    description: Too Many Requests (rate limit exceeded)
+    handling: Exponential backoff (1s, 2s, 4s), return cached value
+
+  - status: 500
+    description: Internal Server Error
+    handling: Retry with backoff, raise AccountDataError if persistent
+
+usage:
+  # Used by AccountData methods:
+  - get_buying_power(): Extracts ['buying_power']
+  - get_account_balance(): Extracts ['equity'], ['cash'], ['buying_power']
+  - get_day_trade_count(): Extracts ['day_trade_count']
+
+---
+
+# Holdings Endpoint
+endpoint: robin_stocks.robinhood.account.build_holdings()
+description: Fetch all equity positions with current prices and P&L
+method: GET (wrapped by robin-stocks)
+authentication: Required (uses RobinhoodAuth session)
+
+request:
+  parameters: none
+
+response:
+  type: dict
+  schema:
+    # Dict keyed by symbol
+    SYMBOL:  # e.g., "AAPL", "TSLA"
+      quantity:
+        type: string
+        example: "10"
+        description: Number of shares held
+
+      average_buy_price:
+        type: string
+        example: "150.25"
+        description: Average cost basis per share
+
+      price:
+        type: string
+        example: "155.00"
+        description: Current market price
+
+      equity:
+        type: string
+        example: "1550.00"
+        description: Current position value (quantity × price)
+
+      percent_change:
+        type: string
+        example: "3.16"
+        description: Percentage gain/loss
+
+      equity_change:
+        type: string
+        example: "47.50"
+        description: Dollar gain/loss
+
+      # Additional fields exist but not used
+
+errors:
+  - status: 401
+    description: Unauthorized
+    handling: Trigger re-auth
+
+  - status: 429
+    description: Rate limit
+    handling: Exponential backoff, return cached positions
+
+  - status: 500
+    description: Server error
+    handling: Retry with backoff
+
+usage:
+  # Used by AccountData.get_positions()
+  # Returns: List[Position] with calculated P&L
+
+  calculation:
+    cost_basis: Decimal(quantity) × Decimal(average_buy_price)
+    current_value: Decimal(quantity) × Decimal(price)
+    profit_loss: current_value - cost_basis
+    profit_loss_pct: (profit_loss / cost_basis) × 100
+
+special_cases:
+  empty_response:
+    description: No open positions
+    response: {}
+    handling: Return empty list (not an error)
+
+  fractional_shares:
+    description: Robinhood supports fractional shares
+    handling: Use Decimal for precise calculations
+
+---
+
+# AccountData Module API (Internal)
+# This is the internal API provided by AccountData service
+
+service: AccountData
+module: src.trading_bot.account.account_data
+
+methods:
+  - name: get_buying_power
+    signature: get_buying_power(use_cache: bool = True) -> float
+    description: Fetch current buying power with optional caching
+    parameters:
+      use_cache:
+        type: bool
+        default: True
+        description: Use cached value if valid (TTL: 60s)
+    returns:
+      type: float
+      description: Available buying power in dollars
+    errors:
+      - AccountDataError: API failure after retries
+    cache_ttl: 60 seconds
+
+  - name: get_positions
+    signature: get_positions(use_cache: bool = True) -> List[Position]
+    description: Fetch all positions with P&L calculations
+    parameters:
+      use_cache:
+        type: bool
+        default: True
+        description: Use cached value if valid (TTL: 60s)
+    returns:
+      type: List[Position]
+      description: List of Position objects with P&L
+    errors:
+      - AccountDataError: API failure after retries
+    cache_ttl: 60 seconds
+
+  - name: get_account_balance
+    signature: get_account_balance(use_cache: bool = True) -> AccountBalance
+    description: Fetch account balance breakdown
+    parameters:
+      use_cache:
+        type: bool
+        default: True
+    returns:
+      type: AccountBalance
+      description: Cash, equity, buying_power breakdown
+    errors:
+      - AccountDataError: API failure after retries
+    cache_ttl: 60 seconds
+
+  - name: get_day_trade_count
+    signature: get_day_trade_count(use_cache: bool = True) -> int
+    description: Fetch day trade count (PDT tracking)
+    parameters:
+      use_cache:
+        type: bool
+        default: True
+        description: Use cached value if valid (TTL: 300s)
+    returns:
+      type: int
+      description: Number of day trades (0-3 for non-PDT accounts)
+    errors:
+      - AccountDataError: API failure after retries
+    cache_ttl: 300 seconds
+
+  - name: invalidate_cache
+    signature: invalidate_cache(cache_type: Optional[str] = None) -> None
+    description: Manually clear cache (all or specific type)
+    parameters:
+      cache_type:
+        type: Optional[str]
+        default: None
+        description: Cache key to clear ('buying_power', 'positions', etc.) or None for all
+    returns: None
+    usage: Call after trade execution to ensure fresh data
+
+---
+
+# Integration Contract: TradingBot
+
+integration_point: src.trading_bot.bot.TradingBot
+updated_methods:
+  - name: get_buying_power
+    before: "return 10000.00  # Mock"
+    after: |
+      if self.account_data:
+          return self.account_data.get_buying_power()
+      return 10000.00  # Fallback for backward compatibility
+
+  - name: execute_trade
+    update: |
+      # After successful trade execution:
+      if self.account_data:
+          self.account_data.invalidate_cache('buying_power')
+          self.account_data.invalidate_cache('positions')
+
+---
+
+# Integration Contract: SafetyChecks
+
+integration_point: src.trading_bot.safety_checks.SafetyChecks
+updated_methods:
+  - name: __init__
+    signature: __init__(config, account_data: Optional[AccountData] = None)
+    change: Add optional account_data parameter
+
+  - name: validate_trade
+    signature: validate_trade(symbol, action, quantity, price, current_buying_power=None)
+    update: |
+      # If current_buying_power not provided, fetch from AccountData
+      if current_buying_power is None and self.account_data:
+          current_buying_power = self.account_data.get_buying_power()
+      # Continue with existing validation logic
+
+---
+
+# Performance Guarantees
+
+cache_performance:
+  cache_hit: "<10ms"
+  cache_miss: "<2s (API call)"
+  invalidation: "<1ms"
+
+api_rate_limiting:
+  target: "<10 calls/minute"
+  strategy: "TTL-based caching"
+  ttls:
+    buying_power: 60s
+    positions: 60s
+    account_balance: 60s
+    day_trade_count: 300s
+
+retry_strategy:
+  max_attempts: 3
+  delays: [1s, 2s, 4s]
+  errors:
+    - network_timeout
+    - connection_error
+    - rate_limit_429
+
+---
+
+# Security Considerations
+
+logging:
+  DO_LOG:
+    - API call events ("Fetching buying power")
+    - Cache events ("Cache hit: buying_power")
+    - Error events ("Rate limit hit, retrying")
+    - Operation duration ("Fetch completed in 1.2s")
+
+  DO_NOT_LOG:
+    - Account numbers (PII)
+    - Exact account balances (mask: "$X,XXX.XX")
+    - API tokens/session data
+    - Internal account IDs
+
+data_protection:
+  cache_location: "In-memory only (not persisted)"
+  session_management: "Delegated to RobinhoodAuth"
+  credential_handling: "No direct credential access"

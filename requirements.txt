@@ -26,6 +26,7 @@ pylint==3.0.3
 # Security (§Security)
 python-dotenv==1.0.0
 bandit==1.7.6
+pyotp==2.9.0  # MFA TOTP generation (authentication-module)
 
 # Backtesting
 backtrader==1.9.78.123
