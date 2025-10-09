@@ -216,7 +216,8 @@
   - Verify account access
   - Display dashboard
   - Enter main loop
-  - [BLOCKED: authentication-module, configuration-validator, status-dashboard]
+  - [UNBLOCKED: authentication-module shipped, configuration-validator shipped, market-data-module shipped]
+  - [OPTIONAL: status-dashboard can be added later]
 
 ### credentials-manager
 - **Title**: Secure credentials management
