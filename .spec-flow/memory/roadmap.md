@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-08 (market-data-module shipped)
+**Last updated**: 2025-10-09 (credentials-manager shipped)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -169,25 +169,89 @@
   - Code quality: A (95/100) from senior code review
   - Documentation: spec, plan, tasks, analysis-report, optimization-report, code-review-report
 
-## In Progress
-
-<!-- Currently implementing -->
+### startup-sequence
+- **Title**: Bot startup and initialization
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-08
+- **Commit**: b5a73f4
+- **Spec**: specs/startup-sequence/
+- **Delivered**:
+  - StartupOrchestrator class with dependency-ordered initialization
+  - Startup banner display (PAPER/LIVE mode indicators)
+  - Configuration loading and validation (§Pre_Deploy)
+  - Logging system initialization with dedicated startup.log
+  - Mode switcher initialization (paper/live mode management)
+  - Circuit breaker initialization and health verification
+  - Trading bot initialization with component health checks
+  - Comprehensive status summary before trading begins
+  - --dry-run flag for validation-only mode
+  - --json flag for machine-readable status output
+  - Fail-fast error handling with clear remediation guidance
+  - Automatic directory creation (logs/, data/, backtests/results/)
+  - Exit codes (0=success, 1=config error, 2=validation error, 3=init failure)
+  - Startup duration tracking (131ms, 97.4% under 5s target)
+  - 16 unit tests + 4 integration tests (100% pass rate)
+  - Type safety: mypy errors reduced 25 → 1
+  - Full Constitution v1.0.0 compliance (§Safety_First, §Pre_Deploy, §Audit_Everything)
+  - Documentation: spec, plan, tasks, analysis-report, optimization-report
 
 ### error-handling-framework
 - **Title**: API error handling framework
 - **Area**: infra
 - **Role**: all
 - **Intra**: No
-- **Branch**: error-handling-framework
-- **Spec**: specs/error-handling-framework/spec.md
-- **Updated**: 2025-01-08
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Retry logic for API failures (§Risk_Management)
-  - Rate limit detection and exponential backoff
-  - Network error recovery
-  - Graceful shutdown on critical errors
-  - [PIGGYBACK: bot.py has basic error handling]
+- **Date**: 2025-10-08
+- **Spec**: specs/error-handling-framework/
+- **Delivered**:
+  - Exception hierarchy (RetriableError, NonRetriableError, RateLimitError)
+  - RetryPolicy configuration system with validation
+  - @with_retry decorator with exponential backoff (1s, 2s, 4s) + jitter
+  - Rate limit detection (HTTP 429 with Retry-After header support)
+  - Circuit breaker with sliding window (5 failures in 60s triggers shutdown)
+  - Callbacks (on_retry, on_exhausted) for custom handling
+  - Integration with existing TradingLogger (§Audit_Everything)
+  - Exception chaining preservation for debugging
+  - Predefined policies (DEFAULT, AGGRESSIVE, CONSERVATIVE)
+  - 27 unit tests (100% pass rate)
+  - Test coverage: 87-96% per module
+  - Type safety: mypy --strict passes (100% type coverage)
+  - Security audit: 0 vulnerabilities
+  - Performance: <100ms overhead per retry
+  - Senior code review: 8.5/10 (APPROVED)
+  - Full Constitution v1.0.0 compliance (§Risk_Management, §Safety_First, §Audit_Everything)
+  - Production-ready, available for immediate use
+  - Documentation: spec, plan, tasks, analysis, optimization-report, code-review-report
+
+### credentials-manager
+- **Title**: Secure credentials management
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-09
+- **Commit**: e1114ed
+- **Spec**: specs/credentials-manager/
+- **Delivered**:
+  - utils/security.py module with 4 credential masking functions (100% coverage)
+  - Device token persistence via dotenv.set_key() to .env file
+  - MFA secret format validation (16-char base32 regex: ^[A-Z2-7]{16}$)
+  - Device token optional validation in ConfigValidator
+  - RobinhoodAuth.save_device_token_to_env() method
+  - RobinhoodAuth.login_with_device_token() with automatic MFA fallback
+  - Updated login() to try device token first (reduces MFA fatigue)
+  - Credential masking in all logs (username, password, MFA secret, device token)
+  - DEVICE_TOKEN field in Config and .env.example
+  - 40 unit + integration + performance tests (100% pass rate)
+  - Test coverage: 85.57% (robinhood_auth), 100% (security)
+  - Validation performance: <500ms (actual ~5-10ms)
+  - Full Constitution v1.0.0 compliance (§Security, §Code_Quality, §Audit_Everything)
+  - Production-ready with comprehensive documentation
+  - Documentation: spec, plan, tasks, analysis-report, README credentials section
+
+## In Progress
+
+<!-- Currently implementing -->
 
 ## Next
 
@@ -201,36 +265,6 @@
 
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
-
-### startup-sequence
-- **Title**: Bot startup and initialization
-- **Area**: infra
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Validate environment (§Pre_Deploy)
-  - Authenticate with MFA
-  - Load config
-  - Check market status
-  - Verify account access
-  - Display dashboard
-  - Enter main loop
-  - [UNBLOCKED: authentication-module shipped, configuration-validator shipped, market-data-module shipped]
-  - [OPTIONAL: status-dashboard can be added later]
-
-### credentials-manager
-- **Title**: Secure credentials management
-- **Area**: infra
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Secure storage of credentials (§Security)
-  - Validate MFA secret format
-  - Test authentication on first run
-  - Store device token for faster subsequent logins
-  - [BLOCKED: environment-config]
 
 ### trade-logging
 - **Title**: Trade history database/CSV
