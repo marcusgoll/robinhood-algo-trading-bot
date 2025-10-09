@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-09 (credentials-manager shipped)
+**Last updated**: 2025-10-09 (trade-logging shipped)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -249,6 +249,38 @@
   - Production-ready with comprehensive documentation
   - Documentation: spec, plan, tasks, analysis-report, README credentials section
 
+### trade-logging
+- **Title**: Enhanced trade logging with structured JSONL format
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-09
+- **Commit**: 7c685bd
+- **Spec**: specs/trade-logging/
+- **Delivered**:
+  - TradeRecord dataclass with 27 fields (core data, strategy metadata, decision audit, outcome tracking, performance metrics, compliance)
+  - StructuredTradeLogger class with daily JSONL file rotation (logs/trades/YYYY-MM-DD.jsonl)
+  - TradeQueryHelper class with analytics queries (date range, symbol filtering, win rate calculation)
+  - Thread-safe concurrent writes with file locking (0.405ms write latency, 10 threads verified)
+  - Streaming I/O with generator pattern for memory efficiency (O(1) per record)
+  - Dual logging: Backwards-compatible text logs + new structured JSONL logs
+  - Field validation in TradeRecord.__post_init__() (symbol format, numeric constraints, required fields)
+  - Graceful error degradation (OSError caught, logged to stderr, bot continues)
+  - TradingBot integration with all 27 fields populated (session_id, bot_version, config_hash, order_id)
+  - Decimal precision preservation (string serialization in JSON)
+  - ISO 8601 UTC timestamps with 'Z' suffix
+  - Compact JSONL format (~709KB for 1000 trades)
+  - 20 tests (5 unit trade_record, 6 unit structured_logger, 4 unit query_helper, 3 integration, 2 smoke) - 100% pass rate
+  - Test coverage: 95.89% (query_helper 89.47%, structured_logger 100%, trade_record 98.21%)
+  - Performance: Write 0.405ms (12.3x faster than 5ms target), Query 15.17ms for 1000 trades (32.9x faster than 500ms target)
+  - Security: 0 vulnerabilities (bandit scan 607 lines), Windows ACL file permissions (owner-only)
+  - Senior code review: GOOD (0 critical, 0 important, 30 minor auto-fixed)
+  - Contract compliance: 100% (27 fields, 10 methods verified)
+  - KISS/DRY: No violations
+  - Full Constitution v1.0.0 compliance (§Audit_Everything, §Data_Integrity, §Safety_First, §Testing)
+  - Production-ready, local-only feature (no staging/production deployment needed)
+  - Documentation: spec, plan, tasks, contracts/api.yaml, analysis-report, optimization-report, code-review-report
+
 ## In Progress
 
 <!-- Currently implementing -->
@@ -266,18 +298,6 @@
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
 
-### trade-logging
-- **Title**: Trade history database/CSV
-- **Area**: infra
-- **Role**: all
-- **Intra**: Yes
-- **Impact**: 4 | **Effort**: 2 | **Confidence**: 1.0 | **Score**: 2.00
-- **Requirements**:
-  - Save all trades to CSV (timestamp, symbol, action, quantity, price, P&L)
-  - Track daily performance metrics (§Audit_Everything)
-  - Export trade history
-  - [BLOCKED: logging-system]
-
 ### status-dashboard
 - **Title**: CLI status dashboard & performance metrics
 - **Area**: infra
@@ -294,7 +314,7 @@
   - Update real-time
   - Export daily summary
   - Compare against targets
-  - [BLOCKED: account-data-module, performance-tracking]
+  - [UNBLOCKED: account-data-module shipped, performance-tracking ready (trade-logging provides data)]
   - [MERGED: performance-metrics-dashboard]
 
 ### health-check
@@ -339,7 +359,7 @@
   - Calculate and display current risk-reward ratio
   - Alert if R:R falls below 1:1
   - Daily trade log with timestamps and P&L
-  - [BLOCKED: trade-logging]
+  - [UNBLOCKED: trade-logging shipped - provides TradeQueryHelper with win rate calculation]
   - [PIGGYBACK: extends trade-logging with analytics]
   - [MERGED: win-rate-tracking, avg-win-loss-calculator]
 
