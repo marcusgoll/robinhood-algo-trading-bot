@@ -134,3 +134,18 @@ class TestStartupOrchestrator:
         assert len(orchestrator.steps) == 1
         assert orchestrator.steps[0].name == "Loading configuration"
         assert orchestrator.steps[0].status == "success"
+
+    def test_validate_config_success(self, mock_config):
+        """Test validate_config with valid configuration."""
+        # Given: Orchestrator with valid config
+        orchestrator = StartupOrchestrator(config=mock_config, dry_run=True)
+
+        # When: Validate config
+        is_valid, errors, warnings = orchestrator._validate_config()
+
+        # Then: Validation passes
+        assert is_valid == True
+        assert errors == []
+        assert len(orchestrator.steps) == 1
+        assert orchestrator.steps[0].name == "Validating configuration"
+        assert orchestrator.steps[0].status == "success"
