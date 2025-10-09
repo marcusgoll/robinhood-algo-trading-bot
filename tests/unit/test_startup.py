@@ -207,3 +207,44 @@ class TestStartupOrchestrator:
         assert hasattr(orchestrator, 'bot')
         assert "trading_bot" in orchestrator.component_states
         assert orchestrator.component_states["trading_bot"]["is_running"] == False
+
+    def test_json_output_format(self, mock_config):
+        """Test JSON output format matches schema."""
+        import json
+        from datetime import datetime, timezone
+
+        # Given: Successful startup result
+        orchestrator = StartupOrchestrator(config=mock_config, dry_run=True, json_output=True)
+
+        result = StartupResult(
+            status="ready",
+            mode="paper",
+            phase="experience",
+            steps=[
+                StartupStep(name="Config", status="success"),
+                StartupStep(name="Validation", status="success")
+            ],
+            errors=[],
+            warnings=["Low balance"],
+            component_states={
+                "logging": {"status": "ready"},
+                "mode_switcher": {"status": "ready"}
+            },
+            startup_duration_seconds=2.5,
+            timestamp="2025-01-08T10:00:00Z"
+        )
+
+        # When: Format JSON output
+        json_output = orchestrator._format_json_output(result)
+
+        # Then: Assert JSON has all required fields
+        parsed = json.loads(json_output)
+        assert parsed["status"] == "ready"
+        assert parsed["mode"] == "paper"
+        assert parsed["phase"] == "experience"
+        assert parsed["startup_duration_seconds"] == 2.5
+        assert parsed["timestamp"] == "2025-01-08T10:00:00Z"
+        assert "logging" in parsed["components"]
+        assert "mode_switcher" in parsed["components"]
+        assert parsed["errors"] == []
+        assert parsed["warnings"] == ["Low balance"]
