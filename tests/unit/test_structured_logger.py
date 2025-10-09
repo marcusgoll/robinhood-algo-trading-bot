@@ -181,3 +181,64 @@ class TestStructuredTradeLogger:
         assert log_file.exists(), "Log file should exist"
         lines = log_file.read_text().strip().split('\n')
         assert len(lines) == num_calls, f"Expected {num_calls} lines, got {len(lines)}"
+
+    def test_logger_handles_missing_directory(self) -> None:
+        """T035 [RED]: Logger should gracefully handle missing directory.
+
+        GIVEN: StructuredTradeLogger instance with non-existent directory
+        WHEN: log_trade() called
+        THEN: Directory auto-created and trade logged successfully
+
+        Expected: Directory creation already implemented (line 93 in structured_logger.py)
+        """
+        # GIVEN: Logger with non-existent directory path
+        missing_dir = self.temp_dir / "completely" / "missing" / "path"
+        assert not missing_dir.exists(), "Directory should not exist initially"
+
+        logger = StructuredTradeLogger(log_dir=missing_dir)
+
+        # WHEN: Log a trade
+        trade = sample_buy_trade()
+        logger.log_trade(trade)
+
+        # THEN: Directory should be auto-created
+        assert missing_dir.exists(), "Directory should be auto-created"
+
+        # AND: Trade should be logged successfully
+        today = datetime.now().strftime("%Y-%m-%d")
+        log_file = missing_dir / f"{today}.jsonl"
+
+        assert log_file.exists(), "Log file should exist after auto-creation"
+        lines = log_file.read_text().strip().split('\n')
+        assert len(lines) == 1, "Should have logged 1 trade"
+
+        # Verify valid JSON
+        data = json.loads(lines[0])
+        assert "symbol" in data, "Trade record should contain symbol"
+
+    def test_logger_handles_disk_full(self, capsys) -> None:
+        """T037 [RED]: Logger should handle disk full error gracefully.
+
+        GIVEN: StructuredTradeLogger instance
+        WHEN: log_trade() called but disk full (OSError)
+        THEN: OSError caught, logged to stderr, bot continues without crash
+
+        Expected to FAIL: Error handling not implemented yet
+        """
+        # GIVEN: Logger instance
+        logger = StructuredTradeLogger(log_dir=self.logs_dir)
+        trade = sample_buy_trade()
+
+        # WHEN: Simulate disk full error by mocking open()
+        import unittest.mock as mock
+
+        with mock.patch("builtins.open", side_effect=OSError("[Errno 28] No space left on device")):
+            # Call log_trade() - should NOT crash
+            logger.log_trade(trade)
+
+        # THEN: Error should be logged to stderr
+        captured = capsys.readouterr()
+        assert "ERROR: Failed to write trade log" in captured.err, \
+            "Should log error to stderr"
+        assert "No space left on device" in captured.err, \
+            "Should include error details in stderr"
