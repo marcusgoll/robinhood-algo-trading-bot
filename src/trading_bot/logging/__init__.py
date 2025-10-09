@@ -9,10 +9,11 @@ Constitution v1.0.0:
 - Data_Driven: Queryable logs enable performance analysis
 """
 
-# Imports commented out for TDD RED phase - modules don't exist yet
-# Uncomment during GREEN phase (T009-T013)
-# from .trade_record import TradeRecord
+# T009-T013 [GREEN]: TradeRecord implemented and tested
+from .trade_record import TradeRecord
+
+# Coming in future tasks:
 # from .structured_logger import StructuredTradeLogger
 # from .query_helper import TradeQueryHelper
 
-# __all__ = ['TradeRecord', 'StructuredTradeLogger', 'TradeQueryHelper']
+__all__ = ['TradeRecord']
