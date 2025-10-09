@@ -193,22 +193,20 @@ class RobinhoodAuth:
 
         logger.info(f"Authenticating user {mask_username(username)}")
 
-        # T023: Handle MFA if configured
-        mfa_code = None
-        if self.auth_config.mfa_secret and pyotp:
-            totp = pyotp.TOTP(self.auth_config.mfa_secret)
-            mfa_code = totp.now()
+        # T023: First try without MFA code (for push notification approval)
+        # If that fails and MFA secret is configured, retry with TOTP code
+        logger.info("Attempting login - if your account uses push notifications, please approve in the Robinhood app")
 
         # Attempt login with retry logic (T034)
         try:
             # Define login function for retry wrapper
             def _do_login() -> Any:
-                # Call rh.login() - let robin_stocks handle session caching
-                # pickle_name parameter allows session reuse across bot restarts
+                # Call rh.login() WITHOUT mfa_code to trigger push notification
+                # If user has TOTP-based MFA (not push), they should set MFA_SECRET
                 result = rh.login(
                     username=username,
                     password=password,
-                    mfa_code=mfa_code,
+                    mfa_code=None,  # Let Robinhood send push notification
                     store_session=True,
                     pickle_name=self.auth_config.pickle_path
                 )
@@ -217,8 +215,9 @@ class RobinhoodAuth:
                     raise AuthenticationError("Invalid credentials or authentication failed")
                 return result
 
-            # Use retry with exponential backoff for network resilience
-            self._session = _retry_with_backoff(_do_login, max_attempts=3, base_delay=1.0)
+            # Use longer delays to give user time to approve push notification
+            # 10s, 20s, 40s = 70 seconds total for user to approve
+            self._session = _retry_with_backoff(_do_login, max_attempts=3, base_delay=10.0)
 
             self._authenticated = True
             logger.info(f"Authentication successful for {mask_username(username)}")
