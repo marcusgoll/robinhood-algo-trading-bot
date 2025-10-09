@@ -294,6 +294,50 @@ class TestStartupOrchestrator:
         assert parsed["errors"] == []
         assert parsed["warnings"] == ["Low balance"]
 
+    def test_run_success_path(self, valid_env_file, valid_config_file, tmp_logs_dir, monkeypatch):
+        """Test run() method executes full startup sequence successfully.
+
+        T028 [RED]: Write failing test for run() method
+        - Given: Valid .env and config.json
+        - When: result = orchestrator.run()
+        - Then: Assert result.status == "ready", len(result.steps) >= 6, all steps success
+        """
+        # Given: Valid .env and config.json files
+        monkeypatch.setenv("ROBINHOOD_USERNAME", "test_user")
+        monkeypatch.setenv("ROBINHOOD_PASSWORD", "test_pass")
+        monkeypatch.setenv("ROBINHOOD_MFA_CODE", "123456")
+
+        # Create config and orchestrator
+        from src.trading_bot.config import Config
+        config = Config.from_env_and_json()
+        config.logs_dir = str(tmp_logs_dir)
+
+        orchestrator = StartupOrchestrator(config=config, dry_run=True, json_output=False)
+
+        # When: Run startup sequence
+        result = orchestrator.run()
+
+        # Then: Assert successful startup
+        assert result.status == "ready"
+        assert len(result.steps) >= 6, f"Expected at least 6 steps, got {len(result.steps)}"
+
+        # Verify all steps succeeded
+        for step in result.steps:
+            assert step.status == "success", f"Step '{step.name}' failed: {step.error_message}"
+
+        # Verify result fields populated
+        assert result.mode == "paper"
+        assert result.phase == "experience"
+        assert result.startup_duration_seconds > 0
+        assert result.timestamp is not None
+        assert len(result.errors) == 0
+
+        # Verify component states
+        assert "logging" in result.component_states
+        assert "mode_switcher" in result.component_states
+        assert "circuit_breaker" in result.component_states
+        assert "trading_bot" in result.component_states
+
     def test_verify_health_checks_components(self, mock_config, tmp_logs_dir):
         """Test verify_health checks all components are ready.
 
@@ -325,3 +369,27 @@ class TestStartupOrchestrator:
         assert orchestrator.component_states["mode_switcher"]["status"] == "ready"
         assert orchestrator.component_states["circuit_breaker"]["status"] == "ready"
         assert orchestrator.component_states["trading_bot"]["status"] == "ready"
+
+    def test_cleanup_on_failure_closes_logger(self, mock_config, tmp_logs_dir):
+        """Test cleanup_on_failure closes logger handlers.
+
+        T032 [RED]: Write failing test for _cleanup_on_failure()
+        - Given: Partial initialization (logging initialized, then error)
+        - When: orchestrator._cleanup_on_failure()
+        - Then: Assert logger handlers closed, no resource leaks
+        """
+        # Given: Partial initialization with logging initialized
+        mock_config.logs_dir = str(tmp_logs_dir)
+        orchestrator = StartupOrchestrator(config=mock_config, dry_run=True)
+        orchestrator._initialize_logging()
+
+        # Verify logger has handlers before cleanup
+        assert hasattr(orchestrator, 'startup_logger')
+        initial_handler_count = len(orchestrator.startup_logger.handlers)
+        assert initial_handler_count > 0
+
+        # When: Cleanup on failure
+        orchestrator._cleanup_on_failure()
+
+        # Then: Assert logger handlers closed and removed
+        assert len(orchestrator.startup_logger.handlers) == 0
