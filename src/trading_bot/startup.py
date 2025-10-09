@@ -204,3 +204,37 @@ class StartupOrchestrator:
             step.error_message = str(e)
             self.errors.append(f"Mode switcher initialization failed: {e}")
             raise
+
+    def _initialize_circuit_breakers(self) -> 'CircuitBreaker':
+        """Initialize circuit breakers for risk management.
+
+        Returns:
+            CircuitBreaker instance
+
+        Raises:
+            Exception: If circuit breaker initialization fails
+        """
+        from .bot import CircuitBreaker
+
+        step = StartupStep(name="Initializing circuit breakers", status="running")
+        self.steps.append(step)
+
+        try:
+            circuit_breaker = CircuitBreaker(
+                max_daily_loss_pct=self.config.risk_management.max_daily_loss_pct,
+                max_consecutive_losses=self.config.risk_management.max_consecutive_losses
+            )
+            self.circuit_breaker = circuit_breaker
+
+            step.status = "success"
+            self.component_states["circuit_breaker"] = {
+                "status": "ready",
+                "max_daily_loss_pct": self.config.risk_management.max_daily_loss_pct,
+                "max_consecutive_losses": self.config.risk_management.max_consecutive_losses
+            }
+            return circuit_breaker
+        except Exception as e:
+            step.status = "failed"
+            step.error_message = str(e)
+            self.errors.append(f"Circuit breaker initialization failed: {e}")
+            raise
