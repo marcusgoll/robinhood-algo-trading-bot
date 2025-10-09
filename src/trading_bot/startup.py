@@ -143,3 +143,33 @@ class StartupOrchestrator:
             step.error_message = str(e)
             self.errors.append(f"Validation failed: {e}")
             raise
+
+    def _initialize_logging(self) -> None:
+        """Initialize logging system and create startup logger.
+
+        Raises:
+            Exception: If logging initialization fails
+        """
+        from pathlib import Path
+        from .logger import TradingLogger
+
+        step = StartupStep(name="Initializing logging system", status="running")
+        self.steps.append(step)
+
+        try:
+            # Convert logs_dir to Path if it's a string
+            logs_dir = Path(self.config.logs_dir) if isinstance(self.config.logs_dir, str) else self.config.logs_dir
+            TradingLogger.setup(logs_dir=logs_dir)
+            self.startup_logger = TradingLogger.get_startup_logger()
+            self.startup_logger.info("Startup sequence initiated")
+
+            step.status = "success"
+            self.component_states["logging"] = {
+                "status": "ready",
+                "logs_dir": str(self.config.logs_dir)
+            }
+        except Exception as e:
+            step.status = "failed"
+            step.error_message = str(e)
+            self.errors.append(f"Logging initialization failed: {e}")
+            raise
