@@ -173,3 +173,34 @@ class StartupOrchestrator:
             step.error_message = str(e)
             self.errors.append(f"Logging initialization failed: {e}")
             raise
+
+    def _initialize_mode_switcher(self) -> 'ModeSwitcher':
+        """Initialize mode switcher for paper/live trading management.
+
+        Returns:
+            ModeSwitcher instance
+
+        Raises:
+            Exception: If mode switcher initialization fails
+        """
+        from .mode_switcher import ModeSwitcher
+
+        step = StartupStep(name="Initializing mode switcher", status="running")
+        self.steps.append(step)
+
+        try:
+            mode_switcher = ModeSwitcher(self.config)
+            self.mode_switcher = mode_switcher
+
+            step.status = "success"
+            self.component_states["mode_switcher"] = {
+                "status": "ready",
+                "mode": self.config.trading.mode,
+                "phase": self.config.phase_progression.current_phase
+            }
+            return mode_switcher
+        except Exception as e:
+            step.status = "failed"
+            step.error_message = str(e)
+            self.errors.append(f"Mode switcher initialization failed: {e}")
+            raise
