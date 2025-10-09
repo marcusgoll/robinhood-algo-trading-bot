@@ -208,6 +208,26 @@ class TestStartupOrchestrator:
         assert "trading_bot" in orchestrator.component_states
         assert orchestrator.component_states["trading_bot"]["is_running"] == False
 
+    def test_display_banner_paper_mode(self, mock_config, capsys):
+        """Test display_banner shows mode and phase.
+
+        T022 [RED]: Write failing test for _display_banner()
+        - Given: Config with mode=paper, phase=experience
+        - When: orchestrator._display_banner()
+        - Then: Assert stdout contains "PAPER TRADING", "experience"
+        """
+        # Given: Config with mode=paper, phase=experience
+        orchestrator = StartupOrchestrator(config=mock_config, dry_run=True)
+
+        # When: Display banner
+        orchestrator._display_banner()
+
+        # Then: Assert stdout contains "PAPER TRADING"
+        captured = capsys.readouterr()
+        assert "PAPER TRADING" in captured.out
+        assert "Simulation - No Real Money" in captured.out
+        assert "ROBINHOOD TRADING BOT" in captured.out
+
     def test_display_summary_shows_config(self, mock_config, capsys):
         """Test display_summary shows startup configuration summary.
 
@@ -273,3 +293,35 @@ class TestStartupOrchestrator:
         assert "mode_switcher" in parsed["components"]
         assert parsed["errors"] == []
         assert parsed["warnings"] == ["Low balance"]
+
+    def test_verify_health_checks_components(self, mock_config, tmp_logs_dir):
+        """Test verify_health checks all components are ready.
+
+        T030 [RED]: Write failing test for _verify_health()
+        - Given: All components initialized
+        - When: orchestrator._verify_health()
+        - Then: Assert all component_states have status="ready"
+        """
+        # Given: Orchestrator with all components initialized
+        mock_config.logs_dir = str(tmp_logs_dir)
+        orchestrator = StartupOrchestrator(config=mock_config, dry_run=True)
+
+        # Initialize all required components
+        orchestrator._initialize_logging()
+        orchestrator._initialize_mode_switcher()
+        orchestrator._initialize_circuit_breakers()
+        orchestrator._initialize_bot()
+
+        # When: Verify health
+        orchestrator._verify_health()
+
+        # Then: Assert health verification step added
+        assert len(orchestrator.steps) == 5  # 4 init steps + 1 health check
+        assert orchestrator.steps[-1].name == "Verifying component health"
+        assert orchestrator.steps[-1].status == "success"
+
+        # Assert all components have status="ready"
+        assert orchestrator.component_states["logging"]["status"] == "ready"
+        assert orchestrator.component_states["mode_switcher"]["status"] == "ready"
+        assert orchestrator.component_states["circuit_breaker"]["status"] == "ready"
+        assert orchestrator.component_states["trading_bot"]["status"] == "ready"
