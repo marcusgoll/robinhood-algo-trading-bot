@@ -44,6 +44,10 @@ def main() -> int:
         # Load configuration
         config = Config.from_env_and_json()
 
+        # Initialize authentication
+        from ..auth.robinhood_auth import RobinhoodAuth
+        auth = RobinhoodAuth(config=config)
+
         # Log dashboard launch
         logger.info(
             "dashboard.launched",
@@ -54,7 +58,7 @@ def main() -> int:
         )
 
         # Initialize AccountData service
-        account_data = AccountData(config=config)
+        account_data = AccountData(auth=auth)
 
         # Initialize TradeQueryHelper
         trade_helper = TradeQueryHelper(log_file=Path("logs/trades-structured.jsonl"))

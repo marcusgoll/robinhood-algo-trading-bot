@@ -1,0 +1,30 @@
+# Dashboard Performance Targets Configuration
+# Copy this file to dashboard-targets.yaml and adjust values to your trading goals
+#
+# Usage: The dashboard will load this file and compare actual performance metrics
+# against these targets, displaying variance indicators (✓ meeting / ✗ not meeting)
+
+# Win Rate Target (percentage)
+# Target: Percentage of winning trades vs total closed trades
+# Example: 60.0 means you aim for 60% of trades to be profitable
+win_rate_target: 60.0
+
+# Daily P&L Target (dollars)
+# Target: Total profit/loss goal per trading day
+# Example: 500.0 means you aim for $500 profit per day
+daily_pl_target: 500.0
+
+# Trades Per Day Target (count)
+# Target: Number of trades you aim to execute per trading day
+# Example: 10 means you aim for 10 trades per day
+trades_per_day_target: 10
+
+# Maximum Drawdown Target (dollars)
+# Target: Maximum acceptable loss before stopping trading
+# Example: -200.0 means stop trading if you're down $200 in a day
+max_drawdown_target: -200.0
+
+# Average Risk-Reward Ratio Target
+# Target: Ratio of potential profit vs potential loss per trade
+# Example: 2.0 means you aim for 2:1 reward-to-risk ratio
+avg_risk_reward_target: 2.0
