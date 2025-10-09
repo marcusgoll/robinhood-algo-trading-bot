@@ -95,7 +95,7 @@ def main() -> int:
         else:
             # Startup blocked
             if not args.json:
-                print(f"\n❌ Startup failed:")
+                print("\n❌ Startup failed:")
                 for error in result.errors:
                     print(f"  - {error}")
 

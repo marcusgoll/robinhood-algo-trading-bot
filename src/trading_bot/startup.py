@@ -12,13 +12,16 @@ Provides:
 - StartupOrchestrator: Coordinates startup sequence
 """
 
-from dataclasses import dataclass
-from typing import Literal, Optional, List, Dict, Tuple, TYPE_CHECKING
-import time
 import json
+import time
+from dataclasses import dataclass
+from datetime import UTC
+from typing import TYPE_CHECKING, Literal, Optional
 
 if TYPE_CHECKING:
+    from .bot import CircuitBreaker, TradingBot
     from .config import Config
+    from .mode_switcher import ModeSwitcher
 
 
 @dataclass
@@ -33,7 +36,7 @@ class StartupStep:
     """
     name: str
     status: Literal["pending", "running", "success", "failed"]
-    error_message: Optional[str] = None
+    error_message: str | None = None
     duration_seconds: float = 0.0
 
 
@@ -55,10 +58,10 @@ class StartupResult:
     status: Literal["ready", "blocked"]
     mode: str
     phase: str
-    steps: List[StartupStep]
-    errors: List[str]
-    warnings: List[str]
-    component_states: Dict[str, Dict]
+    steps: list[StartupStep]
+    errors: list[str]
+    warnings: list[str]
+    component_states: dict[str, dict]
     startup_duration_seconds: float
     timestamp: str  # ISO 8601 UTC
 
@@ -96,11 +99,11 @@ class StartupOrchestrator:
         self.config = config
         self.dry_run = dry_run
         self.json_output = json_output
-        self.steps: List[StartupStep] = []
-        self.errors: List[str] = []
-        self.warnings: List[str] = []
-        self.component_states: Dict[str, Dict] = {}
-        self.start_time: Optional[float] = None
+        self.steps: list[StartupStep] = []
+        self.errors: list[str] = []
+        self.warnings: list[str] = []
+        self.component_states: dict[str, dict] = {}
+        self.start_time: float | None = None
 
     def _load_config(self) -> 'Config':
         """Load configuration from environment and JSON files.
@@ -127,7 +130,7 @@ class StartupOrchestrator:
             self.errors.append(f"Configuration loading failed: {e}")
             raise
 
-    def _validate_config(self) -> Tuple[bool, List[str], List[str]]:
+    def _validate_config(self) -> tuple[bool, list[str], list[str]]:
         """Validate configuration settings.
 
         Returns:
@@ -137,6 +140,8 @@ class StartupOrchestrator:
             Exception: If validation fails unexpectedly
         """
         from .validator import ConfigValidator
+
+        assert self.config is not None, "Config must be loaded before validation"
 
         step = StartupStep(name="Validating configuration", status="running")
         self.steps.append(step)
@@ -167,7 +172,10 @@ class StartupOrchestrator:
             Exception: If logging initialization fails
         """
         from pathlib import Path
+
         from .logger import TradingLogger
+
+        assert self.config is not None, "Config must be loaded before logging initialization"
 
         step = StartupStep(name="Initializing logging system", status="running")
         self.steps.append(step)
@@ -201,6 +209,8 @@ class StartupOrchestrator:
         """
         from .mode_switcher import ModeSwitcher
 
+        assert self.config is not None, "Config must be loaded before mode switcher initialization"
+
         step = StartupStep(name="Initializing mode switcher", status="running")
         self.steps.append(step)
 
@@ -231,6 +241,8 @@ class StartupOrchestrator:
             Exception: If circuit breaker initialization fails
         """
         from .bot import CircuitBreaker
+
+        assert self.config is not None, "Config must be loaded before circuit breaker initialization"
 
         step = StartupStep(name="Initializing circuit breakers", status="running")
         self.steps.append(step)
@@ -265,6 +277,8 @@ class StartupOrchestrator:
             Exception: If trading bot initialization fails
         """
         from .bot import TradingBot
+
+        assert self.config is not None, "Config must be loaded before bot initialization"
 
         step = StartupStep(name="Initializing trading bot", status="running")
         self.steps.append(step)
@@ -309,7 +323,7 @@ class StartupOrchestrator:
 
         T029 [GREEN→T028]: Implement run() method
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         self.start_time = time.time()
 
@@ -319,7 +333,8 @@ class StartupOrchestrator:
                 self._display_banner()
 
             # Execute startup sequence
-            config = self._load_config()
+            self._load_config()
+            assert self.config is not None, "Config must be loaded before proceeding"
             is_valid, errors, warnings = self._validate_config()
 
             if not is_valid:
@@ -346,7 +361,7 @@ class StartupOrchestrator:
                 warnings=self.warnings,
                 component_states=self.component_states,
                 startup_duration_seconds=duration,
-                timestamp=datetime.now(timezone.utc).isoformat()
+                timestamp=datetime.now(UTC).isoformat()
             )
 
             if self.json_output:
@@ -370,6 +385,7 @@ class StartupOrchestrator:
         Pattern: Reuses mode_switcher.py display_mode_banner() approach (line 141)
         T023 [GREEN]: Implementation for _display_banner() test
         """
+        assert self.config is not None, "Config must be loaded before displaying banner"
         mode_display = "PAPER TRADING (Simulation - No Real Money)" if self.config.paper_trading else "LIVE TRADING (Real Money)"
 
         print("=" * 60)
@@ -390,6 +406,8 @@ class StartupOrchestrator:
 
         T025 [GREEN]: Implementation for _display_summary() test
         """
+        assert self.config is not None, "Config must be loaded before displaying summary"
+
         print("=" * 60)
         print("✅ STARTUP COMPLETE - Ready to trade")
         print("=" * 60)
@@ -449,6 +467,26 @@ class StartupOrchestrator:
             # Log cleanup errors but don't raise
             print(f"Warning: Cleanup error: {e}")
 
+    def _get_mode(self) -> str:
+        """Get current trading mode for reporting.
+
+        Returns:
+            Trading mode string ("paper", "live", or "unknown")
+        """
+        if hasattr(self, 'config') and self.config:
+            return "paper" if self.config.paper_trading else "live"
+        return "unknown"
+
+    def _get_phase(self) -> str:
+        """Get current phase for reporting.
+
+        Returns:
+            Current phase string or "unknown"
+        """
+        if hasattr(self, 'config') and self.config:
+            return self.config.current_phase
+        return "unknown"
+
     def _create_blocked_result(self, error_message: str, duration: float = 0.0) -> StartupResult:
         """Create a blocked result with error information.
 
@@ -461,7 +499,7 @@ class StartupOrchestrator:
 
         T035 [GREEN→T034]: Implement _create_blocked_result() method
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         # Add error message to errors list if not already present
         if error_message not in self.errors:
@@ -469,14 +507,14 @@ class StartupOrchestrator:
 
         return StartupResult(
             status="blocked",
-            mode="paper" if (hasattr(self, 'config') and self.config and self.config.paper_trading) else "live" if (hasattr(self, 'config') and self.config) else "unknown",
-            phase=self.config.current_phase if hasattr(self, 'config') and self.config else "unknown",
+            mode=self._get_mode(),
+            phase=self._get_phase(),
             steps=self.steps,
             errors=self.errors,
             warnings=self.warnings,
             component_states=self.component_states,
             startup_duration_seconds=duration,
-            timestamp=datetime.now(timezone.utc).isoformat()
+            timestamp=datetime.now(UTC).isoformat()
         )
 
     def _format_json_output(self, result: StartupResult) -> str:

@@ -7,9 +7,6 @@ Uses temporary directories, monkeypatch, and real Config loading.
 Constitution v1.0.0: End-to-end validation of startup sequence.
 """
 
-import pytest
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 
@@ -182,3 +179,91 @@ class TestStartupFlowIntegration:
         error_output = captured.out.lower()
         assert any(term in error_output for term in ["phase", "validation", "experience", "live"]), \
             f"Expected error message about phase-mode conflict, got: {captured.out}"
+
+    def test_json_output_mode(self, tmp_path, monkeypatch, capsys):
+        """Test JSON output mode produces valid machine-readable output.
+
+        Additional test for end-to-end JSON output validation.
+
+        - Given: Valid environment with --json flag
+        - When: Run main() with --json --dry-run
+        - Then: Assert valid JSON output with expected structure
+        """
+        import json
+
+        # Given: Valid .env and config.json in tmp_path
+        env_file = tmp_path / ".env"
+        env_file.write_text(
+            "ROBINHOOD_USERNAME=test_user\n"
+            "ROBINHOOD_PASSWORD=test_pass\n"
+            "ROBINHOOD_MFA_SECRET=TESTSECRET123456\n"
+            "ROBINHOOD_DEVICE_TOKEN=test_device_token\n"
+        )
+
+        config_file = tmp_path / "config.json"
+        config_file.write_text(
+            '{\n'
+            '  "trading": {"mode": "paper"},\n'
+            '  "phase_progression": {"current_phase": "experience"},\n'
+            '  "risk_management": {\n'
+            '    "max_daily_loss_pct": 3.0,\n'
+            '    "max_consecutive_losses": 3,\n'
+            '    "max_position_pct": 5.0\n'
+            '  }\n'
+            '}\n'
+        )
+
+        # Create logs directory
+        logs_dir = tmp_path / "logs"
+        logs_dir.mkdir(exist_ok=True)
+
+        # Monkeypatch environment and cwd
+        monkeypatch.setenv("ROBINHOOD_USERNAME", "test_user")
+        monkeypatch.setenv("ROBINHOOD_PASSWORD", "test_pass")
+        monkeypatch.chdir(tmp_path)
+
+        # When: Run main() with --json --dry-run
+        with patch('sys.argv', ['main.py', '--json', '--dry-run']):
+            from src.trading_bot.main import main
+            exit_code = main()
+
+        # Then: Assert exit code 0
+        assert exit_code == 0, "Expected exit code 0 for successful dry run"
+
+        # Capture and validate JSON output
+        captured = capsys.readouterr()
+
+        # Extract JSON from output (filter out logger messages)
+        # JSON output starts with '{'
+        output_lines = captured.out.strip().split('\n')
+        json_lines = []
+        in_json = False
+        for line in output_lines:
+            if line.strip().startswith('{'):
+                in_json = True
+            if in_json:
+                json_lines.append(line)
+
+        json_text = '\n'.join(json_lines)
+
+        # Parse JSON output
+        json_output = json.loads(json_text)
+
+        # Validate structure
+        assert json_output["status"] == "ready"
+        assert json_output["mode"] == "paper"
+        assert json_output["phase"] == "experience"
+        assert "startup_duration_seconds" in json_output
+        assert "timestamp" in json_output
+        assert "components" in json_output
+        assert "errors" in json_output
+        assert "warnings" in json_output
+
+        # Validate components
+        assert "logging" in json_output["components"]
+        assert "mode_switcher" in json_output["components"]
+        assert "circuit_breaker" in json_output["components"]
+        assert "trading_bot" in json_output["components"]
+
+        # Validate no errors
+        assert len(json_output["errors"]) == 0

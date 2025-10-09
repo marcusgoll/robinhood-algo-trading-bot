@@ -7,9 +7,8 @@ Tests:
 - Individual startup steps
 """
 
-import pytest
-from src.trading_bot.startup import StartupStep, StartupResult, StartupOrchestrator
 from src.trading_bot.config import Config
+from src.trading_bot.startup import StartupOrchestrator, StartupResult, StartupStep
 
 
 class TestStartupStep:
@@ -256,7 +255,6 @@ class TestStartupOrchestrator:
     def test_json_output_format(self, mock_config):
         """Test JSON output format matches schema."""
         import json
-        from datetime import datetime, timezone
 
         # Given: Successful startup result
         orchestrator = StartupOrchestrator(config=mock_config, dry_run=True, json_output=True)
@@ -308,7 +306,6 @@ class TestStartupOrchestrator:
         monkeypatch.setenv("ROBINHOOD_MFA_CODE", "123456")
 
         # Create config and orchestrator
-        from src.trading_bot.config import Config
         config = Config.from_env_and_json()
         config.logs_dir = str(tmp_logs_dir)
 
@@ -402,7 +399,6 @@ class TestStartupOrchestrator:
         - When: result = orchestrator._create_blocked_result("Missing credentials")
         - Then: Assert result.status == "blocked", "Missing credentials" in result.errors
         """
-        from datetime import datetime, timezone
 
         # Given: Orchestrator with validation failure
         orchestrator = StartupOrchestrator(config=mock_config, dry_run=True)

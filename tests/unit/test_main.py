@@ -7,9 +7,7 @@ Tests follow TDD approach:
 """
 
 import sys
-import pytest
-from unittest.mock import patch, MagicMock
-from argparse import Namespace
+from unittest.mock import MagicMock, patch
 
 
 class TestParseArguments:
@@ -203,7 +201,7 @@ class TestMain:
                 MockConfig.from_env_and_json.return_value = mock_config
                 MockOrchestrator.return_value.run.return_value = mock_result
 
-                exit_code = main()
+                main()  # Don't need exit code, just checking output
 
         captured = capsys.readouterr()
         assert "Startup failed" in captured.out
@@ -231,9 +229,29 @@ class TestMain:
                 MockConfig.from_env_and_json.return_value = mock_config
                 MockOrchestrator.return_value.run.return_value = mock_result
 
-                exit_code = main()
+                main()  # Don't need exit code, just checking output
 
         captured = capsys.readouterr()
         # In JSON mode, errors should not be printed by main()
         # (orchestrator handles JSON output)
         assert "Startup failed" not in captured.out
+
+
+class TestMainModule:
+    """Test suite for __main__.py module invocation."""
+
+    def test_main_module_importable(self):
+        """Test __main__.py module can be imported.
+
+        CRITICAL-002: Add test coverage for __main__.py (0% → 100%)
+
+        Given: __main__.py exists
+        When: Module is imported
+        Then: Assert it imports without error and has main reference
+        """
+        # This test ensures __main__.py exists and is importable
+        import src.trading_bot.__main__ as main_module
+
+        # Verify the module has access to main function
+        assert hasattr(main_module, 'main'), "__main__.py should import main function"
+        assert callable(main_module.main), "main should be callable"

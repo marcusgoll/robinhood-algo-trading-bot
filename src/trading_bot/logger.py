@@ -87,10 +87,11 @@ class TradingLogger:
 
         # Set custom logs directory if provided
         if logs_dir:
-            cls.LOGS_DIR = logs_dir
-            cls.MAIN_LOG = logs_dir / "trading_bot.log"
-            cls.TRADES_LOG = logs_dir / "trades.log"
-            cls.ERRORS_LOG = logs_dir / "errors.log"
+            # Convert to absolute path to avoid issues with relative paths
+            cls.LOGS_DIR = logs_dir.resolve() if not logs_dir.is_absolute() else logs_dir
+            cls.MAIN_LOG = cls.LOGS_DIR / "trading_bot.log"
+            cls.TRADES_LOG = cls.LOGS_DIR / "trades.log"
+            cls.ERRORS_LOG = cls.LOGS_DIR / "errors.log"
 
         # Create logs directory
         cls.LOGS_DIR.mkdir(parents=True, exist_ok=True)
