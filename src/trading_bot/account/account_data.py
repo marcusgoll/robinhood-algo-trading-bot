@@ -392,13 +392,19 @@ class AccountData:
             profile = rh.account.load_account_profile()
 
             # Validate response
-            if not profile or 'day_trade_count' not in profile:
-                raise AccountDataError("Invalid API response: missing day_trade_count")
+            if not profile:
+                raise AccountDataError("Invalid API response: empty profile")
 
-            try:
-                return int(profile['day_trade_count'])
-            except (ValueError, TypeError) as e:
-                raise AccountDataError(f"Invalid day_trade_count value: {e}") from e
+            # Check for day_trade_count (might be 0 or missing)
+            if 'day_trade_count' in profile:
+                try:
+                    return int(profile['day_trade_count'])
+                except (ValueError, TypeError) as e:
+                    raise AccountDataError(f"Invalid day_trade_count value: {e}") from e
+
+            # Field missing - default to 0 for cash accounts or accounts with no day trades
+            logger.warning(f"day_trade_count not in profile, defaulting to 0. Available fields: {list(profile.keys())[:10]}")
+            return 0
 
         return self._retry_with_backoff(_fetch, max_attempts=3, base_delay=1.0)
 
