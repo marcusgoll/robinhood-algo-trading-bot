@@ -164,5 +164,24 @@ Secure credentials management system for Robinhood trading bot. Provides secure 
 - mask_mfa_secret("ABCDEFGHIJKLMNOP") == "****" ✓
 - mask_device_token("1a2b3c4d5e6f7g8h") == "1a2b3c4d***" ✓
 
+**✅ T008-T010 [RED]: Write failing tests for MFA secret format validation** (2025-10-08)
+- Added 3 tests to tests/unit/test_validator.py for MFA validation
+- Status: Tests FAIL as expected (implementation doesn't exist yet - TDD RED phase)
+- Test breakdown:
+  - T008: test_validate_mfa_secret_format_valid() - Valid 16-char base32 secret (PASSED - no validation yet)
+  - T009: test_validate_mfa_secret_format_invalid_length() - Too short secret (FAILED - expected)
+  - T010: test_validate_mfa_secret_format_invalid_chars() - Invalid base32 chars 8,9 (FAILED - expected)
+- Test pattern: Reuses existing ConfigValidator test patterns from test_validator.py
+- Validates FR-008, FR-009 (MFA secret must be 16-char base32 string)
+- File: tests/unit/test_validator.py (lines 218-266, added 49 lines)
+- Test results: 2 FAILED (expected), 1 PASSED (expected) - RED phase confirmed
+- Next: Implement ConfigValidator._validate_mfa_secret_format() to make tests GREEN
+
+**Failure Verification**:
+- T009 fails: "MFA secret must be 16 characters" error not found (implementation missing) ✓
+- T010 fails: "MFA secret must contain only base32 characters" error not found (implementation missing) ✓
+- No import errors, tests structured correctly ✓
+- Tests fail for the RIGHT reason (missing implementation, not broken tests) ✓
+
 ## Last Updated
-2025-10-08T23:57:00-05:00
+2025-10-08T23:59:00-05:00

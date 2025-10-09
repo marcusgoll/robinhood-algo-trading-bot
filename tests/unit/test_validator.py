@@ -214,3 +214,53 @@ class TestConfigValidator:
             "API connection test" in warning or "authentication-module" in warning
             for warning in validator.warnings
         )
+
+    # =========================================================================
+    # T008-T010: MFA Secret Validation Tests (RED phase - TDD)
+    # FR-008, FR-009: MFA secret format validation
+    # =========================================================================
+
+    def test_validate_mfa_secret_format_valid(self) -> None:
+        """Should pass validation for valid 16-char base32 MFA secret (T008)."""
+        config = Config(
+            robinhood_username="test_user",
+            robinhood_password="test_pass",
+            robinhood_mfa_secret="ABCDEFGHIJKLMNOP"  # Valid: 16-char base32
+        )
+        validator = ConfigValidator(config)
+        validator._validate_credentials()
+
+        # Should not raise any errors about MFA format
+        assert not any("MFA secret must be" in error for error in validator.errors)
+
+    def test_validate_mfa_secret_format_invalid_length(self) -> None:
+        """Should error for MFA secret with invalid length (T009)."""
+        config = Config(
+            robinhood_username="test_user",
+            robinhood_password="test_pass",
+            robinhood_mfa_secret="ABCD"  # Invalid: too short
+        )
+        validator = ConfigValidator(config)
+        validator._validate_credentials()
+
+        # Should have error about length
+        assert any(
+            "MFA secret must be 16 characters" in error
+            for error in validator.errors
+        )
+
+    def test_validate_mfa_secret_format_invalid_chars(self) -> None:
+        """Should error for MFA secret with invalid base32 characters (T010)."""
+        config = Config(
+            robinhood_username="test_user",
+            robinhood_password="test_pass",
+            robinhood_mfa_secret="ABCDEFGH12345678"  # Invalid: contains 8, 9
+        )
+        validator = ConfigValidator(config)
+        validator._validate_credentials()
+
+        # Should have error about invalid base32 characters
+        assert any(
+            "MFA secret must contain only base32 characters" in error
+            for error in validator.errors
+        )
