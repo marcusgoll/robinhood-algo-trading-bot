@@ -264,3 +264,23 @@ class TestConfigValidator:
             "MFA secret must contain only base32 characters" in error
             for error in validator.errors
         )
+
+    # =========================================================================
+    # T011: Device Token Validation Tests (RED phase - TDD)
+    # FR-004: Device token is optional, validation should pass if empty
+    # =========================================================================
+
+    def test_validate_device_token_optional(self) -> None:
+        """Should pass validation for empty device token - token is optional (T011)."""
+        config = Config(
+            robinhood_username="test_user",
+            robinhood_password="test_pass",
+            robinhood_device_token=""  # Empty: optional field
+        )
+        validator = ConfigValidator(config)
+        validator._validate_credentials()
+
+        # Device token is optional - should NOT raise errors
+        assert not any("DEVICE_TOKEN" in error for error in validator.errors)
+        # May have warning but not error
+        assert len(validator.errors) == 0

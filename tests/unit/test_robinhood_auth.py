@@ -581,3 +581,127 @@ class TestNetworkResilience:
         mock_sleep.assert_any_call(1.0)
         # Second retry: 2s delay
         mock_sleep.assert_any_call(2.0)
+
+
+class TestDeviceTokenManagement:
+    """Test suite for device token save/load/fallback functionality (T012-T014)."""
+
+    @patch('src.trading_bot.auth.robinhood_auth.dotenv.set_key')
+    def test_save_device_token_to_env(self, mock_set_key):
+        """
+        Test saving device token to .env file (T012).
+
+        GIVEN: Device token "test_token_123"
+        WHEN: RobinhoodAuth.save_device_token_to_env("test_token_123") called
+        THEN: dotenv.set_key called with (".env", "DEVICE_TOKEN", "test_token_123")
+        """
+        # Given: Config
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = None
+        config.robinhood_device_token = None
+
+        # And: RobinhoodAuth instance
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth
+        auth = RobinhoodAuth(config)
+
+        # When: save_device_token_to_env called with device token
+        device_token = "test_token_123"
+        auth.save_device_token_to_env(device_token)
+
+        # Then: dotenv.set_key called with correct parameters
+        mock_set_key.assert_called_once_with(".env", "DEVICE_TOKEN", device_token)
+
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    def test_login_with_device_token_success(self, mock_path, mock_robin_stocks):
+        """
+        Test login with valid device token succeeds (T013).
+
+        GIVEN: Valid device token in config
+        WHEN: RobinhoodAuth.login_with_device_token() called
+        THEN: robin_stocks.login called with device_token parameter, returns True
+        """
+        # Given: No pickle file
+        mock_path.return_value.exists.return_value = False
+
+        # And: Config with device token
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = None
+        config.robinhood_device_token = "valid_device_token_123"
+
+        # And: robin_stocks.login succeeds with device token
+        mock_session = MagicMock()
+        mock_robin_stocks.login.return_value = mock_session
+
+        # When: RobinhoodAuth logs in with device token
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth
+        auth = RobinhoodAuth(config)
+        result = auth.login_with_device_token()
+
+        # Then: Login called with device_token parameter
+        mock_robin_stocks.login.assert_called_once()
+        call_args = mock_robin_stocks.login.call_args
+        assert "device_token" in call_args.kwargs or len(call_args.args) > 2
+        assert result is True
+
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    @patch('src.trading_bot.auth.robinhood_auth.pyotp')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    @patch('src.trading_bot.auth.robinhood_auth.dotenv.set_key')
+    def test_login_with_device_token_fallback(
+        self, mock_set_key, mock_path, mock_pyotp, mock_robin_stocks
+    ):
+        """
+        Test login with invalid device token falls back to MFA (T014).
+
+        GIVEN: Invalid device token (causes 401 error)
+        WHEN: RobinhoodAuth.login_with_device_token() called
+        THEN: Falls back to MFA authentication
+              Saves new device token to .env on successful MFA login
+        """
+        # Given: No pickle file
+        mock_path.return_value.exists.return_value = False
+
+        # And: Config with invalid device token and MFA secret
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = "BASE32SECRETMFA"
+        config.robinhood_device_token = "invalid_token_old"
+
+        # And: pyotp generates MFA code
+        mock_totp = MagicMock()
+        mock_totp.now.return_value = "123456"
+        mock_pyotp.TOTP.return_value = mock_totp
+
+        # And: robin_stocks.login fails with device token (401), succeeds with MFA
+        mock_session_success = MagicMock()
+        mock_session_success.get.return_value = {"device_token": "new_device_token_456"}
+        mock_robin_stocks.login.side_effect = [
+            Exception("401 Unauthorized: Invalid device token"),  # Device token fails
+            mock_session_success,  # MFA succeeds
+        ]
+
+        # When: RobinhoodAuth attempts login with fallback
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth
+        auth = RobinhoodAuth(config)
+        result = auth.login_with_device_token()
+
+        # Then: robin_stocks.login called twice (device token, then MFA)
+        assert mock_robin_stocks.login.call_count == 2
+
+        # And: MFA code generated
+        mock_pyotp.TOTP.assert_called_once_with("BASE32SECRETMFA")
+        mock_totp.now.assert_called_once()
+
+        # And: New device token saved to .env
+        mock_set_key.assert_called_once()
+        assert "DEVICE_TOKEN" in mock_set_key.call_args.args
+        assert "new_device_token_456" in str(mock_set_key.call_args)
+
+        # And: Login succeeded
+        assert result is True

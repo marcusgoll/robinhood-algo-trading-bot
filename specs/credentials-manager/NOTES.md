@@ -183,5 +183,29 @@ Secure credentials management system for Robinhood trading bot. Provides secure 
 - No import errors, tests structured correctly ✓
 - Tests fail for the RIGHT reason (missing implementation, not broken tests) ✓
 
+**✅ T011-T014 [RED]: Write failing tests for device token validation and save/load functionality** (2025-10-08)
+- Added 4 tests across 2 test files for device token functionality
+- Status: 1 GREEN (T011), 3 RED (T012-T014) - as expected for TDD
+- Test breakdown:
+  - T011: test_validate_device_token_optional() - Empty device token passes validation (PASSED - already correct)
+  - T012: test_save_device_token_to_env() - Save device token to .env using dotenv.set_key (FAILED - expected)
+  - T013: test_login_with_device_token_success() - Login with valid device token (FAILED - expected)
+  - T014: test_login_with_device_token_fallback() - Invalid token triggers MFA fallback (FAILED - expected)
+- Test pattern: AAA pattern with comprehensive mocking (dotenv, robin_stocks, pyotp)
+- Validates FR-004 (device token optional), FR-005 (fallback to MFA), FR-006 (update token after fallback)
+- Files modified:
+  - tests/unit/test_validator.py (lines 268-286, added 19 lines)
+  - tests/unit/test_robinhood_auth.py (lines 586-707, added 122 lines)
+- Test results: 1 PASSED, 3 FAILED (expected) - RED phase confirmed
+- Next: Implement RobinhoodAuth.save_device_token_to_env() and login_with_device_token() methods
+
+**Failure Verification**:
+- T011 PASSED: Device token validation already treats empty tokens as optional (GREEN test) ✓
+- T012 fails: AttributeError: module has no attribute 'dotenv' (needs import) ✓
+- T013 fails: AttributeError: 'RobinhoodAuth' object has no attribute 'login_with_device_token' ✓
+- T014 fails: AttributeError: module has no attribute 'dotenv' (needs import) ✓
+- No import errors, tests structured correctly ✓
+- Tests fail for the RIGHT reason (missing implementation, not broken tests) ✓
+
 ## Last Updated
 2025-10-08T23:59:00-05:00
