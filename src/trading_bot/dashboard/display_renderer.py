@@ -13,7 +13,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from trading_bot.dashboard.models import (
+from .models import (
     AccountStatus,
     DashboardState,
     DashboardTargets,

@@ -12,6 +12,7 @@ Feature: status-dashboard
 Task: T018 - Create MetricsCalculator class
 """
 
+from datetime import UTC
 from decimal import Decimal
 from typing import Literal
 
@@ -284,8 +285,8 @@ class MetricsCalculator:
         )
 
         # Count today's trades
-        from datetime import datetime, timezone
-        today = datetime.now(timezone.utc).date()
+        from datetime import datetime
+        today = datetime.now(UTC).date()
         trades_today = sum(
             1 for t in trades
             if datetime.fromisoformat(t.timestamp.replace('Z', '+00:00')).date() == today

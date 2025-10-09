@@ -14,9 +14,9 @@ from pathlib import Path
 
 from ..account.account_data import AccountData
 from ..config import Config
-from ..logging.query_helper import TradeQueryHelper
 from ..logger import get_logger
-from .dashboard import fetch_dashboard_state, load_targets, run_dashboard_loop
+from ..logging.query_helper import TradeQueryHelper
+from .dashboard import load_targets, run_dashboard_loop
 
 logger = get_logger(__name__)
 

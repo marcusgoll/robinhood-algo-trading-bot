@@ -7,11 +7,10 @@ of Decimal and datetime types.
 
 import json
 from datetime import datetime
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from src.trading_bot.dashboard.models import DashboardState
+from .models import DashboardState
 
 
 class ExportGenerator:

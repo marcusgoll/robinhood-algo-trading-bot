@@ -5,17 +5,17 @@ Provides real-time monitoring of account status, current positions, and performa
 """
 
 from .dashboard import (
-    load_targets,
     fetch_dashboard_state,
+    load_targets,
     run_dashboard_loop,
 )
 from .metrics_calculator import MetricsCalculator
 from .models import (
-    DashboardState,
     AccountStatus,
-    PositionDisplay,
-    PerformanceMetrics,
+    DashboardState,
     DashboardTargets,
+    PerformanceMetrics,
+    PositionDisplay,
 )
 
 __all__ = [

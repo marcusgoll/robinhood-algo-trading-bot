@@ -15,17 +15,17 @@ Tasks: T021-T023 - Dashboard orchestration with polling loop
 
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Literal
 
 import yaml
-from rich.live import Live
-from rich.console import Console
 from pynput import keyboard
+from rich.console import Console
+from rich.live import Live
 
-from ..account.account_data import AccountData, Position
+from ..account.account_data import AccountData
 from ..logging.query_helper import TradeQueryHelper
 from ..utils.time_utils import is_market_open
 from .display_renderer import DisplayRenderer
@@ -34,7 +34,6 @@ from .models import (
     AccountStatus,
     DashboardState,
     DashboardTargets,
-    PerformanceMetrics,
     PositionDisplay,
 )
 
@@ -89,7 +88,7 @@ def load_targets(config_path: Path = Path("config/dashboard-targets.yaml")) -> D
             return None
 
         # Read and parse YAML
-        with open(config_path, 'r', encoding='utf-8') as f:
+        with open(config_path, encoding='utf-8') as f:
             config = yaml.safe_load(f)
 
         # Validate required fields
@@ -173,7 +172,7 @@ def fetch_dashboard_state(
         account_balance=account_balance_obj.equity,
         cash_balance=account_balance_obj.cash,
         day_trade_count=day_trade_count,
-        last_updated=datetime.now(timezone.utc)
+        last_updated=datetime.now(UTC)
     )
 
     # Fetch and convert positions
@@ -192,7 +191,7 @@ def fetch_dashboard_state(
         position_displays.append(position_display)
 
     # Query today's trades
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today_str = datetime.now(UTC).strftime("%Y-%m-%d")
     trades_today = trade_helper.query_by_date_range(today_str, today_str)
 
     # Calculate performance metrics
@@ -212,7 +211,7 @@ def fetch_dashboard_state(
         positions=position_displays,
         performance_metrics=performance_metrics,
         market_status=market_status,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         targets=targets
     )
 
