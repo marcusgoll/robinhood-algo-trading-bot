@@ -196,8 +196,8 @@ class StartupOrchestrator:
             step.status = "success"
             self.component_states["mode_switcher"] = {
                 "status": "ready",
-                "mode": self.config.trading.mode,
-                "phase": self.config.phase_progression.current_phase
+                "mode": "paper" if self.config.paper_trading else "live",
+                "phase": self.config.current_phase
             }
             return mode_switcher
         except Exception as e:
@@ -222,16 +222,16 @@ class StartupOrchestrator:
 
         try:
             circuit_breaker = CircuitBreaker(
-                max_daily_loss_pct=self.config.risk_management.max_daily_loss_pct,
-                max_consecutive_losses=self.config.risk_management.max_consecutive_losses
+                max_daily_loss_pct=self.config.max_daily_loss_pct,
+                max_consecutive_losses=self.config.max_consecutive_losses
             )
             self.circuit_breaker = circuit_breaker
 
             step.status = "success"
             self.component_states["circuit_breaker"] = {
                 "status": "ready",
-                "max_daily_loss_pct": self.config.risk_management.max_daily_loss_pct,
-                "max_consecutive_losses": self.config.risk_management.max_consecutive_losses
+                "max_daily_loss_pct": self.config.max_daily_loss_pct,
+                "max_consecutive_losses": self.config.max_consecutive_losses
             }
             return circuit_breaker
         except Exception as e:
@@ -256,10 +256,10 @@ class StartupOrchestrator:
 
         try:
             bot = TradingBot(
-                paper_trading=(self.config.trading.mode == "paper"),
-                max_position_pct=self.config.risk_management.max_position_pct,
-                max_daily_loss_pct=self.config.risk_management.max_daily_loss_pct,
-                max_consecutive_losses=self.config.risk_management.max_consecutive_losses
+                paper_trading=self.config.paper_trading,
+                max_position_pct=self.config.max_position_pct,
+                max_daily_loss_pct=self.config.max_daily_loss_pct,
+                max_consecutive_losses=self.config.max_consecutive_losses
             )
             self.bot = bot
 
@@ -275,6 +275,75 @@ class StartupOrchestrator:
             self.errors.append(f"Trading bot initialization failed: {e}")
             raise
 
+    def run(self) -> StartupResult:
+        """Execute the full startup sequence.
+
+        Coordinates all initialization steps in dependency order:
+        1. Display banner (if not json_output)
+        2. Load configuration
+        3. Validate configuration
+        4. Initialize logging system
+        5. Initialize mode switcher
+        6. Initialize circuit breakers
+        7. Initialize trading bot
+        8. Verify component health
+        9. Display summary (if not json_output)
+
+        Returns:
+            StartupResult with status="ready" or "blocked"
+
+        T029 [GREEN→T028]: Implement run() method
+        """
+        from datetime import datetime, timezone
+
+        self.start_time = time.time()
+
+        try:
+            # Display banner
+            if not self.json_output:
+                self._display_banner()
+
+            # Execute startup sequence
+            config = self._load_config()
+            is_valid, errors, warnings = self._validate_config()
+
+            if not is_valid:
+                return self._create_blocked_result("Validation failed")
+
+            self._initialize_logging()
+            self._initialize_mode_switcher()
+            self._initialize_circuit_breakers()
+            self._initialize_bot()
+            self._verify_health()
+
+            # Display summary
+            if not self.json_output:
+                self._display_summary()
+
+            # Create success result
+            duration = time.time() - self.start_time
+            result = StartupResult(
+                status="ready",
+                mode="paper" if self.config.paper_trading else "live",
+                phase=self.config.current_phase,
+                steps=self.steps,
+                errors=self.errors,
+                warnings=self.warnings,
+                component_states=self.component_states,
+                startup_duration_seconds=duration,
+                timestamp=datetime.now(timezone.utc).isoformat()
+            )
+
+            if self.json_output:
+                print(self._format_json_output(result))
+
+            return result
+
+        except Exception as e:
+            self._cleanup_on_failure()
+            duration = time.time() - self.start_time if self.start_time else 0.0
+            return self._create_blocked_result(str(e), duration)
+
     def _display_banner(self) -> None:
         """Display startup banner with mode and phase information.
 
@@ -286,7 +355,7 @@ class StartupOrchestrator:
         Pattern: Reuses mode_switcher.py display_mode_banner() approach (line 141)
         T023 [GREEN]: Implementation for _display_banner() test
         """
-        mode_display = "PAPER TRADING (Simulation - No Real Money)" if self.config.trading.mode == "paper" else "LIVE TRADING (Real Money)"
+        mode_display = "PAPER TRADING (Simulation - No Real Money)" if self.config.paper_trading else "LIVE TRADING (Real Money)"
 
         print("=" * 60)
         print("         ROBINHOOD TRADING BOT - STARTUP SEQUENCE")
@@ -309,12 +378,12 @@ class StartupOrchestrator:
         print("=" * 60)
         print("✅ STARTUP COMPLETE - Ready to trade")
         print("=" * 60)
-        print(f"Current Phase: {self.config.phase_progression.current_phase}")
+        print(f"Current Phase: {self.config.current_phase}")
 
-        # Get phase-specific config
-        phase_config = getattr(self.config.phase_progression, self.config.phase_progression.current_phase)
+        # Get phase-specific config (max_trades_per_day is directly on config)
+        phase_config = self.config
         print(f"Max Trades Today: {phase_config.max_trades_per_day}")
-        print(f"Circuit Breaker: Active (Max Loss: {self.config.risk_management.max_daily_loss_pct}%, Max Consecutive: {self.config.risk_management.max_consecutive_losses})")
+        print(f"Circuit Breaker: Active (Max Loss: {self.config.max_daily_loss_pct}%, Max Consecutive: {self.config.max_consecutive_losses})")
         print()
 
         if self.dry_run:
@@ -364,6 +433,36 @@ class StartupOrchestrator:
         except Exception as e:
             # Log cleanup errors but don't raise
             print(f"Warning: Cleanup error: {e}")
+
+    def _create_blocked_result(self, error_message: str, duration: float = 0.0) -> StartupResult:
+        """Create a blocked result with error information.
+
+        Args:
+            error_message: Error message describing the failure
+            duration: Startup duration in seconds
+
+        Returns:
+            StartupResult with status="blocked"
+
+        T035 [GREEN→T034]: Implement _create_blocked_result() method
+        """
+        from datetime import datetime, timezone
+
+        # Add error message to errors list if not already present
+        if error_message not in self.errors:
+            self.errors.append(error_message)
+
+        return StartupResult(
+            status="blocked",
+            mode="paper" if (hasattr(self, 'config') and self.config and self.config.paper_trading) else "live" if (hasattr(self, 'config') and self.config) else "unknown",
+            phase=self.config.current_phase if hasattr(self, 'config') and self.config else "unknown",
+            steps=self.steps,
+            errors=self.errors,
+            warnings=self.warnings,
+            component_states=self.component_states,
+            startup_duration_seconds=duration,
+            timestamp=datetime.now(timezone.utc).isoformat()
+        )
 
     def _format_json_output(self, result: StartupResult) -> str:
         """Format startup result as JSON for machine-readable output.
