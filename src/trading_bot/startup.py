@@ -238,3 +238,38 @@ class StartupOrchestrator:
             step.error_message = str(e)
             self.errors.append(f"Circuit breaker initialization failed: {e}")
             raise
+
+    def _initialize_bot(self) -> 'TradingBot':
+        """Initialize trading bot with configuration.
+
+        Returns:
+            TradingBot instance
+
+        Raises:
+            Exception: If trading bot initialization fails
+        """
+        from .bot import TradingBot
+
+        step = StartupStep(name="Initializing trading bot", status="running")
+        self.steps.append(step)
+
+        try:
+            bot = TradingBot(
+                paper_trading=(self.config.trading.mode == "paper"),
+                max_position_pct=self.config.risk_management.max_position_pct,
+                max_daily_loss_pct=self.config.risk_management.max_daily_loss_pct,
+                max_consecutive_losses=self.config.risk_management.max_consecutive_losses
+            )
+            self.bot = bot
+
+            step.status = "success"
+            self.component_states["trading_bot"] = {
+                "status": "ready",
+                "is_running": False
+            }
+            return bot
+        except Exception as e:
+            step.status = "failed"
+            step.error_message = str(e)
+            self.errors.append(f"Trading bot initialization failed: {e}")
+            raise
