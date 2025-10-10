@@ -11,8 +11,8 @@ Dual configuration system:
 - config.json: Trading parameters (position sizes, hours, strategy)
 """
 
-from typing import Optional, Dict, Any
-from dataclasses import dataclass
+from typing import Optional, Dict, Any, Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 import os
 import json
@@ -20,6 +20,110 @@ from dotenv import load_dotenv
 
 # Load .env file if exists (§Security: environment variables)
 load_dotenv()
+
+
+@dataclass
+class OrderManagementConfig:
+    """
+    Order management configuration values.
+
+    Supports global defaults with optional per-strategy overrides.
+    """
+
+    offset_mode: str
+    buy_offset: float
+    sell_offset: float
+    max_slippage_pct: float
+    poll_interval_seconds: int
+    strategy_overrides: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+
+    VALID_OFFSET_MODES = {"bps", "absolute"}
+
+    @classmethod
+    def default(cls) -> "OrderManagementConfig":
+        """Return default configuration."""
+        return cls(
+            offset_mode="bps",
+            buy_offset=15.0,
+            sell_offset=10.0,
+            max_slippage_pct=0.5,
+            poll_interval_seconds=15,
+            strategy_overrides={},
+        )
+
+    @classmethod
+    def from_dict(cls, data: Optional[Mapping[str, Any]]) -> "OrderManagementConfig":
+        """Create configuration from JSON payload."""
+        data = data or {}
+
+        offset_mode = data.get("offset_mode", "bps")
+        if offset_mode not in cls.VALID_OFFSET_MODES:
+            raise ValueError(f"Invalid order_management.offset_mode: {offset_mode}")
+
+        buy_offset = float(data.get("buy_offset", 15.0))
+        sell_offset = float(data.get("sell_offset", 10.0))
+        max_slippage_pct = float(data.get("max_slippage_pct", 0.5))
+        poll_interval_seconds = int(data.get("poll_interval_seconds", 15))
+
+        if buy_offset < 0:
+            raise ValueError("order_management.buy_offset must be >= 0")
+        if sell_offset < 0:
+            raise ValueError("order_management.sell_offset must be >= 0")
+        if max_slippage_pct <= 0:
+            raise ValueError("order_management.max_slippage_pct must be > 0")
+        if poll_interval_seconds <= 0:
+            raise ValueError("order_management.poll_interval_seconds must be > 0")
+
+        overrides: Dict[str, Dict[str, Any]] = {}
+        overrides_raw = data.get("strategy_overrides") or {}
+        if not isinstance(overrides_raw, Mapping):
+            raise ValueError("order_management.strategy_overrides must be a mapping if provided")
+
+        for strategy, override in overrides_raw.items():
+            if not isinstance(override, Mapping):
+                raise ValueError(
+                    f"order_management.strategy_overrides.{strategy} must be an object"
+                )
+            override_dict: Dict[str, float] = {}
+
+            override_mode = override.get("offset_mode")
+            if override_mode is not None:
+                if override_mode not in cls.VALID_OFFSET_MODES:
+                    raise ValueError(
+                        f"Invalid offset_mode for strategy {strategy}: {override_mode}"
+                    )
+                override_dict["offset_mode"] = override_mode  # type: ignore[assignment]
+
+            for key in ("buy_offset", "sell_offset", "max_slippage_pct"):
+                if key in override and override[key] is not None:
+                    value = float(override[key])  # type: ignore[arg-type]
+                    if value < 0:
+                        raise ValueError(
+                            f"order_management.strategy_overrides.{strategy}.{key} must be >= 0"
+                        )
+                    override_dict[key] = value
+
+            overrides[str(strategy)] = override_dict
+
+        return cls(
+            offset_mode=offset_mode,
+            buy_offset=buy_offset,
+            sell_offset=sell_offset,
+            max_slippage_pct=max_slippage_pct,
+            poll_interval_seconds=poll_interval_seconds,
+            strategy_overrides=overrides,
+        )
+
+    def validate(self) -> None:
+        """Validate configuration (redundant safety for runtime)."""
+        if self.offset_mode not in self.VALID_OFFSET_MODES:
+            raise ValueError(f"Invalid offset_mode: {self.offset_mode}")
+        if self.buy_offset < 0 or self.sell_offset < 0:
+            raise ValueError("buy_offset and sell_offset must be >= 0")
+        if self.max_slippage_pct <= 0:
+            raise ValueError("max_slippage_pct must be > 0")
+        if self.poll_interval_seconds <= 0:
+            raise ValueError("poll_interval_seconds must be > 0")
 
 
 @dataclass
@@ -63,6 +167,9 @@ class Config:
     logs_dir: Path = Path("logs")
     backtest_dir: Path = Path("backtests")
     config_file: Path = Path("config.json")
+    order_management: OrderManagementConfig = field(
+        default_factory=OrderManagementConfig.default
+    )
 
     @classmethod
     def from_env_and_json(cls, config_file: str = "config.json") -> "Config":
@@ -107,6 +214,9 @@ class Config:
         phase = config_data.get("phase_progression", {})
         current_phase_name = phase.get("current_phase", "experience")
         phase_config = phase.get(current_phase_name, {})
+        order_management_config = OrderManagementConfig.from_dict(
+            config_data.get("order_management")
+        )
 
         return cls(
             # Credentials from .env
@@ -132,6 +242,7 @@ class Config:
             max_trades_per_day=int(phase_config.get("max_trades_per_day", 999)),
             # Paths
             config_file=config_path,
+            order_management=order_management_config,
         )
 
     @classmethod
@@ -209,6 +320,8 @@ class Config:
                 f"Invalid max_trades_per_day: {self.max_trades_per_day} "
                 "(must be >= 1)"
             )
+
+        self.order_management.validate()
 
     def ensure_directories(self) -> None:
         """Create required directories if they don't exist."""

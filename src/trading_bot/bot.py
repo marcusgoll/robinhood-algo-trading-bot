@@ -7,27 +7,40 @@ Enforces Constitution v1.0.0 principles:
 - §Code_Quality: Type hints, clear logic
 """
 
-from typing import Dict, List, Optional, Any
-from decimal import Decimal
-import logging
-from datetime import datetime, timezone
-from pathlib import Path
+from __future__ import annotations
+
 import hashlib
+import logging
 import uuid
+from datetime import UTC, datetime
+from decimal import Decimal
+from pathlib import Path
+from typing import Any
+
+# T038: Authentication module integration
+from src.trading_bot.auth import AuthenticationError, RobinhoodAuth
+
+# Configuration types
+from src.trading_bot.config import Config
+
+# T060: Session health monitoring integration
+from src.trading_bot.health import HealthCheckResult, SessionHealthMonitor
+
+# T030-T034: Structured logging integration
+from src.trading_bot.logging import StructuredTradeLogger, TradeRecord
+
+# Order management integration
+from src.trading_bot.order_management import (
+    OrderManager,
+    OrderRequest,
+    OrderSubmissionError,
+    UnsupportedOrderTypeError,
+)
 
 # REFACTORED: Import SafetyChecks instead of local CircuitBreaker
 # Old CircuitBreaker class removed in favor of comprehensive SafetyChecks module
 # See: src/trading_bot/safety_checks.py for enhanced circuit breaker functionality
 from src.trading_bot.safety_checks import SafetyChecks
-
-# T038: Authentication module integration
-from src.trading_bot.auth import RobinhoodAuth, AuthenticationError
-
-# T030-T034: Structured logging integration
-from src.trading_bot.logging import StructuredTradeLogger, TradeRecord
-
-# T060: Session health monitoring integration
-from src.trading_bot.health import HealthCheckResult, SessionHealthMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +127,7 @@ class TradingBot:
     def __init__(
         self,
         *,
-        config: Optional[Any] = None,
+        config: Config | None = None,
         paper_trading: bool = True,
         max_position_pct: float = 5.0,
         max_daily_loss_pct: float = 3.0,
@@ -132,12 +145,14 @@ class TradingBot:
             max_consecutive_losses: Circuit breaker: max consecutive losses (§Safety_First)
             trading_timezone: Timezone for trading hours enforcement (default: America/New_York)
         """
-        self.paper_trading = paper_trading
+        self.paper_trading = (
+            config.paper_trading if config is not None else paper_trading
+        )
         self.max_position_pct = max_position_pct
 
         # T038: Initialize authentication if config provided
-        self.auth: Optional[RobinhoodAuth] = None
-        self.health_monitor: Optional[SessionHealthMonitor] = None
+        self.auth: RobinhoodAuth | None = None
+        self.health_monitor: SessionHealthMonitor | None = None
         if config is not None:
             self.auth = RobinhoodAuth(config)
             logger.info("Authentication module initialized")
@@ -145,7 +160,7 @@ class TradingBot:
             logger.info("Session health monitor initialized")
 
         # T044: Initialize account data module if authenticated
-        self.account_data: Optional[Any] = None
+        self.account_data: Any | None = None
         if self.auth is not None:
             from src.trading_bot.account import AccountData
             self.account_data = AccountData(auth=self.auth)
@@ -172,7 +187,7 @@ class TradingBot:
         # T052: Pass account_data to SafetyChecks for real buying power
         self.safety_checks = SafetyChecks(safety_config, account_data=self.account_data)
 
-        self.positions: Dict[str, Dict] = {}
+        self.positions: dict[str, dict[str, Any]] = {}
         self.is_running: bool = False
 
         # T030: Initialize StructuredTradeLogger for dual logging (text + JSONL)
@@ -185,12 +200,29 @@ class TradingBot:
         self.bot_version = "1.0.0"
 
         # T030: Config hash for audit trail
-        config_str = f"{paper_trading}_{max_position_pct}_{max_daily_loss_pct}_{max_consecutive_losses}"
+        config_str = (
+            f"{self.paper_trading}_{max_position_pct}_{max_daily_loss_pct}_{max_consecutive_losses}"
+        )
         self.config_hash = hashlib.sha256(config_str.encode()).hexdigest()[:16]
+
+        order_log_path = Path("logs") / "orders.jsonl"
+        self.order_manager: OrderManager | None = None
+        if config is not None and hasattr(config, "order_management"):
+            execution_mode = "PAPER" if config.paper_trading else "LIVE"
+            self.order_manager = OrderManager(
+                config=config.order_management,
+                safety_checks=self.safety_checks,
+                account_data=self.account_data,
+                session_id=self.session_id,
+                bot_version=self.bot_version,
+                config_hash=self.config_hash,
+                order_log_path=order_log_path,
+                execution_mode=execution_mode,
+            )
 
         logger.info(
             f"TradingBot initialized | "
-            f"Paper Trading: {paper_trading} | "
+            f"Paper Trading: {self.paper_trading} | "
             f"Max Position: {max_position_pct}% | "
             f"Max Daily Loss: {max_daily_loss_pct}% | "
             f"Max Consecutive Losses: {max_consecutive_losses} | "
@@ -373,8 +405,8 @@ class TradingBot:
 
             if safety_result.circuit_breaker_triggered:
                 logger.critical(
-                    f"⚠️ CIRCUIT BREAKER ACTIVE | "
-                    f"Manual reset required via safety_checks.reset_circuit_breaker()"
+                    "⚠️ CIRCUIT BREAKER ACTIVE | "
+                    "Manual reset required via safety_checks.reset_circuit_breaker()"
                 )
 
             return
@@ -384,10 +416,51 @@ class TradingBot:
             logger.error(f"Trade rejected: Old circuit breaker tripped | {symbol} {action} {shares}")
             return
 
-        # T032: Build TradeRecord for structured logging
+        order_envelope = None
         order_id = str(uuid.uuid4())
-        timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-        total_value = price * shares
+        execution_price = price
+
+        if not self.paper_trading and self.order_manager is not None:
+            order_request = OrderRequest(
+                symbol=symbol,
+                side=action.upper(),
+                quantity=shares,
+                reference_price=price,
+                order_type="limit",
+            )
+
+            try:
+                order_envelope = self.order_manager.place_limit_order(
+                    order_request,
+                    strategy_name="manual",
+                )
+                order_id = order_envelope.order_id
+                execution_price = order_envelope.limit_price
+            except UnsupportedOrderTypeError as exc:
+                logger.error(
+                    "LIVE ORDER FAILED | Symbol=%s | Action=%s | Shares=%s | Reason=%s",
+                    symbol,
+                    action,
+                    shares,
+                    exc,
+                )
+                logger.info(
+                    "Unsupported order type for live execution. Limit orders only in the current phase."
+                )
+                return
+            except OrderSubmissionError as exc:
+                logger.error(
+                    "LIVE ORDER FAILED | Symbol=%s | Action=%s | Shares=%s | Reason=%s",
+                    symbol,
+                    action,
+                    shares,
+                    exc,
+                )
+                return
+
+        # T032: Build TradeRecord for structured logging
+        timestamp = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        total_value = execution_price * shares
 
         trade_record = TradeRecord(
             # Core Trade Data
@@ -395,7 +468,7 @@ class TradingBot:
             symbol=symbol,
             action=action.upper(),
             quantity=shares,
-            price=price,
+            price=execution_price,
             total_value=total_value,
             # Execution Context
             order_id=order_id,
@@ -435,7 +508,7 @@ class TradingBot:
             f"Symbol={symbol} | "
             f"Action={action} | "
             f"Shares={shares} | "
-            f"Price=${price} | "
+            f"Price=${execution_price} | "
             f"Paper={self.paper_trading} | "
             f"Reason={reason} | "
             f"Timestamp={timestamp} | "
@@ -443,11 +516,16 @@ class TradingBot:
         )
 
         if self.paper_trading:
-            logger.info(f"PAPER TRADE: {symbol} {action} {shares} @ ${price}")
+            logger.info(f"PAPER TRADE: {symbol} {action} {shares} @ ${execution_price}")
         else:
-            # TODO: Implement real Robinhood API call
-            # Must implement with proper error handling (§Error_Handling)
-            logger.warning("Real trading not yet implemented")
+            logger.info(
+                "LIVE ORDER SUBMITTED | Symbol=%s | Action=%s | Shares=%s | Limit=%s | Order ID=%s",
+                symbol,
+                action,
+                shares,
+                execution_price,
+                order_id,
+            )
 
         # T046: Invalidate account cache after trade execution
         if self.account_data is not None:
@@ -512,3 +590,20 @@ class TradingBot:
             return True
 
         return False
+
+    def cancel_all_open_orders(self) -> None:
+        """Cancel all open orders via order manager."""
+
+        if self.order_manager is None:
+            logger.info("Cancel skipped: Order manager unavailable")
+            return
+
+        self.order_manager.cancel_all_open_orders()
+
+    def synchronize_open_orders(self) -> None:
+        """Refresh broker order statuses."""
+
+        if self.order_manager is None:
+            return
+
+        self.order_manager.synchronize_open_orders()

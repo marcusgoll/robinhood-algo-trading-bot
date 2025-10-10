@@ -13,5 +13,6 @@ __author__ = "Your Name"
 from .bot import TradingBot
 from .config import Config
 from . import error_handling
+from . import order_management
 
-__all__ = ["TradingBot", "Config", "error_handling"]
+__all__ = ["TradingBot", "Config", "error_handling", "order_management"]

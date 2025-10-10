@@ -264,6 +264,36 @@ Or run commands individually:
 
 ---
 
+## Order management setup (Stocks project)
+
+When using this repository's trading bot, configure the order-management module before progressing to `/implement`:
+
+1. **Update `config.json`** – ensure an `order_management` block exists (a template lives in `config.example.json`).
+
+   ```jsonc
+   "order_management": {
+     "offset_mode": "bps",
+     "buy_offset": 15.0,
+     "sell_offset": 10.0,
+     "max_slippage_pct": 0.5,
+     "poll_interval_seconds": 15
+   }
+   ```
+
+   Add `strategy_overrides` when a specific strategy needs custom offsets.
+
+2. **Respect limit-only scope** – the live gateway only accepts limit orders. Market or stop requests raise `UnsupportedOrderTypeError` and are logged for follow-up.
+
+3. **Run verification tests** – confirm offset calculations and gateway retries behave correctly:
+
+   ```bash
+   uv run pytest tests/order_management tests/trading_bot/test_execute_trade_live.py --no-cov
+   ```
+
+4. **Review order logs** – live submissions append JSON lines to `logs/orders.jsonl`; rotate the file with your compliance process.
+
+---
+
 ## What's Next?
 
 ### Learn the Full Workflow
@@ -332,4 +362,3 @@ See the full [Troubleshooting Guide](docs/troubleshooting.md) or [file an issue]
 **Happy building!** 🚀
 
 For detailed documentation, visit [docs/getting-started.md](docs/getting-started.md).
-

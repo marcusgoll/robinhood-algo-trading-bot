@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-09 (trade-logging shipped)
+**Last updated**: 2025-10-10 (order management foundation ready for staging)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -281,6 +281,22 @@
   - Production-ready, local-only feature (no staging/production deployment needed)
   - Documentation: spec, plan, tasks, contracts/api.yaml, analysis-report, optimization-report, code-review-report
 
+### order-management
+- **Title**: Order management foundation
+- **Area**: api
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-10
+- **Spec**: specs/order-management/
+- **Delivered**:
+  - Limit-order submission/cancel/status gateway with `with_retry` resilience
+  - OrderManager service coordinating SafetyChecks, AccountData, and JSONL audit logging
+  - TradingBot integration (live path delegates to OrderManager with limit-only enforcement)
+  - Order management configuration block (offsets, slippage guard, strategy overrides)
+  - Structured order log runbook (`logs/orders.jsonl`) + dry-run evidence
+  - 39 test cases across order management + trading bot (95.03 % module coverage)
+  - Documentation: spec, plan, tasks, optimization-report, code-review
+
 ## In Progress
 
 <!-- Currently implementing -->
@@ -329,19 +345,6 @@
   - Log session duration
   - Auto-reauth if token expires
   - [UNBLOCKED: authentication-module shipped]
-
-### order-management
-- **Title**: Order management foundation
-- **Area**: api
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 3 | **Confidence**: 0.8 | **Score**: 1.33
-- **Requirements**:
-  - Place limit buy orders with offset
-  - Place limit sell orders with offset
-  - Cancel all open orders function
-  - Get order status and fill info
-  - [UNBLOCKED: authentication-module shipped, safety-checks shipped]
 
 ### performance-tracking
 - **Title**: Performance tracking and analytics

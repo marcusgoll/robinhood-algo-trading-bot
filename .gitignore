@@ -86,6 +86,7 @@ dmypy.json
 # ============================================
 data/
 logs/
+logs/orders.jsonl
 *.log
 *.csv
 *.json

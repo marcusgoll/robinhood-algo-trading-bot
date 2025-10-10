@@ -344,6 +344,18 @@ wheels = [
 ]
 
 [[package]]
+name = "freezegun"
+version = "1.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-dateutil" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1c/73/5decad3abddbe7e1bf4bf98ead1a8345b1cc6fc6ec7e4fa27da81f4e1eee/freezegun-1.4.0.tar.gz", hash = "sha256:10939b0ba0ff5adaecf3b06a5c2f73071d9678e507c5eaedb23c761d56ac774b", size = 31748, upload-time = "2023-12-19T10:46:41.79Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e3/ad/72ae71e18011e59b7d129f176ff1a607f4558be4cf5b5d739860a57f9381/freezegun-1.4.0-py3-none-any.whl", hash = "sha256:55e0fc3c84ebf0a96a5aa23ff8b53d70246479e9a68863f1fcac5a3e52f19dd6", size = 17557, upload-time = "2023-12-19T10:46:39.919Z" },
+]
+
+[[package]]
 name = "gitdb"
 version = "4.0.12"
 source = { registry = "https://pypi.org/simple" }
@@ -856,6 +868,7 @@ backtest = [
 ]
 dev = [
     { name = "bandit" },
+    { name = "freezegun" },
     { name = "mypy" },
     { name = "pylint" },
     { name = "pytest" },
@@ -871,6 +884,7 @@ dev = [
 requires-dist = [
     { name = "backtrader", marker = "extra == 'backtest'", specifier = "==1.9.78.123" },
     { name = "bandit", marker = "extra == 'dev'", specifier = "==1.7.6" },
+    { name = "freezegun", marker = "extra == 'dev'", specifier = "==1.4.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.8.0" },
     { name = "numpy", specifier = "==1.26.3" },
     { name = "pandas", specifier = "==2.1.4" },

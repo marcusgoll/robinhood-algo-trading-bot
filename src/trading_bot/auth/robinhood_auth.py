@@ -26,10 +26,10 @@ logger = logging.getLogger(__name__)
 T = TypeVar('T')
 
 try:
-    import robin_stocks.robinhood as rh
+    import robin_stocks.robinhood as robin_stocks
     robin_stocks_available = True
 except ImportError:
-    rh = None
+    robin_stocks = None
     robin_stocks_available = False
 
 try:
@@ -184,8 +184,33 @@ class RobinhoodAuth:
         # robin_stocks will automatically load cached session if available and valid
 
         # T022: Credentials-based login with MFA support
-        if not rh:
+        if not robin_stocks:
             raise AuthenticationError("robin_stocks library not available")
+
+        # Attempt to restore existing session from pickle before hitting API
+        pickle_path = Path(self.auth_config.pickle_path)
+        if pickle_path.exists():
+            try:
+                with pickle_path.open("rb") as fh:
+                    cached_session = pickle.load(fh)
+
+                if cached_session:
+                    self._session = cached_session
+                    self._authenticated = True
+                    logger.info("Session restored from existing pickle cache")
+                    return True
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("Failed to restore session from pickle: %s", exc)
+
+        # Evaluate device token pathway before password + MFA
+        if getattr(self.auth_config, "device_token", None):
+            try:
+                if self.login_with_device_token():
+                    return True
+            except AuthenticationError:
+                raise
+            except Exception as exc:  # pragma: no cover - defensive catch before fallback
+                logger.warning("Device token flow encountered error: %s", exc)
 
         # Prepare login parameters
         username = self.auth_config.username
@@ -199,14 +224,19 @@ class RobinhoodAuth:
 
         # Attempt login with retry logic (T034)
         try:
+            mfa_code: Optional[str] = None
+            if self.auth_config.mfa_secret:
+                if not pyotp:
+                    raise AuthenticationError("MFA secret configured but pyotp is unavailable")
+                totp = pyotp.TOTP(self.auth_config.mfa_secret)
+                mfa_code = totp.now()
+
             # Define login function for retry wrapper
             def _do_login() -> Any:
-                # Call rh.login() WITHOUT mfa_code to trigger push notification
-                # If user has TOTP-based MFA (not push), they should set MFA_SECRET
-                result = rh.login(
+                result = robin_stocks.login(
                     username=username,
                     password=password,
-                    mfa_code=None,  # Let Robinhood send push notification
+                    mfa_code=mfa_code,
                     store_session=True,
                     pickle_name=self.auth_config.pickle_path
                 )
@@ -215,11 +245,31 @@ class RobinhoodAuth:
                     raise AuthenticationError("Invalid credentials or authentication failed")
                 return result
 
-            # Use longer delays to give user time to approve push notification
-            # 10s, 20s, 40s = 70 seconds total for user to approve
-            self._session = _retry_with_backoff(_do_login, max_attempts=3, base_delay=10.0)
+            # Exponential backoff for transient failures (1s, 2s, 4s)
+            self._session = _retry_with_backoff(_do_login, max_attempts=3, base_delay=1.0)
 
             self._authenticated = True
+
+            # Persist session to pickle for future reuse
+            pickle_path = Path(self.auth_config.pickle_path)
+            try:
+                with pickle_path.open('wb') as f:
+                    pickle.dump(self._session, f)
+                os.chmod(pickle_path, 0o600)
+                logger.info(f"Session saved to cache for {mask_username(username)}")
+            except Exception:
+                logger.warning(f"Failed to save session cache for {mask_username(username)}")
+
+            # Capture device token if returned in session payload
+            new_device_token = None
+            if hasattr(self._session, 'get') and callable(self._session.get):
+                new_device_token = self._session.get('device_token')
+            elif isinstance(self._session, dict):
+                new_device_token = self._session.get('device_token')
+
+            if new_device_token:
+                self.save_device_token_to_env(new_device_token)
+
             logger.info(f"Authentication successful for {mask_username(username)}")
             return True
 
@@ -233,8 +283,8 @@ class RobinhoodAuth:
     def logout(self) -> None:
         """Logout and clear session."""
         # T016: Logout implementation
-        if rh:
-            rh.logout()
+        if robin_stocks:
+            robin_stocks.logout()
 
         self._authenticated = False
         self._session = None
@@ -283,7 +333,7 @@ class RobinhoodAuth:
         Constitution v1.0.0:
             §Security: Device token tried first, MFA fallback if expired
         """
-        if not rh:
+        if not robin_stocks:
             raise AuthenticationError("robin_stocks library not available")
 
         # Get credentials
@@ -295,7 +345,13 @@ class RobinhoodAuth:
 
         # Try login with device token first (single attempt, no retry for invalid token)
         try:
-            result = rh.login(username, password, device_token=device_token)
+            result = robin_stocks.login(
+                username=username,
+                password=password,
+                device_token=device_token,
+                store_session=True,
+                pickle_name=self.auth_config.pickle_path,
+            )
             if not result:
                 raise AuthenticationError("Device token authentication failed")
 
@@ -305,7 +361,7 @@ class RobinhoodAuth:
             # Save session to pickle
             pickle_path = Path(self.auth_config.pickle_path)
             try:
-                with open(pickle_path, 'wb') as f:
+                with pickle_path.open('wb') as f:
                     pickle.dump(self._session, f)
                 os.chmod(pickle_path, 0o600)
                 logger.info(f"Session saved to cache for {mask_username(username)}")
@@ -328,7 +384,13 @@ class RobinhoodAuth:
             mfa_code = totp.now()
 
             try:
-                result = rh.login(username, password, mfa_code=mfa_code)
+                result = robin_stocks.login(
+                    username=username,
+                    password=password,
+                    mfa_code=mfa_code,
+                    store_session=True,
+                    pickle_name=self.auth_config.pickle_path,
+                )
                 if not result:
                     raise AuthenticationError("MFA authentication failed")
 
@@ -338,7 +400,7 @@ class RobinhoodAuth:
                 # Save session to pickle
                 pickle_path = Path(self.auth_config.pickle_path)
                 try:
-                    with open(pickle_path, 'wb') as f:
+                    with pickle_path.open('wb') as f:
                         pickle.dump(self._session, f)
                     os.chmod(pickle_path, 0o600)
                     logger.info(f"Session saved to cache for {mask_username(username)}")

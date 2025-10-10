@@ -26,7 +26,7 @@ class TestStartupFlowIntegration:
         # Create .env file
         env_file = tmp_path / ".env"
         env_file.write_text(
-            "ROBINHOOD_USERNAME=test_user\n"
+            "ROBINHOOD_USERNAME=test_user@example.com\n"
             "ROBINHOOD_PASSWORD=test_pass\n"
             "ROBINHOOD_MFA_SECRET=TESTSECRET123456\n"
             "ROBINHOOD_DEVICE_TOKEN=test_device_token\n"
@@ -51,7 +51,7 @@ class TestStartupFlowIntegration:
         logs_dir.mkdir(exist_ok=True)
 
         # Monkeypatch environment and cwd
-        monkeypatch.setenv("ROBINHOOD_USERNAME", "test_user")
+        monkeypatch.setenv("ROBINHOOD_USERNAME", "test_user@example.com")
         monkeypatch.setenv("ROBINHOOD_PASSWORD", "test_pass")
         monkeypatch.chdir(tmp_path)
 
@@ -137,7 +137,7 @@ class TestStartupFlowIntegration:
         # Given: Valid .env but config.json with phase-mode conflict
         env_file = tmp_path / ".env"
         env_file.write_text(
-            "ROBINHOOD_USERNAME=test_user\n"
+            "ROBINHOOD_USERNAME=test_user@example.com\n"
             "ROBINHOOD_PASSWORD=test_pass\n"
             "ROBINHOOD_MFA_SECRET=TESTSECRET123456\n"
             "ROBINHOOD_DEVICE_TOKEN=test_device_token\n"
@@ -162,7 +162,7 @@ class TestStartupFlowIntegration:
         logs_dir.mkdir(exist_ok=True)
 
         # Monkeypatch environment and cwd
-        monkeypatch.setenv("ROBINHOOD_USERNAME", "test_user")
+        monkeypatch.setenv("ROBINHOOD_USERNAME", "test_user@example.com")
         monkeypatch.setenv("ROBINHOOD_PASSWORD", "test_pass")
         monkeypatch.chdir(tmp_path)
 
@@ -194,7 +194,7 @@ class TestStartupFlowIntegration:
         # Given: Valid .env and config.json in tmp_path
         env_file = tmp_path / ".env"
         env_file.write_text(
-            "ROBINHOOD_USERNAME=test_user\n"
+            "ROBINHOOD_USERNAME=test_user@example.com\n"
             "ROBINHOOD_PASSWORD=test_pass\n"
             "ROBINHOOD_MFA_SECRET=TESTSECRET123456\n"
             "ROBINHOOD_DEVICE_TOKEN=test_device_token\n"
@@ -218,7 +218,7 @@ class TestStartupFlowIntegration:
         logs_dir.mkdir(exist_ok=True)
 
         # Monkeypatch environment and cwd
-        monkeypatch.setenv("ROBINHOOD_USERNAME", "test_user")
+        monkeypatch.setenv("ROBINHOOD_USERNAME", "test_user@example.com")
         monkeypatch.setenv("ROBINHOOD_PASSWORD", "test_pass")
         monkeypatch.chdir(tmp_path)
 

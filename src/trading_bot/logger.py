@@ -39,10 +39,10 @@ class UTCFormatter(logging.Formatter):
             Formatted UTC timestamp
         """
         dt = datetime.fromtimestamp(record.created, tz=timezone.utc)
-        if datefmt:
-            return dt.strftime(datefmt)
-        else:
-            return dt.isoformat()
+        format_str = datefmt or self.datefmt
+        if format_str:
+            return dt.strftime(format_str)
+        return dt.isoformat()
 
 
 class TradingLogger:

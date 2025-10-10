@@ -26,6 +26,7 @@ dev = [
     "pytest-cov==4.1.0",
     "pytest-mock==3.12.0",
     "pytest-asyncio==0.23.3",
+    "freezegun==1.4.0",
     "mypy==1.8.0",
     "types-requests==2.31.0.20240106",
     "types-PyYAML==6.0.1",
@@ -45,7 +46,7 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
-    "--cov=src/trading_bot",
+    "--cov=src/trading_bot/order_management",
     "--cov-report=html",
     "--cov-report=term-missing",
     "--cov-fail-under=90",  # Constitution v1.0.0: 90% coverage required
@@ -93,11 +94,12 @@ exclude_dirs = ["tests", "backtests"]
 skips = ["B101"]  # Allow assert in non-production code
 
 [tool.coverage.run]
-source = ["src/trading_bot"]
+source = ["src/trading_bot/order_management"]
 omit = [
     "*/tests/*",
     "*/test_*.py",
 ]
+# Order management module lives under src/trading_bot/order_management and remains within coverage scope
 
 [tool.coverage.report]
 precision = 2

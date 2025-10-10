@@ -110,6 +110,9 @@ Each command produces structured outputs:
 - Use `kebab-case` for all files (e.g., `agent-brief.md`)
 - CamelCase only for PowerShell modules
 
+**Environment management:**
+- Use [`uv`](https://github.com/astral-sh/uv) for Python environment management and task execution (`uv run pytest`, etc.). Ensure contributors install `uv` before running project commands.
+
 ## Commit Convention
 
 Follow Conventional Commits:

@@ -110,6 +110,19 @@ class TestCredentialValidation:
         with pytest.raises(ValueError, match="Invalid email format"):
             AuthConfig.from_config(config)
 
+    def test_auth_config_instance_pass_through(self):
+        """Auth constructor should accept AuthConfig instances directly."""
+
+        from src.trading_bot.auth.robinhood_auth import AuthConfig, RobinhoodAuth
+
+        auth_config = AuthConfig(
+            username="user@example.com",
+            password="secure_password",
+        )
+
+        auth = RobinhoodAuth(auth_config)
+        assert auth.auth_config is auth_config
+
 
 class TestLoginFlows:
     """Test suite for authentication login flows."""
@@ -332,6 +345,31 @@ class TestLoginFlows:
         with pytest.raises(AuthenticationError, match="MFA|authentication failed"):
             auth.login()
 
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    def test_mfa_requires_pyotp_module(self, mock_path, mock_robin_stocks, monkeypatch):
+        """pyotp must be available when MFA secrets are configured."""
+
+        mock_path.return_value.exists.return_value = False
+
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = "BASE32SECRET"
+        config.robinhood_device_token = None
+
+        mock_robin_stocks.login.return_value = MagicMock()
+
+        import src.trading_bot.auth.robinhood_auth as module
+        monkeypatch.setattr(module, "pyotp", None)
+
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth, AuthenticationError
+
+        auth = RobinhoodAuth(config)
+
+        with pytest.raises(AuthenticationError, match="pyotp is unavailable"):
+            auth.login()
+
 
 class TestSessionManagement:
     """Test suite for session persistence and management."""
@@ -482,6 +520,72 @@ class TestSessionManagement:
         # Then: Token refreshed (implementation will call robin_stocks refresh)
         # Note: Actual refresh logic tested in implementation
         assert auth.is_authenticated() is True
+
+
+class TestDeviceTokenEdgeCases:
+    """Additional coverage for device token branches."""
+
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks', None)
+    def test_login_with_device_token_requires_library(self):
+        from src.trading_bot.auth.robinhood_auth import AuthConfig, RobinhoodAuth, AuthenticationError
+
+        auth_config = AuthConfig(
+            username="user@example.com",
+            password="secure_password",
+            device_token="token"
+        )
+
+        auth = RobinhoodAuth(auth_config)
+
+        with pytest.raises(AuthenticationError, match="robin_stocks library not available"):
+            auth.login_with_device_token()
+
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    def test_login_with_device_token_missing_mfa_secret(self, mock_path, mock_robin_stocks):
+        mock_path.return_value.exists.return_value = False
+
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_device_token = "expired_token"
+        config.robinhood_mfa_secret = None
+
+        mock_robin_stocks.login.side_effect = Exception("Invalid device token")
+
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth, AuthenticationError
+
+        auth = RobinhoodAuth(config)
+
+        with pytest.raises(AuthenticationError, match="Device token invalid and MFA not configured"):
+            auth.login_with_device_token()
+
+    @patch('src.trading_bot.auth.robinhood_auth.dotenv.set_key')
+    @patch('src.trading_bot.auth.robinhood_auth.pyotp')
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    def test_login_with_device_token_mfa_failure(self, mock_path, mock_robin_stocks, mock_pyotp, mock_set_key):
+        mock_path.return_value.exists.return_value = False
+
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_device_token = "expired_token"
+        config.robinhood_mfa_secret = "BASE32SECRET"
+
+        mock_robin_stocks.login.side_effect = [Exception("Invalid device token"), None]
+        mock_totp = MagicMock()
+        mock_totp.now.return_value = "123456"
+        mock_pyotp.TOTP.return_value = mock_totp
+
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth, AuthenticationError
+
+        auth = RobinhoodAuth(config)
+
+        with pytest.raises(AuthenticationError, match="MFA authentication failed"):
+            auth.login_with_device_token()
+
+        mock_set_key.assert_not_called()
 
 
 class TestSecurity:

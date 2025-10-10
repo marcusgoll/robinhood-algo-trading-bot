@@ -58,12 +58,13 @@ This project follows strict development principles defined in [`.specify/memory/
 5. **Configure trading parameters** (config.json file):
    ```bash
    cp config.example.json config.json
-   # Edit config.json to customize:
-   #   - Trading hours (default: 7am-10am EST)
-   #   - Position sizes
-   #   - Risk limits
-   #   - Phase progression settings
-   ```
+ # Edit config.json to customize:
+ #   - Trading hours (default: 7am-10am EST)
+ #   - Position sizes
+ #   - Risk limits
+ #   - Phase progression settings
+  #   - Order management offsets (global defaults + per-strategy overrides)
+  ```
 
 6. **Test configuration**:
    ```bash
@@ -286,6 +287,36 @@ Stocks/
   - Phase progression settings
   - Strategy parameters (bull flag, VWAP, EMA, MACD)
   - Screening filters
+
+### 3. Order management configuration
+- **Purpose**: Control limit-order offsets and slippage guardrails for the live gateway
+- **Location**: `config.json` → top-level `"order_management"` block
+- **Fields**:
+  - `offset_mode`: `"bps"` (basis points) or `"absolute"`
+  - `buy_offset` / `sell_offset`: Adjust limit prices away from the reference quote
+  - `max_slippage_pct`: Hard cap on allowable deviation from the reference price
+  - `poll_interval_seconds`: Frequency for open-order synchronization
+  - `strategy_overrides`: Optional per-strategy tweaks (inherit from globals by default)
+
+```jsonc
+"order_management": {
+  "offset_mode": "bps",
+  "buy_offset": 15.0,
+  "sell_offset": 10.0,
+  "max_slippage_pct": 0.5,
+  "poll_interval_seconds": 15,
+  "strategy_overrides": {
+    "bull_flag_breakout": {
+      "buy_offset": 20.0,
+      "sell_offset": 8.0
+    }
+  }
+}
+```
+
+> **Limit-only scope**: The live gateway currently accepts **limit orders only**. Any `market` or `stop` type request triggers an `UnsupportedOrderTypeError` and is logged for review. Update offsets instead of switching to a non-limit order type.
+
+Order submissions are appended to `logs/orders.jsonl` for audit trails; rotate or archive that JSONL file with your existing log retention process.
 
 ### Why Two Files?
 - **.env**: Secrets that **never** change (credentials)

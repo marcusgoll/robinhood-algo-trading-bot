@@ -324,23 +324,29 @@ class AccountData:
             if not account_profile:
                 raise AccountDataError("Invalid API response: empty account profile")
 
-            # Get portfolio profile for equity
-            portfolio_profile = rh.profiles.load_portfolio_profile()
-            if not portfolio_profile:
-                raise AccountDataError("Invalid API response: empty portfolio profile")
-
             # Validate required fields
             if 'cash' not in account_profile:
                 raise AccountDataError("Invalid API response: missing cash")
             if 'buying_power' not in account_profile:
                 raise AccountDataError("Invalid API response: missing buying_power")
-            if 'equity' not in portfolio_profile:
-                raise AccountDataError("Invalid API response: missing equity in portfolio")
+
+            equity_source = account_profile.get('equity')
+            try:
+                portfolio_profile = rh.profiles.load_portfolio_profile()
+            except Exception as exc:  # pragma: no cover
+                logger.debug(f"Failed to load portfolio profile: {exc}")
+                portfolio_profile = None
+
+            if portfolio_profile and portfolio_profile.get('equity') is not None:
+                equity_source = portfolio_profile.get('equity')
+
+            if equity_source is None:
+                raise AccountDataError("Invalid API response: missing equity value")
 
             try:
                 return AccountBalance(
                     cash=Decimal(account_profile['cash']),
-                    equity=Decimal(portfolio_profile['equity']),
+                    equity=Decimal(equity_source),
                     buying_power=Decimal(account_profile['buying_power']),
                     last_updated=datetime.utcnow()
                 )

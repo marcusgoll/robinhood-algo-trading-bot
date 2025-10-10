@@ -370,6 +370,21 @@ class SafetyChecks:
 
         return True  # No duplicate
 
+    def register_pending_order(self, symbol: str, action: str, order_id: str) -> None:
+        """Register a pending order for duplicate prevention."""
+
+        self._pending_orders[symbol] = action
+
+    def clear_pending_order(self, symbol: str) -> None:
+        """Clear a pending order entry once resolved."""
+
+        self._pending_orders.pop(symbol, None)
+
+    def clear_all_pending_orders(self) -> None:
+        """Clear all pending orders (e.g., after mass cancellation)."""
+
+        self._pending_orders.clear()
+
     def trigger_circuit_breaker(self, reason: str) -> None:
         """
         Trigger circuit breaker with reason.

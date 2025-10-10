@@ -140,5 +140,22 @@
     "rotate_logs": true,
     "max_log_size_mb": 10,
     "backup_count": 5
+  },
+
+  "order_management": {
+    "offset_mode": "bps",
+    "comment_offset_mode": "bps = basis points, absolute = fixed dollar offset",
+    "buy_offset": 15.0,
+    "sell_offset": 10.0,
+    "max_slippage_pct": 0.5,
+    "poll_interval_seconds": 15,
+    "comment_slippage": "Maximum allowed deviation from reference price (percent)",
+    "strategy_overrides": {
+      "bull_flag_breakout": {
+        "comment": "Optional strategy-specific overrides. Remove block if unused.",
+        "buy_offset": 20.0,
+        "sell_offset": 8.0
+      }
+    }
   }
 }
