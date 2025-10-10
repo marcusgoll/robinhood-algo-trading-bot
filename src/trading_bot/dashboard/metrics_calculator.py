@@ -12,7 +12,7 @@ Feature: status-dashboard
 Task: T018 - Create MetricsCalculator class
 """
 
-from datetime import UTC
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -245,6 +245,36 @@ class MetricsCalculator:
         return (realized_pl, unrealized_pl, total_pl)
 
     @staticmethod
+    @staticmethod
+    def calculate_max_drawdown(trades: list[TradeRecord]) -> Decimal:
+        """
+        Calculate maximum drawdown from realized net P&L sequence.
+
+        Computes the largest peak-to-trough decline in cumulative net profit/loss
+        using trade execution order (timestamp ascending). Returns negative values
+        to indicate drawdown magnitude (e.g., -200.00 means $200 drawdown).
+        """
+        cumulative = Decimal("0")
+        peak = Decimal("0")
+        max_drawdown = Decimal("0")
+
+        # Sort trades chronologically to build cumulative curve
+        sorted_trades = sorted(
+            (t for t in trades if t.net_profit_loss is not None),
+            key=lambda trade: MetricsCalculator._parse_timestamp(trade.timestamp),
+        )
+
+        for trade in sorted_trades:
+            cumulative += trade.net_profit_loss  # type: ignore[arg-type]
+            if cumulative > peak:
+                peak = cumulative
+            drawdown = cumulative - peak
+            if drawdown < max_drawdown:
+                max_drawdown = drawdown
+
+        return max_drawdown
+
+    @staticmethod
     def aggregate_metrics(
         trades: list[TradeRecord],
         positions: list[Position],
@@ -285,12 +315,14 @@ class MetricsCalculator:
         )
 
         # Count today's trades
-        from datetime import datetime
         today = datetime.now(UTC).date()
         trades_today = sum(
-            1 for t in trades
-            if datetime.fromisoformat(t.timestamp.replace('Z', '+00:00')).date() == today
+            1
+            for trade in trades
+            if MetricsCalculator._parse_timestamp(trade.timestamp).date() == today
         )
+
+        max_drawdown = MetricsCalculator.calculate_max_drawdown(trades)
 
         # Build PerformanceMetrics dataclass
         return PerformanceMetrics(
@@ -302,5 +334,13 @@ class MetricsCalculator:
             current_streak=streak_count,
             streak_type=streak_type,
             trades_today=trades_today,
-            session_count=session_count
+            session_count=session_count,
+            max_drawdown=max_drawdown,
         )
+
+    @staticmethod
+    def _parse_timestamp(timestamp: str) -> datetime:
+        """Parse ISO 8601 timestamp (supports trailing Z)."""
+        return datetime.fromisoformat(
+            timestamp.replace("Z", "+00:00")
+        ).astimezone(UTC)

@@ -1,261 +1,198 @@
-"""
-Export generator for dashboard state.
+"""Export generator for dashboard snapshots."""
 
-Provides JSON and Markdown export functionality with proper serialization
-of Decimal and datetime types.
-"""
+from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
-from .models import DashboardState
+from .models import DashboardSnapshot, PositionDisplay
 
 
 class ExportGenerator:
-    """Generates JSON and Markdown exports of dashboard state."""
+    """Generates JSON and Markdown exports of dashboard snapshots."""
 
-    def __init__(self) -> None:
-        """Initialize export generator."""
-        pass
-
-    def export_to_json(self, state: DashboardState, filepath: Path) -> None:
-        """
-        Export dashboard state to JSON file.
-
-        Args:
-            state: Dashboard state to export
-            filepath: Path to write JSON file
-
-        Raises:
-            IOError: If file cannot be written
-        """
-        # Ensure parent directory exists
+    def export_to_json(self, snapshot: DashboardSnapshot, filepath: Path) -> None:
+        """Write snapshot to JSON file (ISO timestamps, Decimal-safe)."""
         filepath.parent.mkdir(parents=True, exist_ok=True)
+        data = self._serialize_snapshot(snapshot)
+        with filepath.open("w", encoding="utf-8") as handle:
+            json.dump(data, handle, indent=2, ensure_ascii=False)
 
-        # Convert state to serializable dict
-        data = self._serialize_state(state)
-
-        # Write JSON file with indentation
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-
-    def export_to_markdown(self, state: DashboardState, filepath: Path) -> None:
-        """
-        Export dashboard state to Markdown file.
-
-        Args:
-            state: Dashboard state to export
-            filepath: Path to write Markdown file
-
-        Raises:
-            IOError: If file cannot be written
-        """
-        # Ensure parent directory exists
+    def export_to_markdown(self, snapshot: DashboardSnapshot, filepath: Path) -> None:
+        """Write snapshot to Markdown report."""
         filepath.parent.mkdir(parents=True, exist_ok=True)
+        markdown = self._generate_markdown(snapshot)
+        with filepath.open("w", encoding="utf-8") as handle:
+            handle.write(markdown)
 
-        # Generate markdown content
-        markdown = self._generate_markdown(state)
-
-        # Write markdown file
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(markdown)
-
-    def generate_exports(self, state: DashboardState) -> tuple[Path, Path]:
-        """
-        Generate both JSON and Markdown exports with date-based filenames.
-
-        Args:
-            state: Dashboard state to export
-
-        Returns:
-            Tuple of (json_path, markdown_path)
-
-        Raises:
-            IOError: If files cannot be written
-        """
-        # Create date-based filename
-        date_str = datetime.now().strftime("%Y-%m-%d")
+    def generate_exports(self, snapshot: DashboardSnapshot) -> tuple[Path, Path]:
+        """Generate JSON and Markdown exports for the provided snapshot."""
+        date_str = snapshot.generated_at.astimezone(UTC).strftime("%Y-%m-%d")
         logs_dir = Path("logs")
-
         json_path = logs_dir / f"dashboard-export-{date_str}.json"
-        markdown_path = logs_dir / f"dashboard-export-{date_str}.md"
+        md_path = logs_dir / f"dashboard-export-{date_str}.md"
 
-        # Generate both exports
-        self.export_to_json(state, json_path)
-        self.export_to_markdown(state, markdown_path)
+        self.export_to_json(snapshot, json_path)
+        self.export_to_markdown(snapshot, md_path)
 
-        return json_path, markdown_path
+        return json_path, md_path
 
-    def _serialize_state(self, state: DashboardState) -> dict[str, Any]:
-        """
-        Convert DashboardState to JSON-serializable dict.
-
-        Args:
-            state: Dashboard state to serialize
-
-        Returns:
-            Serializable dictionary
-        """
+    # ------------------------------------------------------------------
+    # Serialization helpers
+    # ------------------------------------------------------------------
+    def _serialize_snapshot(self, snapshot: DashboardSnapshot) -> dict[str, Any]:
+        """Convert DashboardSnapshot into a JSON-serialisable dict."""
         return {
-            "timestamp": state.timestamp.isoformat(),
-            "market_status": state.market_status,
+            "generated_at": snapshot.generated_at.isoformat(),
+            "market_status": snapshot.market_status,
+            "data_age_seconds": snapshot.data_age_seconds,
+            "is_data_stale": snapshot.is_data_stale,
+            "warnings": list(snapshot.warnings),
             "account_status": {
-                "buying_power": float(state.account_status.buying_power),
-                "account_balance": float(state.account_status.account_balance),
-                "cash_balance": float(state.account_status.cash_balance),
-                "day_trade_count": state.account_status.day_trade_count,
-                "last_updated": state.account_status.last_updated.isoformat(),
+                "buying_power": float(snapshot.account_status.buying_power),
+                "account_balance": float(snapshot.account_status.account_balance),
+                "cash_balance": float(snapshot.account_status.cash_balance),
+                "day_trade_count": snapshot.account_status.day_trade_count,
+                "last_updated": snapshot.account_status.last_updated.isoformat(),
             },
-            "positions": [
-                {
-                    "symbol": pos.symbol,
-                    "quantity": pos.quantity,
-                    "entry_price": float(pos.entry_price),
-                    "current_price": float(pos.current_price),
-                    "unrealized_pl": float(pos.unrealized_pl),
-                    "unrealized_pl_pct": float(pos.unrealized_pl_pct),
-                }
-                for pos in state.positions
-            ],
+            "positions": [self._serialize_position(pos) for pos in snapshot.positions],
             "performance_metrics": {
-                "win_rate": state.performance_metrics.win_rate,
-                "avg_risk_reward": state.performance_metrics.avg_risk_reward,
-                "total_realized_pl": float(state.performance_metrics.total_realized_pl),
-                "total_unrealized_pl": float(
-                    state.performance_metrics.total_unrealized_pl
-                ),
-                "total_pl": float(state.performance_metrics.total_pl),
-                "current_streak": state.performance_metrics.current_streak,
-                "streak_type": state.performance_metrics.streak_type,
-                "trades_today": state.performance_metrics.trades_today,
-                "session_count": state.performance_metrics.session_count,
+                "win_rate": snapshot.performance_metrics.win_rate,
+                "avg_risk_reward": snapshot.performance_metrics.avg_risk_reward,
+                "total_realized_pl": float(snapshot.performance_metrics.total_realized_pl),
+                "total_unrealized_pl": float(snapshot.performance_metrics.total_unrealized_pl),
+                "total_pl": float(snapshot.performance_metrics.total_pl),
+                "current_streak": snapshot.performance_metrics.current_streak,
+                "streak_type": snapshot.performance_metrics.streak_type,
+                "trades_today": snapshot.performance_metrics.trades_today,
+                "session_count": snapshot.performance_metrics.session_count,
+                "max_drawdown": float(snapshot.performance_metrics.max_drawdown),
             },
             "targets": (
                 {
-                    "win_rate_target": state.targets.win_rate_target,
-                    "daily_pl_target": float(state.targets.daily_pl_target),
-                    "trades_per_day_target": state.targets.trades_per_day_target,
-                    "max_drawdown_target": float(state.targets.max_drawdown_target),
-                    "avg_risk_reward_target": state.targets.avg_risk_reward_target,
+                    "win_rate_target": snapshot.targets.win_rate_target,
+                    "daily_pl_target": float(snapshot.targets.daily_pl_target),
+                    "trades_per_day_target": snapshot.targets.trades_per_day_target,
+                    "max_drawdown_target": float(snapshot.targets.max_drawdown_target),
+                    "avg_risk_reward_target": snapshot.targets.avg_risk_reward_target,
                 }
-                if state.targets
+                if snapshot.targets
                 else None
             ),
         }
 
-    def _generate_markdown(self, state: DashboardState) -> str:
-        """
-        Generate Markdown report from dashboard state.
+    def _serialize_position(self, position: PositionDisplay) -> dict[str, Any]:
+        """Serialize PositionDisplay with formatted decimals."""
+        return {
+            "symbol": position.symbol,
+            "quantity": position.quantity,
+            "entry_price": float(position.entry_price),
+            "current_price": float(position.current_price),
+            "unrealized_pl": float(position.unrealized_pl),
+            "unrealized_pl_pct": float(position.unrealized_pl_pct),
+            "last_updated": position.last_updated.isoformat(),
+        }
 
-        Args:
-            state: Dashboard state to format
+    def _generate_markdown(self, snapshot: DashboardSnapshot) -> str:
+        """Create Markdown summary for the snapshot."""
+        lines: list[str] = []
 
-        Returns:
-            Formatted markdown string
-        """
-        lines = []
-
-        # Header
         lines.append("# Trading Dashboard Export")
         lines.append("")
-        lines.append(f"**Generated:** {state.timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
-        lines.append(f"**Market Status:** {state.market_status}")
+        lines.append(f"**Generated:** {snapshot.generated_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append(f"**Market Status:** {snapshot.market_status}")
+        lines.append(f"**Data Age:** {int(snapshot.data_age_seconds)}s")
+        lines.append(f"**Data Stale:** {'Yes' if snapshot.is_data_stale else 'No'}")
         lines.append("")
 
-        # Account Status
+        account = snapshot.account_status
         lines.append("## Account Status")
         lines.append("")
-        lines.append(
-            f"- **Buying Power:** ${state.account_status.buying_power:,.2f}"
-        )
-        lines.append(
-            f"- **Account Balance:** ${state.account_status.account_balance:,.2f}"
-        )
-        lines.append(f"- **Cash Balance:** ${state.account_status.cash_balance:,.2f}")
-        lines.append(f"- **Day Trade Count:** {state.account_status.day_trade_count}")
-        lines.append(
-            f"- **Last Updated:** {state.account_status.last_updated.strftime('%Y-%m-%d %H:%M:%S')}"
-        )
+        lines.append(f"- **Buying Power:** ${account.buying_power:,.2f}")
+        lines.append(f"- **Account Balance:** ${account.account_balance:,.2f}")
+        lines.append(f"- **Cash Balance:** ${account.cash_balance:,.2f}")
+        lines.append(f"- **Day Trade Count:** {account.day_trade_count}")
+        lines.append(f"- **Last Updated:** {account.last_updated.strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append("")
 
-        # Positions
         lines.append("## Positions")
         lines.append("")
-        if state.positions:
-            lines.append("| Symbol | Quantity | Entry Price | Current Price | P&L | P&L % |")
-            lines.append("|--------|----------|-------------|---------------|-----|-------|")
-            for pos in state.positions:
-                pl_sign = "+" if pos.unrealized_pl >= 0 else ""
+        positions = list(snapshot.positions)
+        if positions:
+            lines.append("| Symbol | Quantity | Entry Price | Current Price | P&L | P&L % | Updated |")
+            lines.append("|--------|----------|-------------|---------------|-----|-------|---------|")
+            for position in positions:
+                pl_sign = "+" if position.unrealized_pl >= 0 else ""
                 lines.append(
-                    f"| {pos.symbol} | {pos.quantity} | ${pos.entry_price:.2f} | "
-                    f"${pos.current_price:.2f} | {pl_sign}${pos.unrealized_pl:.2f} | "
-                    f"{pl_sign}{pos.unrealized_pl_pct:.2f}% |"
+                    f"| {position.symbol} | {position.quantity} | ${position.entry_price:.2f} | "
+                    f"${position.current_price:.2f} | {pl_sign}${position.unrealized_pl:.2f} | "
+                    f"{pl_sign}{position.unrealized_pl_pct:.2f}% | {position.last_updated.strftime('%H:%M:%S')} |"
                 )
         else:
             lines.append("*No open positions*")
         lines.append("")
 
-        # Performance Metrics
+        metrics = snapshot.performance_metrics
         lines.append("## Performance Metrics")
         lines.append("")
-        metrics = state.performance_metrics
         lines.append(f"- **Win Rate:** {metrics.win_rate:.2f}%")
         lines.append(f"- **Average Risk/Reward:** {metrics.avg_risk_reward:.2f}")
         lines.append(f"- **Total Realized P&L:** ${metrics.total_realized_pl:,.2f}")
-        lines.append(
-            f"- **Total Unrealized P&L:** ${metrics.total_unrealized_pl:,.2f}"
-        )
+        lines.append(f"- **Total Unrealized P&L:** ${metrics.total_unrealized_pl:,.2f}")
         lines.append(f"- **Total P&L:** ${metrics.total_pl:,.2f}")
-        lines.append(
-            f"- **Current Streak:** {metrics.current_streak} ({metrics.streak_type})"
-        )
+        lines.append(f"- **Max Drawdown:** ${metrics.max_drawdown:,.2f}")
+        lines.append(f"- **Current Streak:** {metrics.current_streak} ({metrics.streak_type})")
         lines.append(f"- **Trades Today:** {metrics.trades_today}")
         lines.append(f"- **Session Count:** {metrics.session_count}")
         lines.append("")
 
-        # Targets (if available)
-        if state.targets:
+        if snapshot.targets:
+            targets = snapshot.targets
             lines.append("## Performance Targets")
             lines.append("")
-            targets = state.targets
 
-            # Win rate comparison
-            win_rate_diff = metrics.win_rate - targets.win_rate_target
-            win_rate_status = "✓" if win_rate_diff >= 0 else "✗"
+            win_diff = metrics.win_rate - targets.win_rate_target
             lines.append(
                 f"- **Win Rate:** {metrics.win_rate:.2f}% vs {targets.win_rate_target:.2f}% "
-                f"({win_rate_diff:+.2f}%) {win_rate_status}"
+                f"({win_diff:+.2f}%) {'✓' if win_diff >= 0 else '✗'}"
             )
 
-            # Risk/reward comparison
-            rr_diff = metrics.avg_risk_reward - targets.avg_risk_reward_target
-            rr_status = "✓" if rr_diff >= 0 else "✗"
-            lines.append(
-                f"- **Avg Risk/Reward:** {metrics.avg_risk_reward:.2f} vs "
-                f"{targets.avg_risk_reward_target:.2f} ({rr_diff:+.2f}) {rr_status}"
-            )
+            if targets.avg_risk_reward_target is not None:
+                rr_diff = metrics.avg_risk_reward - targets.avg_risk_reward_target
+                lines.append(
+                    f"- **Avg Risk/Reward:** {metrics.avg_risk_reward:.2f} vs {targets.avg_risk_reward_target:.2f} "
+                    f"({rr_diff:+.2f}) {'✓' if rr_diff >= 0 else '✗'}"
+                )
 
-            # Daily P&L comparison
             pl_diff = metrics.total_pl - targets.daily_pl_target
-            pl_status = "✓" if pl_diff >= 0 else "✗"
             lines.append(
                 f"- **Total P&L:** ${metrics.total_pl:,.2f} vs ${targets.daily_pl_target:,.2f} "
-                f"(${pl_diff:+,.2f}) {pl_status}"
+                f"(${pl_diff:+,.2f}) {'✓' if pl_diff >= 0 else '✗'}"
             )
 
-            # Trades per day comparison
             trades_diff = metrics.trades_today - targets.trades_per_day_target
-            trades_status = "✓" if metrics.trades_today >= targets.trades_per_day_target else "✗"
             lines.append(
                 f"- **Trades Today:** {metrics.trades_today} vs {targets.trades_per_day_target} "
-                f"({trades_diff:+d}) {trades_status}"
+                f"({trades_diff:+d}) {'✓' if trades_diff >= 0 else '✗'}"
+            )
+
+            drawdown_diff = metrics.max_drawdown - targets.max_drawdown_target
+            lines.append(
+                f"- **Max Drawdown:** ${metrics.max_drawdown:,.2f} vs ${targets.max_drawdown_target:,.2f} "
+                f"(${drawdown_diff:+,.2f}) {'✓' if drawdown_diff >= 0 else '✗'}"
             )
 
             lines.append("")
 
-        # Footer
+        if snapshot.warnings:
+            lines.append("## Warnings")
+            lines.append("")
+            for warning in snapshot.warnings:
+                lines.append(f"- {warning}")
+            lines.append("")
+
         lines.append("---")
         lines.append("")
         lines.append("*Generated by Trading Bot Dashboard*")

@@ -1,31 +1,30 @@
 """
-CLI Dashboard Module for Trading Bot.
+CLI dashboard package exports.
 
-Provides real-time monitoring of account status, current positions, and performance metrics.
+Provides reusable data provider, models, metrics calculator, and CLI entry points
+for both the Rich terminal dashboard and forthcoming Textual TUI implementation.
 """
 
-from .dashboard import (
-    fetch_dashboard_state,
-    load_targets,
-    run_dashboard_loop,
-)
+from .data_provider import DashboardDataProvider, ProviderConfig
+from .dashboard import main, run_dashboard_loop
 from .metrics_calculator import MetricsCalculator
 from .models import (
     AccountStatus,
-    DashboardState,
+    DashboardSnapshot,
     DashboardTargets,
     PerformanceMetrics,
     PositionDisplay,
 )
 
 __all__ = [
-    "DashboardState",
     "AccountStatus",
     "PositionDisplay",
     "PerformanceMetrics",
     "DashboardTargets",
+    "DashboardSnapshot",
+    "DashboardDataProvider",
+    "ProviderConfig",
     "MetricsCalculator",
-    "load_targets",
-    "fetch_dashboard_state",
     "run_dashboard_loop",
+    "main",
 ]

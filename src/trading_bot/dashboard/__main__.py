@@ -1,134 +1,61 @@
-"""
-Dashboard Entry Point.
+"""CLI entry point for `python -m trading_bot.dashboard`."""
 
-Provides CLI interface for launching the trading bot dashboard.
-
-Usage:
-    python -m trading_bot.dashboard
-
-Task: T025 [P] - Dashboard entry point
-"""
+from __future__ import annotations
 
 import sys
 from pathlib import Path
 
+from rich.console import Console
+
 from ..account.account_data import AccountData
+from ..auth.robinhood_auth import RobinhoodAuth
 from ..config import Config
 from ..logger import get_logger
 from ..logging.query_helper import TradeQueryHelper
-from .dashboard import load_targets, run_dashboard_loop
+from .dashboard import main as run_dashboard
 
 logger = get_logger(__name__)
 
 
 def main() -> int:
-    """
-    Main entry point for dashboard.
+    """Authenticate, initialise services, and launch the dashboard loop."""
+    console = Console()
 
-    Orchestrates:
-    1. Initialize AccountData service
-    2. Initialize TradeQueryHelper
-    3. Load targets (optional)
-    4. Log dashboard.launched event
-    5. Run dashboard loop
-    6. Log dashboard.exited event on quit
-
-    Returns:
-        Exit code:
-        - 0: Success (clean exit)
-        - 1: Configuration error
-        - 2: Service initialization failure
-        - 130: Interrupted by user (Ctrl+C)
-    """
     try:
-        # Load configuration
         config = Config.from_env_and_json()
 
-        # Initialize authentication
-        from ..auth.robinhood_auth import RobinhoodAuth
         auth = RobinhoodAuth(config=config)
-
-        # Log into Robinhood
-        logger.info("Attempting Robinhood login...")
+        logger.info("Attempting Robinhood login")
         auth.login()
         logger.info("Robinhood login successful")
 
-        # Log dashboard launch
-        logger.info(
-            "dashboard.launched",
-            extra={
-                "event": "dashboard.launched",
-                "config_loaded": True,
-            },
-        )
-
-        # Initialize AccountData service
         account_data = AccountData(auth=auth)
-
-        # Initialize TradeQueryHelper
         trade_helper = TradeQueryHelper(log_dir=Path("logs"))
 
-        # Load targets (optional)
-        targets = load_targets()
-
-        # Run dashboard loop
-        run_dashboard_loop(
-            account_data=account_data, trade_helper=trade_helper, targets=targets
-        )
-
-        # Log dashboard exit
-        logger.info(
-            "dashboard.exited",
-            extra={
-                "event": "dashboard.exited",
-                "exit_reason": "user_quit",
-            },
+        run_dashboard(
+            account_data=account_data,
+            trade_helper=trade_helper,
+            console=console,
         )
 
         return 0
 
     except KeyboardInterrupt:
-        logger.info(
-            "dashboard.interrupted",
-            extra={
-                "event": "dashboard.interrupted",
-                "exit_reason": "keyboard_interrupt",
-            },
-        )
-        print("\n\nWarning: Dashboard interrupted by user")
+        logger.info("dashboard.interrupted", extra={"event": "dashboard.interrupted"})
+        console.print("\n[yellow]Dashboard interrupted by user[/yellow]")
         return 130
 
-    except Exception as e:
-        # Check if authentication error
-        if "AuthenticationError" in type(e).__name__ or "authentication" in str(e).lower():
-            logger.error(
-                "dashboard.auth_failed",
-                extra={
-                    "event": "dashboard.auth_failed",
-                    "error_type": type(e).__name__,
-                    "error_message": str(e),
-                },
-                exc_info=True,
-            )
-            print(f"\nError: Authentication failed: {e}")
-            print("\nPlease check your environment variables:")
-            print("  - ROBINHOOD_USERNAME (email address)")
-            print("  - ROBINHOOD_PASSWORD")
-            print("  - ROBINHOOD_MFA_SECRET (optional, for TOTP MFA)")
-            print("  - ROBINHOOD_DEVICE_TOKEN (optional)")
-            return 2
-
-    except Exception as e:
+    except Exception as exc:  # pragma: no cover - runtime errors handled gracefully
         logger.error(
             "dashboard.error",
             extra={
                 "event": "dashboard.error",
-                "error_type": type(e).__name__,
-                "error_message": str(e),
+                "error_type": type(exc).__name__,
+                "error_message": str(exc),
             },
             exc_info=True,
         )
-        print(f"\nError: Dashboard error: {e}")
+        console.print(f"\n[red]Dashboard failed: {exc}[/red]")
         return 1
 
 

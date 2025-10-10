@@ -1,12 +1,17 @@
 """
-Rich-based rendering for CLI dashboard displays.
+Rich-based rendering for the CLI dashboard.
 
-Provides DisplayRenderer class for formatting dashboard components with
-color-coded P&L, target comparisons, and structured layouts.
+Formats dashboard data into panels, tables, and layout structures with
+color-coded metrics, target comparisons, and warnings. Designed to consume
+the shared `DashboardSnapshot` payload produced by DashboardDataProvider
+so the UI layer stays thin and reusable.
 """
+
+from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Iterable
 
 from rich.layout import Layout
 from rich.panel import Panel
@@ -15,7 +20,7 @@ from rich.text import Text
 
 from .models import (
     AccountStatus,
-    DashboardState,
+    DashboardSnapshot,
     DashboardTargets,
     PerformanceMetrics,
     PositionDisplay,
@@ -23,44 +28,97 @@ from .models import (
 
 
 class DisplayRenderer:
-    """Renders dashboard components using rich library."""
+    """Renders dashboard components using the rich library."""
 
-    def render_account_status(
-        self, account: AccountStatus, market_status: str
-    ) -> Panel:
+    # ------------------------------------------------------------------ #
+    # Public rendering API
+    # ------------------------------------------------------------------ #
+    def render_full_dashboard(self, snapshot: DashboardSnapshot) -> Layout:
         """
-        Render account status panel with market state.
+        Render the complete dashboard layout for a snapshot of data.
 
         Args:
-            account: Account snapshot with balances and metadata
-            market_status: Current market state ("OPEN" or "CLOSED")
+            snapshot: DashboardSnapshot from DashboardDataProvider.
 
         Returns:
-            Panel containing formatted account information
+            Rich Layout object ready for Live.update().
         """
-        market_color = "green" if market_status == "OPEN" else "yellow"
-        market_text = Text(f"Market: {market_status}", style=market_color)
+        layout = Layout()
+
+        header = self._render_header(snapshot)
+        warnings_panel = self._render_warnings(snapshot.warnings)
+        account_panel = self.render_account_status(snapshot.account_status, snapshot)
+        positions_table = self.render_positions_table(snapshot.positions)
+        metrics_panel = self.render_performance_metrics(
+            snapshot.performance_metrics, snapshot.targets
+        )
+
+        # Layout structure: header [+ warnings], then body split into account + main column.
+        if warnings_panel is not None:
+            layout.split_column(
+                Layout(header, size=3, name="header"),
+                Layout(warnings_panel, size=3, name="warnings"),
+                Layout(name="body"),
+            )
+        else:
+            layout.split_column(
+                Layout(header, size=3, name="header"),
+                Layout(name="body"),
+            )
+
+        layout["body"].split_row(
+            Layout(account_panel, size=38, name="account"),
+            Layout(name="main"),
+        )
+
+        layout["main"].split_column(
+            Layout(positions_table, ratio=2, name="positions"),
+            Layout(metrics_panel, ratio=1, name="metrics"),
+        )
+
+        return layout
+
+    def render_account_status(
+        self,
+        account: AccountStatus,
+        snapshot: DashboardSnapshot,
+    ) -> Panel:
+        """
+        Render account status panel with market and staleness indicators.
+
+        Args:
+            account: AccountStatus dataclass.
+            snapshot: DashboardSnapshot for context (market status, staleness).
+        """
+        market_color = "green" if snapshot.market_status == "OPEN" else "yellow"
+        data_age = int(snapshot.data_age_seconds)
 
         content = Text()
         content.append(f"Account Balance: ${self._format_currency(account.account_balance)}\n")
         content.append(f"Cash Balance:    ${self._format_currency(account.cash_balance)}\n")
         content.append(f"Buying Power:    ${self._format_currency(account.buying_power)}\n")
         content.append(f"Day Trades:      {account.day_trade_count}\n")
-        content.append(f"Last Updated:    {self._format_datetime(account.last_updated)}\n\n")
-        content.append(market_text)
+        content.append(
+            f"Last Updated:    {self._format_datetime(account.last_updated)} "
+            f"(age {data_age}s)\n"
+        )
+        content.append(f"Market Status:   ", style="bold")
+        content.append(f"{snapshot.market_status}\n", style=market_color + " bold")
 
-        return Panel(content, title="Account Status", border_style="blue")
+        if snapshot.is_data_stale:
+            content.append(
+                f"\n⚠️  Data may be stale (>{self._format_seconds(snapshot.data_age_seconds)})",
+                style="yellow",
+            )
 
-    def render_positions_table(self, positions: list[PositionDisplay]) -> Table:
-        """
-        Render positions table with P&L color coding.
+        return Panel(
+            content,
+            title="Account Status",
+            border_style="blue",
+        )
 
-        Args:
-            positions: List of position displays with calculated P&L
-
-        Returns:
-            Table showing all positions or empty state message
-        """
+    def render_positions_table(self, positions: Iterable[PositionDisplay]) -> Table:
+        """Render positions table with P&L color coding."""
         table = Table(title="Open Positions", show_header=True, header_style="bold cyan")
         table.add_column("Symbol", style="white", no_wrap=True)
         table.add_column("Qty", justify="right")
@@ -68,11 +126,14 @@ class DisplayRenderer:
         table.add_column("Current", justify="right")
         table.add_column("Unrealized P&L", justify="right")
         table.add_column("P&L %", justify="right")
+        table.add_column("Updated", justify="right")
 
-        if not positions:
-            # Create single-row table with "No open positions" message
+        positions_list = list(positions)
+
+        if not positions_list:
             table.add_row(
                 "[dim]No open positions[/dim]",
+                "-",
                 "-",
                 "-",
                 "-",
@@ -81,7 +142,7 @@ class DisplayRenderer:
             )
             return table
 
-        for pos in positions:
+        for pos in positions_list:
             pl_color = self._get_pl_color(pos.unrealized_pl)
             pl_pct_color = self._get_pl_color(pos.unrealized_pl_pct)
 
@@ -92,181 +153,207 @@ class DisplayRenderer:
                 f"${self._format_currency(pos.current_price)}",
                 f"[{pl_color}]${self._format_currency(pos.unrealized_pl)}[/{pl_color}]",
                 f"[{pl_pct_color}]{self._format_percentage(pos.unrealized_pl_pct)}[/{pl_pct_color}]",
+                self._format_time_short(pos.last_updated),
             )
 
         return table
 
     def render_performance_metrics(
-        self, metrics: PerformanceMetrics, targets: DashboardTargets | None
+        self,
+        metrics: PerformanceMetrics,
+        targets: DashboardTargets | None,
     ) -> Panel:
-        """
-        Render performance metrics panel with target comparisons.
-
-        Args:
-            metrics: Aggregated trading performance data
-            targets: Optional performance targets for comparison
-
-        Returns:
-            Panel with color-coded metrics and target indicators
-        """
+        """Render performance metrics panel with target comparisons."""
         content = Text()
 
-        # Win rate with target comparison
-        win_rate_text = f"Win Rate:         {self._format_percentage(metrics.win_rate)}"
-        if targets:
-            meets_target = metrics.win_rate >= targets.win_rate_target
-            indicator = "✓" if meets_target else "✗"
-            indicator_color = "green" if meets_target else "red"
-            content.append(
-                f"{win_rate_text} [{indicator_color}]{indicator}[/{indicator_color}] "
-                f"(target: {self._format_percentage(targets.win_rate_target)})\n"
-            )
-        else:
-            content.append(f"{win_rate_text}\n")
+        # Win rate
+        content.append(self._metric_with_target(
+            label="Win Rate",
+            actual=f"{metrics.win_rate:.2f}%",
+            meets=self._meets_target(metrics.win_rate, targets.win_rate_target) if targets else None,
+            target=f"{targets.win_rate_target:.2f}%" if targets else None,
+        ))
 
-        # Risk/Reward ratio with target comparison
-        rr_text = f"Avg Risk/Reward:  {metrics.avg_risk_reward:.2f}"
-        if targets:
-            meets_target = metrics.avg_risk_reward >= targets.avg_risk_reward_target
-            indicator = "✓" if meets_target else "✗"
-            indicator_color = "green" if meets_target else "red"
-            content.append(
-                f"{rr_text} [{indicator_color}]{indicator}[/{indicator_color}] "
-                f"(target: {targets.avg_risk_reward_target:.2f})\n"
-            )
-        else:
-            content.append(f"{rr_text}\n")
+        # Avg Risk/Reward
+        avg_rr_target = targets.avg_risk_reward_target if targets else None
+        content.append(self._metric_with_target(
+            label="Avg Risk/Reward",
+            actual=f"{metrics.avg_risk_reward:.2f}",
+            meets=self._meets_target(metrics.avg_risk_reward, avg_rr_target) if avg_rr_target is not None else None,
+            target=f"{avg_rr_target:.2f}" if avg_rr_target is not None else None,
+        ))
 
-        # Total P&L with target comparison
+        # Total P&L
         total_pl_color = self._get_pl_color(metrics.total_pl)
-        total_pl_text = f"Total P&L:        ${self._format_currency(metrics.total_pl)}"
+        total_pl_text = f"${self._format_currency(metrics.total_pl)}"
+        meets_total = None
+        target_total = None
         if targets:
-            meets_target = metrics.total_pl >= targets.daily_pl_target
-            indicator = "✓" if meets_target else "✗"
-            indicator_color = "green" if meets_target else "red"
-            content.append(
-                f"[{total_pl_color}]{total_pl_text}[/{total_pl_color}] "
-                f"[{indicator_color}]{indicator}[/{indicator_color}] "
-                f"(target: ${self._format_currency(targets.daily_pl_target)})\n"
+            meets_total = metrics.total_pl >= targets.daily_pl_target
+            target_total = f"${self._format_currency(targets.daily_pl_target)}"
+        content.append(
+            self._metric_with_target(
+                label="Total P&L",
+                actual=f"[{total_pl_color}]{total_pl_text}[/{total_pl_color}]",
+                meets=meets_total,
+                target=target_total,
             )
-        else:
-            content.append(f"[{total_pl_color}]{total_pl_text}[/{total_pl_color}]\n")
+        )
 
-        # Realized and unrealized P&L
-        realized_color = self._get_pl_color(metrics.total_realized_pl)
-        unrealized_color = self._get_pl_color(metrics.total_unrealized_pl)
+        # Realized / Unrealized breakdown
         content.append(
-            f"  Realized:       [{realized_color}]${self._format_currency(metrics.total_realized_pl)}[/{realized_color}]\n"
+            f"  • Realized: [{self._get_pl_color(metrics.total_realized_pl)}]"
+            f"${self._format_currency(metrics.total_realized_pl)}"
+            f"[/{self._get_pl_color(metrics.total_realized_pl)}]\n"
         )
         content.append(
-            f"  Unrealized:     [{unrealized_color}]${self._format_currency(metrics.total_unrealized_pl)}[/{unrealized_color}]\n"
+            f"  • Unrealized: [{self._get_pl_color(metrics.total_unrealized_pl)}]"
+            f"${self._format_currency(metrics.total_unrealized_pl)}"
+            f"[/{self._get_pl_color(metrics.total_unrealized_pl)}]\n"
         )
 
-        # Streak
-        streak_color = (
-            "green" if metrics.streak_type == "WIN" else "red" if metrics.streak_type == "LOSS" else "yellow"
-        )
-        streak_text = (
-            f"Current Streak:   [{streak_color}]{metrics.current_streak} {metrics.streak_type}[/{streak_color}]\n"
-        )
-        content.append(streak_text)
-
-        # Trades today with target comparison
-        trades_text = f"Trades Today:     {metrics.trades_today}"
+        # Max drawdown
+        drawdown_color = self._get_pl_color(metrics.max_drawdown)
+        drawdown_text = f"${self._format_currency(metrics.max_drawdown)}"
+        meets_drawdown = None
+        target_drawdown = None
         if targets:
-            meets_target = metrics.trades_today >= targets.trades_per_day_target
-            indicator = "✓" if meets_target else "✗"
-            indicator_color = "green" if meets_target else "red"
-            content.append(
-                f"{trades_text} [{indicator_color}]{indicator}[/{indicator_color}] "
-                f"(target: {targets.trades_per_day_target})\n"
+            meets_drawdown = metrics.max_drawdown >= targets.max_drawdown_target
+            target_drawdown = f"${self._format_currency(targets.max_drawdown_target)}"
+        content.append(
+            self._metric_with_target(
+                label="Max Drawdown",
+                actual=f"[{drawdown_color}]{drawdown_text}[/{drawdown_color}]",
+                meets=meets_drawdown,
+                target=target_drawdown,
             )
-        else:
-            content.append(f"{trades_text}\n")
+        )
 
-        # Session count
-        content.append(f"Sessions:         {metrics.session_count}")
+        # Streak / Trades / Sessions
+        streak_color = self._streak_color(metrics.streak_type)
+        content.append(
+            f"Current Streak: [{streak_color}]{metrics.current_streak} {metrics.streak_type}[/{streak_color}]\n"
+        )
+
+        trades_meets = None
+        trades_target = None
+        if targets:
+            trades_meets = metrics.trades_today >= targets.trades_per_day_target
+            trades_target = str(targets.trades_per_day_target)
+        content.append(
+            self._metric_with_target(
+                label="Trades Today",
+                actual=str(metrics.trades_today),
+                meets=trades_meets,
+                target=trades_target,
+            )
+        )
+
+        content.append(f"Session Count: {metrics.session_count}")
 
         return Panel(content, title="Performance Metrics", border_style="magenta")
 
-    def render_full_dashboard(self, state: DashboardState) -> Layout:
-        """
-        Render complete dashboard layout.
+    # ------------------------------------------------------------------ #
+    # Helpers
+    # ------------------------------------------------------------------ #
+    def _render_header(self, snapshot: DashboardSnapshot) -> Panel:
+        """Render dashboard header banner."""
+        timestamp = self._format_datetime(snapshot.generated_at)
+        header_text = Text.assemble(
+            ("Trading Dashboard", "bold white"),
+            ("  •  ", "dim"),
+            (timestamp, "white"),
+            ("  •  ", "dim"),
+            (f"Market {snapshot.market_status}", "green bold" if snapshot.market_status == "OPEN" else "yellow bold"),
+        )
 
-        Args:
-            state: Complete dashboard state with all components
-
-        Returns:
-            Layout with account status, positions, and performance metrics
-        """
-        layout = Layout()
-
-        # Create header with timestamp
-        header = Panel(
-            Text(
-                f"Trading Dashboard - {self._format_datetime(state.timestamp)}",
-                justify="center",
-            ),
+        return Panel(
+            header_text,
             style="bold white on blue",
         )
 
-        # Render components
-        account_panel = self.render_account_status(
-            state.account_status, state.market_status
-        )
-        positions_table = self.render_positions_table(state.positions)
-        metrics_panel = self.render_performance_metrics(
-            state.performance_metrics, state.targets
+    def _render_warnings(self, warnings: list[str]) -> Panel | None:
+        """Render warnings panel if any warnings exist."""
+        if not warnings:
+            return None
+
+        content = Text()
+        for warning in warnings:
+            content.append(f"• {warning}\n", style="yellow")
+
+        return Panel(
+            content,
+            title="Warnings",
+            border_style="yellow",
         )
 
-        # Build layout structure
-        layout.split_column(
-            Layout(header, size=3, name="header"),
-            Layout(name="body"),
-        )
+    def _metric_with_target(
+        self,
+        *,
+        label: str,
+        actual: str,
+        meets: bool | None,
+        target: str | None,
+    ) -> str:
+        """Format metric line with optional target comparison."""
+        suffix = ""
+        if target is not None and meets is not None:
+            indicator = "✓" if meets else "✗"
+            indicator_color = "green" if meets else "red"
+            suffix = f" [{indicator_color}]{indicator}[/{indicator_color}] (target: {target})"
+        return f"{label}: {actual}{suffix}\n"
 
-        layout["body"].split_row(
-            Layout(account_panel, name="account"),
-            Layout(name="main"),
-        )
+    @staticmethod
+    def _get_pl_color(value: Decimal | float) -> str:
+        """Determine color for P&L values."""
+        numeric_value = float(value)
+        if numeric_value > 0:
+            return "green"
+        if numeric_value < 0:
+            return "red"
+        return "yellow"
 
-        layout["main"].split_column(
-            Layout(positions_table, name="positions"),
-            Layout(metrics_panel, name="metrics"),
-        )
-
-        return layout
+    @staticmethod
+    def _streak_color(streak_type: str) -> str:
+        """Color used for streak indicator."""
+        if streak_type == "WIN":
+            return "green"
+        if streak_type == "LOSS":
+            return "red"
+        return "yellow"
 
     @staticmethod
     def _format_currency(value: Decimal) -> str:
-        """Format decimal as currency string: X,XXX.XX"""
+        """Format Decimal as currency with thousands separator."""
         return f"{value:,.2f}"
 
     @staticmethod
-    def _format_percentage(value: float | Decimal) -> str:
-        """Format decimal/float as percentage string: XX.XX%"""
+    def _format_percentage(value: Decimal | float) -> str:
+        """Format numeric value as percentage string."""
         return f"{float(value):.2f}%"
 
     @staticmethod
     def _format_datetime(dt: datetime) -> str:
-        """Format datetime for display."""
-        return dt.strftime("%Y-%m-%d %H:%M:%S")
+        """Format datetime for human-readable display."""
+        return dt.astimezone().strftime("%Y-%m-%d %H:%M:%S")
 
     @staticmethod
-    def _get_pl_color(value: Decimal | float) -> str:
-        """
-        Determine color for P&L value.
+    def _format_time_short(dt: datetime) -> str:
+        """Compact time formatter for table cells."""
+        return dt.astimezone().strftime("%H:%M:%S")
 
-        Args:
-            value: P&L value to color-code
+    @staticmethod
+    def _format_seconds(seconds: float) -> str:
+        """Human-friendly seconds formatter (e.g., 75s, 2m5s)."""
+        total = int(seconds)
+        minutes, secs = divmod(total, 60)
+        if minutes == 0:
+            return f"{secs}s"
+        return f"{minutes}m{secs:02d}s"
 
-        Returns:
-            Color name: "green" for positive, "red" for negative, "yellow" for zero
-        """
-        numeric_value = float(value)
-        if numeric_value > 0:
-            return "green"
-        elif numeric_value < 0:
-            return "red"
-        else:
-            return "yellow"
+    @staticmethod
+    def _meets_target(actual: float, target: float | None) -> bool | None:
+        """Return True/False if target provided, else None."""
+        if target is None:
+            return None
+        return actual >= target

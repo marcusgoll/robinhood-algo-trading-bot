@@ -1,0 +1,9 @@
+[run]
+source = src/trading_bot/dashboard
+omit =
+    src/trading_bot/dashboard/__main__.py
+
+[report]
+fail_under = 90
+show_missing = True
+skip_covered = False
