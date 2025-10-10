@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-01-08 (authentication-module shipped)
+**Last updated**: 2025-10-10 (status-dashboard shipped)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -144,25 +144,110 @@
   - Backward compatible (fallback to $10k mock)
   - Documentation: spec, plan, tasks, optimization-report, code-review-report
 
-## In Progress
-
-<!-- Currently implementing -->
-
 ### error-handling-framework
 - **Title**: API error handling framework
 - **Area**: infra
 - **Role**: all
 - **Intra**: No
-- **Branch**: error-handling-framework
-- **Spec**: specs/error-handling-framework/spec.md
-- **Updated**: 2025-01-08
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Retry logic for API failures (§Risk_Management)
-  - Rate limit detection and exponential backoff
-  - Network error recovery
-  - Graceful shutdown on critical errors
-  - [PIGGYBACK: bot.py has basic error handling]
+- **Date**: 2025-10-08
+- **Commit**: 7e11412
+- **Spec**: specs/error-handling-framework/
+- **Delivered**:
+  - RetryPolicy dataclass with default/aggressive/conservative presets and validation
+  - `with_retry` decorator with jittered exponential backoff, RateLimitError support, and circuit breaker telemetry
+  - CircuitBreaker singleton coordinating failure thresholds across services
+  - Comprehensive unit suite (`tests/unit/test_error_handling/*`) plus market data integration coverage
+
+### market-data-module
+- **Title**: Market data and trading hours
+- **Area**: api
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-08
+- **Commit**: 98a88b1
+- **Spec**: specs/market-data-module/
+- **Delivered**:
+  - MarketDataService with quote, historical OHLCV, and market status endpoints guarded by retry policy
+  - Quote/MarketStatus/MarketDataConfig dataclasses with configurable trading window enforcement
+  - Validation stack for prices, timestamps, trading hours, and historical continuity
+  - Unit + integration tests (tests/unit/test_market_data/*, tests/integration/test_market_data_integration.py)
+
+### startup-sequence
+- **Title**: Bot startup and initialization
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-08
+- **Commit**: b5a73f4
+- **Spec**: specs/startup-sequence/
+- **Delivered**:
+  - StartupOrchestrator coordinating 8-step initialization with StartupStep/StartupResult dataclasses
+  - `--dry-run` and `--json` CLI flows with structured exit codes for automation
+  - Dedicated startup logger writing to `logs/startup.log` with Constitution-compliant messaging
+  - Unit/integration coverage (tests/unit/test_startup.py, tests/integration/test_startup_flow.py) including failure diagnostics
+
+### credentials-manager
+- **Title**: Secure credentials management
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-09
+- **Commit**: fe4d55b
+- **Spec**: specs/credentials-manager/
+- **Delivered**:
+  - Credential masking helpers for username, password, MFA secret, and device token (`src/trading_bot/utils/security.py`, tests/unit/test_utils/test_security.py)
+  - ConfigValidator MFA format enforcement with base32 + length checks (tests/unit/test_validator.py:T008-T010)
+  - RobinhoodAuth device-token reuse with MFA fallback and .env persistence (tests/integration/test_credentials_flow.py)
+  - Full task suite complete (specs/credentials-manager/NOTES.md#L341) with supporting docs, contracts, and analysis reports
+
+### trade-logging
+- **Title**: Trade history database/CSV
+- **Area**: infra
+- **Role**: all
+- **Intra**: Yes
+- **Date**: 2025-10-09
+- **Commit**: 7c685bd
+- **Spec**: specs/trade-logging/
+- **Delivered**:
+  - TradeRecord dataclass (27 audited fields) with validation and JSON serialization helpers
+  - StructuredTradeLogger writing daily JSONL ledgers with thread-safe rotation
+  - TradeQueryHelper for date/symbol filtering, analytics, and win-rate calculations
+  - Smoke, unit, and integration test suite plus review artifacts (specs/trade-logging/, tests/{unit,integration,smoke}/test_trade_logging_*.py)
+
+### status-dashboard
+- **Title**: CLI status dashboard & performance metrics
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-10
+- **Commit**: 73b85f6
+- **Spec**: specs/status-dashboard/
+- **Delivered**:
+  - Dashboard orchestrator loop with Rich-based live display and keyboard controls (R/E/H/Q)
+  - MetricsCalculator, ExportGenerator, and DashboardTargets for targets/exports and analytics
+  - Usage telemetry to `logs/dashboard-usage.jsonl` plus JSON/Markdown export pipeline
+  - Example runner and unit coverage (`examples/run_dashboard.py`, tests/unit/test_dashboard/test_dashboard_orchestration.py)
+
+## In Progress
+
+<!-- Currently implementing -->
+
+### health-check
+- **Title**: Session health monitoring
+- **Area**: api
+- **Role**: all
+- **Intra**: Yes
+- **Branch**: health-check
+- **Updated**: 2025-10-10
+- **Impact**: 4 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 1.80
+- **Progress**:
+  - SessionHealthMonitor + HealthCheckLogger implemented (`src/trading_bot/health/`)
+  - TradingBot integrates pre-trade health checks and periodic monitoring
+  - Startup orchestrator bootstraps health monitor (`component_states["trading_bot"].health_monitor`)
+- **Remaining**:
+  - Integration tests covering bot startup/run with mocked robin_stocks
+  - CLI/config documentation updates explaining health-check usage
+  - Confirm log rotation and dashboard surfacing of health metrics
 
 ## Next
 
@@ -176,93 +261,6 @@
 
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
-
-### market-data-module
-- **Title**: Market data and trading hours
-- **Area**: api
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Get real-time stock quotes
-  - Fetch historical price data (for backtesting)
-  - Check if market is open
-  - Enforce 7am-10am EST trading window (block trades outside peak volatility)
-  - [UNBLOCKED: authentication-module shipped]
-  - [MERGED: trading-hours-restriction]
-
-### startup-sequence
-- **Title**: Bot startup and initialization
-- **Area**: infra
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Validate environment (§Pre_Deploy)
-  - Authenticate with MFA
-  - Load config
-  - Check market status
-  - Verify account access
-  - Display dashboard
-  - Enter main loop
-  - [BLOCKED: authentication-module, configuration-validator, status-dashboard]
-
-### credentials-manager
-- **Title**: Secure credentials management
-- **Area**: infra
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Secure storage of credentials (§Security)
-  - Validate MFA secret format
-  - Test authentication on first run
-  - Store device token for faster subsequent logins
-  - [BLOCKED: environment-config]
-
-### trade-logging
-- **Title**: Trade history database/CSV
-- **Area**: infra
-- **Role**: all
-- **Intra**: Yes
-- **Impact**: 4 | **Effort**: 2 | **Confidence**: 1.0 | **Score**: 2.00
-- **Requirements**:
-  - Save all trades to CSV (timestamp, symbol, action, quantity, price, P&L)
-  - Track daily performance metrics (§Audit_Everything)
-  - Export trade history
-  - [BLOCKED: logging-system]
-
-### status-dashboard
-- **Title**: CLI status dashboard & performance metrics
-- **Area**: infra
-- **Role**: all
-- **Intra**: No
-- **Impact**: 4 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 1.80
-- **Requirements**:
-  - Display current positions
-  - Show today's P&L
-  - Track number of trades executed
-  - Show remaining buying power
-  - Display active orders
-  - **Performance metrics display**: All key stats (win rate, avg R:R, total P&L, current streak, trades today, session count)
-  - Update real-time
-  - Export daily summary
-  - Compare against targets
-  - [BLOCKED: account-data-module, performance-tracking]
-  - [MERGED: performance-metrics-dashboard]
-
-### health-check
-- **Title**: Session health monitoring
-- **Area**: api
-- **Role**: all
-- **Intra**: Yes
-- **Impact**: 4 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 1.80
-- **Requirements**:
-  - Ping API every 5 minutes to maintain session
-  - Verify authentication status
-  - Log session duration
-  - Auto-reauth if token expires
-  - [UNBLOCKED: authentication-module shipped]
 
 ### order-management
 - **Title**: Order management foundation
@@ -293,7 +291,7 @@
   - Calculate and display current risk-reward ratio
   - Alert if R:R falls below 1:1
   - Daily trade log with timestamps and P&L
-  - [BLOCKED: trade-logging]
+  - [UNBLOCKED: trade-logging shipped (2025-10-09)]
   - [PIGGYBACK: extends trade-logging with analytics]
   - [MERGED: win-rate-tracking, avg-win-loss-calculator]
 
@@ -308,7 +306,7 @@
   - Relative volume filter (5x+ average)
   - Float size filter (under 20M shares)
   - Daily performance filter (10%+ movers)
-  - [BLOCKED: market-data-module]
+  - [UNBLOCKED: market-data-module shipped (2025-10-08)]
 
 ### momentum-detection
 - **Title**: Momentum and catalyst detection
@@ -320,7 +318,7 @@
   - Identify stocks with breaking news catalysts
   - Track pre-market movers
   - Scan for bull flag patterns
-  - [BLOCKED: market-data-module, technical-indicators]
+  - [BLOCKED: technical-indicators; UNBLOCKED: market-data-module shipped (2025-10-08)]
 
 ### technical-indicators
 - **Title**: Technical indicators module
@@ -342,7 +340,7 @@
   - Verify MACD is positive for longs
   - Detect divergence (lines moving apart)
   - Trigger exit when MACD crosses negative
-  - [BLOCKED: market-data-module]
+  - [UNBLOCKED: market-data-module shipped (2025-10-08)]
   - [MERGED: vwap-monitor, ema-calculator, macd-indicator]
 
 ### entry-logic-bull-flag
@@ -456,7 +454,7 @@
   - Monitor order flow for large seller alerts
   - Track Time & Sales for volume spikes
   - Trigger exits on red burst patterns
-  - [BLOCKED: market-data-module]
+  - [UNBLOCKED: market-data-module shipped (2025-10-08)]
   - [CLARIFY: Does Robinhood API provide Level 2 data?]
 
 ### backtesting-engine
@@ -469,7 +467,7 @@
   - Replay historical data against strategy rules
   - Calculate win rate and R:R over 20+ trades
   - Performance analytics and reporting
-  - [BLOCKED: market-data-module, technical-indicators]
+  - [BLOCKED: technical-indicators; UNBLOCKED: market-data-module shipped (2025-10-08)]
   - [PIGGYBACK: extends backtest/ structure]
 
 ### position-scaling-logic

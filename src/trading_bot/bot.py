@@ -26,6 +26,9 @@ from src.trading_bot.auth import RobinhoodAuth, AuthenticationError
 # T030-T034: Structured logging integration
 from src.trading_bot.logging import StructuredTradeLogger, TradeRecord
 
+# T060: Session health monitoring integration
+from src.trading_bot.health import HealthCheckResult, SessionHealthMonitor
+
 logger = logging.getLogger(__name__)
 
 
@@ -134,9 +137,12 @@ class TradingBot:
 
         # T038: Initialize authentication if config provided
         self.auth: Optional[RobinhoodAuth] = None
+        self.health_monitor: Optional[SessionHealthMonitor] = None
         if config is not None:
             self.auth = RobinhoodAuth(config)
             logger.info("Authentication module initialized")
+            self.health_monitor = SessionHealthMonitor(auth=self.auth)
+            logger.info("Session health monitor initialized")
 
         # T044: Initialize account data module if authenticated
         self.account_data: Optional[Any] = None
@@ -152,13 +158,16 @@ class TradingBot:
         )
 
         # NEW: Initialize SafetyChecks module for comprehensive pre-trade validation
-        from unittest.mock import Mock
-        # Create mock config with safety parameters
-        safety_config = Mock()
-        safety_config.max_daily_loss_pct = max_daily_loss_pct
-        safety_config.max_consecutive_losses = max_consecutive_losses
-        safety_config.max_position_pct = max_position_pct
-        safety_config.trading_timezone = trading_timezone
+        if config is not None:
+            safety_config = config
+        else:
+            from unittest.mock import Mock
+
+            safety_config = Mock()
+            safety_config.max_daily_loss_pct = max_daily_loss_pct
+            safety_config.max_consecutive_losses = max_consecutive_losses
+            safety_config.max_position_pct = max_position_pct
+            safety_config.trading_timezone = trading_timezone
 
         # T052: Pass account_data to SafetyChecks for real buying power
         self.safety_checks = SafetyChecks(safety_config, account_data=self.account_data)
@@ -206,6 +215,28 @@ class TradingBot:
                 logger.info("Authenticating with Robinhood...")
                 self.auth.login()
                 logger.info("Authentication successful")
+
+                if self.health_monitor is not None:
+                    startup_result = self.health_monitor.check_health(context="startup")
+                    if startup_result.success:
+                        self.health_monitor.start_periodic_checks()
+                        logger.info("Session health monitor started (5m interval)")
+                    else:
+                        reason = startup_result.error_message or "unknown error"
+                        allow_degraded = self.paper_trading or "library not available" in reason.lower()
+                        if allow_degraded:
+                            logger.warning(
+                                "Session health monitor disabled (reason: %s). Manual checks recommended before live trading.",
+                                reason,
+                            )
+                            self.health_monitor.stop_periodic_checks()
+                            self.health_monitor = None
+                        else:
+                            logger.critical(
+                                "Startup health check failed: %s",
+                                reason,
+                            )
+                            raise RuntimeError("Session health verification failed during startup")
             except AuthenticationError as e:
                 logger.error(f"Authentication failed: {e}")
                 raise RuntimeError(
@@ -222,6 +253,10 @@ class TradingBot:
         T040: Logs out of Robinhood session on shutdown.
         """
         self.is_running = False
+
+        if self.health_monitor is not None:
+            self.health_monitor.stop_periodic_checks()
+            logger.info("Session health monitor stopped")
 
         # T040: Logout on bot shutdown
         if self.auth is not None:
@@ -302,6 +337,20 @@ class TradingBot:
         if not self.is_running:
             logger.warning(f"Trade rejected: Bot not running | {symbol} {action} {shares}")
             return
+
+        if self.health_monitor is not None:
+            health_result: HealthCheckResult = self.health_monitor.check_health(context="pre-trade")
+            if not health_result.success:
+                logger.error(
+                    "Trade blocked due to failed session health check | "
+                    "Symbol=%s | Action=%s | Reason=%s",
+                    symbol,
+                    action,
+                    health_result.error_message or "Health check failure",
+                )
+                self.safety_checks.trigger_circuit_breaker("Session health verification failed")
+                self.is_running = False
+                return
 
         # NEW: Comprehensive pre-trade safety validation
         safety_result = self.safety_checks.validate_trade(

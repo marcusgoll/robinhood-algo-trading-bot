@@ -285,6 +285,7 @@ class StartupOrchestrator:
 
         try:
             bot = TradingBot(
+                config=self.config,
                 paper_trading=self.config.paper_trading,
                 max_position_pct=self.config.max_position_pct,
                 max_daily_loss_pct=self.config.max_daily_loss_pct,
@@ -295,7 +296,8 @@ class StartupOrchestrator:
             step.status = "success"
             self.component_states["trading_bot"] = {
                 "status": "ready",
-                "is_running": False
+                "is_running": False,
+                "health_monitor": "ready" if bot.health_monitor else "disabled"
             }
             return bot
         except Exception as e:
@@ -417,6 +419,12 @@ class StartupOrchestrator:
         phase_config = self.config
         print(f"Max Trades Today: {phase_config.max_trades_per_day}")
         print(f"Circuit Breaker: Active (Max Loss: {self.config.max_daily_loss_pct}%, Max Consecutive: {self.config.max_consecutive_losses})")
+
+        bot = getattr(self, "bot", None)
+        if bot is not None and getattr(bot, "health_monitor", None) is not None:
+            print("Session Health Monitor: READY (5m interval, auto re-auth if needed)")
+        else:
+            print("Session Health Monitor: DISABLED (run manual checks before trading)")
         print()
 
         if self.dry_run:
@@ -444,6 +452,12 @@ class StartupOrchestrator:
                     raise RuntimeError(f"Component {component} not initialized")
                 if self.component_states[component].get("status") != "ready":
                     raise RuntimeError(f"Component {component} not ready")
+
+            trading_bot_state = self.component_states.get("trading_bot", {})
+            if trading_bot_state.get("health_monitor") != "ready":
+                self.warnings.append(
+                    "Session health monitor inactive — periodic checks will not run (paper/offline mode)"
+                )
 
             step.status = "success"
         except Exception as e:

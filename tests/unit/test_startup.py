@@ -119,7 +119,7 @@ class TestStartupOrchestrator:
         """Test load_config successfully loads configuration."""
         # Given: Valid .env and config.json files
         # Monkeypatch to use test environment
-        monkeypatch.setenv("ROBINHOOD_USERNAME", "test_user")
+        monkeypatch.setenv("ROBINHOOD_USERNAME", "test_user@example.com")
         monkeypatch.setenv("ROBINHOOD_PASSWORD", "test_pass")
 
         # When: Load config
@@ -128,7 +128,7 @@ class TestStartupOrchestrator:
 
         # Then: Config loaded successfully
         assert config is not None
-        assert config.robinhood_username == "test_user"
+        assert config.robinhood_username == "test_user@example.com"
         assert config.robinhood_password == "test_pass"
         assert len(orchestrator.steps) == 1
         assert orchestrator.steps[0].name == "Loading configuration"
@@ -248,6 +248,7 @@ class TestStartupOrchestrator:
         assert "Current Phase: experience" in captured.out
         assert "Max Trades Today: 999" in captured.out
         assert "Circuit Breaker: Active" in captured.out
+        assert "Session Health Monitor:" in captured.out
         assert "Max Loss: 3.0%" in captured.out
         assert "Max Consecutive: 3" in captured.out
         assert "[DRY RUN] Exiting without starting trading loop" in captured.out
@@ -301,7 +302,7 @@ class TestStartupOrchestrator:
         - Then: Assert result.status == "ready", len(result.steps) >= 6, all steps success
         """
         # Given: Valid .env and config.json files
-        monkeypatch.setenv("ROBINHOOD_USERNAME", "test_user")
+        monkeypatch.setenv("ROBINHOOD_USERNAME", "test_user@example.com")
         monkeypatch.setenv("ROBINHOOD_PASSWORD", "test_pass")
         monkeypatch.setenv("ROBINHOOD_MFA_CODE", "123456")
 

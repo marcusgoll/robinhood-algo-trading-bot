@@ -8,8 +8,13 @@ Tests Constitution v1.0.0 requirements:
 """
 
 from decimal import Decimal
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
+
 import pytest
 from src.trading_bot.bot import TradingBot, CircuitBreaker
+from src.trading_bot.health import HealthCheckResult
+from src.trading_bot.safety_checks import SafetyResult
 
 
 class TestCircuitBreaker:
@@ -165,3 +170,82 @@ class TestTradingBot:
 
         assert "AAPL" in bot.positions
         assert bot.positions["AAPL"]["stop_loss"] == Decimal("145")
+
+    @patch("src.trading_bot.bot.SessionHealthMonitor")
+    @patch("src.trading_bot.bot.RobinhoodAuth")
+    def test_bot_initializes_health_monitor_with_config(self, mock_auth: MagicMock, mock_monitor: MagicMock, mock_config) -> None:
+        """Bot should create session health monitor when config provided."""
+        bot = TradingBot(config=mock_config)
+
+        mock_auth.assert_called_once_with(mock_config)
+        mock_monitor.assert_called_once_with(auth=mock_auth.return_value)
+        assert bot.health_monitor is mock_monitor.return_value
+
+    def test_start_starts_health_monitor(self) -> None:
+        """start() should authenticate and begin periodic health checks."""
+        bot = TradingBot()
+        bot.auth = MagicMock()
+        bot.circuit_breaker.is_tripped = False
+        bot.health_monitor = MagicMock()
+        bot.health_monitor.check_health.return_value = HealthCheckResult(
+            success=True,
+            timestamp=datetime.now(UTC),
+            latency_ms=10,
+        )
+
+        bot.start()
+
+        bot.auth.login.assert_called_once()
+        bot.health_monitor.check_health.assert_called_once()
+        bot.health_monitor.start_periodic_checks.assert_called_once()
+        assert bot.is_running is True
+
+    def test_execute_trade_calls_health_monitor(self) -> None:
+        """Health monitor should gate trades before validation."""
+        bot = TradingBot()
+        bot.health_monitor = MagicMock()
+        bot.health_monitor.check_health.return_value = HealthCheckResult(
+            success=True,
+            timestamp=datetime.now(UTC),
+            latency_ms=5,
+        )
+        bot.safety_checks = MagicMock()
+        bot.safety_checks.validate_trade.return_value = SafetyResult(is_safe=True)
+        bot.is_running = True
+
+        bot.execute_trade(
+            symbol="AAPL",
+            action="buy",
+            shares=1,
+            price=Decimal("150"),
+            reason="Test trade",
+        )
+
+        bot.health_monitor.check_health.assert_called_once()
+        bot.safety_checks.validate_trade.assert_called_once()
+
+    def test_execute_trade_blocks_when_health_fails(self) -> None:
+        """Trade execution should halt when session health fails."""
+        bot = TradingBot()
+        bot.health_monitor = MagicMock()
+        bot.health_monitor.check_health.return_value = HealthCheckResult(
+            success=False,
+            timestamp=datetime.now(UTC),
+            latency_ms=25,
+            error_message="Session expired",
+            reauth_triggered=True,
+        )
+        bot.safety_checks = MagicMock()
+        bot.is_running = True
+
+        bot.execute_trade(
+            symbol="AAPL",
+            action="buy",
+            shares=1,
+            price=Decimal("150"),
+            reason="Test trade",
+        )
+
+        bot.safety_checks.validate_trade.assert_not_called()
+        bot.safety_checks.trigger_circuit_breaker.assert_called_once()
+        assert bot.is_running is False

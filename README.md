@@ -338,6 +338,45 @@ The bot will **refuse to start** if validation fails (§Safety_First).
 
 ---
 
+## 🩺 Session Health Monitoring
+
+**SessionHealthMonitor (Constitution §Safety_First & §Audit_Everything)** keeps the Robinhood session alive and blocks trading if authentication fails.
+
+- Runs automatically during startup and every 5 minutes while the bot is active
+- Performs lightweight account probes with exponential backoff + automatic re-authentication
+- Emits structured JSONL telemetry to `logs/health/health-checks.jsonl`
+- Triggers the safety circuit breaker and halts trading if health verification fails
+
+### Manual Health Check
+
+```python
+from src.trading_bot.health import SessionHealthMonitor
+from src.trading_bot.auth import RobinhoodAuth
+from src.trading_bot.config import Config
+
+config = Config.from_env_and_json()
+auth = RobinhoodAuth(config)
+monitor = SessionHealthMonitor(auth=auth)
+
+# Run on-demand check (e.g., before manual trades)
+result = monitor.check_health(context="manual")
+print(result.success, result.latency_ms, result.error_message)
+```
+
+### Inspecting Health Logs
+
+```bash
+# Tail structured logs (JSONL)
+tail -f logs/health/health-checks.jsonl | jq
+
+# Count reauthentication events
+rg '"event":"health_check.reauth_' logs/health/health-checks.jsonl | wc -l
+```
+
+If a health check fails and re-authentication does not recover the session, the circuit breaker is tripped—restart the bot after resolving credentials.
+
+---
+
 ## 🔄 Trading Mode (Paper vs Live)
 
 **Mode Switcher (Constitution §Safety_First)**:

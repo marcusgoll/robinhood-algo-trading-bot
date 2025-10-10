@@ -70,7 +70,7 @@ def mock_config() -> Mock:
     config = Mock(spec=Config)
 
     # Robinhood credentials
-    config.robinhood_username = "test_user"
+    config.robinhood_username = "test_user@example.com"
     config.robinhood_password = "test_pass"
     config.robinhood_mfa_secret = None
     config.robinhood_device_token = None
