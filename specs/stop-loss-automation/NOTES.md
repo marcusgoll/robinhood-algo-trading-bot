@@ -159,6 +159,7 @@ Cross-artifact analysis: Validated 100% requirement coverage (14 functional, 8 n
 ✅ T037 [P]: Integrate RiskManager into TradingBot.execute_trade (live mode) (commit: b5b7502)
 ✅ T038 [RED]: Write test for retry on transient broker failures (commit: d96e43f)
 ✅ T039 [GREEN→T038]: Apply @retry_on_transient_failure decorator (commit: 52b3163)
+✅ T040 [P]: Add circuit breaker integration for stop placement failures (commit: 54c7914)
 
 ## Last Updated
-2025-10-16T09:45:00-05:00
+2025-10-16T10:30:00-05:00
