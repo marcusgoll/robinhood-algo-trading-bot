@@ -160,6 +160,102 @@ Cross-artifact analysis: Validated 100% requirement coverage (14 functional, 8 n
 ✅ T038 [RED]: Write test for retry on transient broker failures (commit: d96e43f)
 ✅ T039 [GREEN→T038]: Apply @retry_on_transient_failure decorator (commit: 52b3163)
 ✅ T040 [P]: Add circuit breaker integration for stop placement failures (commit: 54c7914)
+✅ T042 [P]: Document rollback procedure in NOTES.md
+
+## Rollback Runbook
+
+**⚠️ WARNING: Before rolling back, manually close any live positions with active stop-loss or target orders via the Robinhood UI. Automated rollback WILL NOT cancel open orders or close positions.**
+
+### Rollback Steps
+
+Execute in order when reverting stop-loss automation:
+
+1. **Stop the trading bot**
+   ```bash
+   systemctl stop trading-bot
+   ```
+
+2. **Manually close all live positions**
+   - Log in to Robinhood UI
+   - Review all open positions with active stop-loss or target orders
+   - Cancel stop-loss orders via Orders & History → Cancel Order
+   - Cancel target limit sell orders via Orders & History → Cancel Order
+   - Close positions at market if needed (evaluate exit strategy first)
+   - Document closed positions and final P&L in trade journal
+
+3. **Revert to previous commit**
+   ```bash
+   git log --oneline -5  # Identify commit before stop-loss automation
+   git revert HEAD~N     # Revert N commits back (adjust based on log)
+   ```
+
+4. **Remove risk_management configuration**
+   - Edit `config.json`
+   - Delete the entire `risk_management` section
+   - Validate JSON syntax: `python -m json.tool config.json`
+
+5. **Restart bot in paper trading mode**
+   - Edit `config.json`
+   - Set `paper_trading: true`
+   - Restart: `systemctl start trading-bot`
+
+6. **Verify paper trading active**
+   ```bash
+   tail -f logs/trading-bot.log | grep "paper_trading"
+   # Expected: "paper_trading mode ENABLED"
+   ```
+
+### Rollback Verification Checklist
+
+After rollback, verify:
+
+- [ ] Trading bot running: `systemctl status trading-bot` shows `active (running)`
+- [ ] Paper trading enabled: `grep "paper_trading.*true" config.json` returns match
+- [ ] No risk_management section: `grep "risk_management" config.json` returns empty
+- [ ] Logs confirm paper mode: `tail -20 logs/trading-bot.log` shows "paper_trading mode ENABLED"
+- [ ] No open positions: Check Robinhood UI → Holdings (should be empty or pre-rollback state)
+- [ ] No pending orders: Check Robinhood UI → Orders & History (should be empty)
+- [ ] No risk-management log files actively written: `ls -lt logs/risk-management.jsonl` (file may exist but no new entries)
+
+### Post-Rollback Actions
+
+1. **Document rollback reason**
+   - Update `specs/stop-loss-automation/NOTES.md` with:
+     - Timestamp of rollback
+     - Reason for rollback (bug description, performance issue, etc.)
+     - Positions affected (symbol, entry, stop, target, exit, P&L)
+
+2. **Review error logs**
+   - Check `logs/trading-bot.log` for errors leading to rollback
+   - Save relevant error stack traces to `specs/stop-loss-automation/error-log.md`
+
+3. **Notify stakeholders**
+   - Alert team via communication channel
+   - Include: rollback reason, current bot status (paper trading), next steps
+
+### Rollback Risk Assessment
+
+**Low Risk:**
+- No open positions at rollback time
+- Bot already in paper trading mode
+- Config changes only (no code deployed)
+
+**Medium Risk:**
+- 1-3 open positions with active stop/target orders
+- Live trading mode active
+- Positions can be manually closed within 5 minutes
+
+**High Risk:**
+- >3 open positions with complex order structures
+- Market hours with high volatility
+- Positions require immediate attention (approaching stop-loss levels)
+
+**Emergency Rollback Protocol (High Risk):**
+1. Immediately stop bot: `systemctl stop trading-bot`
+2. Screenshot all open positions and orders (Robinhood UI)
+3. Close positions at market (accept slippage)
+4. Proceed with standard rollback steps
+5. Post-mortem review within 24 hours
 
 ## Last Updated
 2025-10-16T10:30:00-05:00
