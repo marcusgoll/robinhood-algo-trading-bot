@@ -18,6 +18,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from .color_scheme import ColorScheme
 from .models import (
     AccountStatus,
     DashboardSnapshot,
@@ -90,7 +91,7 @@ class DisplayRenderer:
             account: AccountStatus dataclass.
             snapshot: DashboardSnapshot for context (market status, staleness).
         """
-        market_color = "green" if snapshot.market_status == "OPEN" else "yellow"
+        market_color = ColorScheme.MARKET_OPEN if snapshot.market_status == "OPEN" else ColorScheme.MARKET_CLOSED
         data_age = int(snapshot.data_age_seconds)
 
         content = Text()
@@ -102,25 +103,25 @@ class DisplayRenderer:
             f"Last Updated:    {self._format_datetime(account.last_updated)} "
             f"(age {data_age}s)\n"
         )
-        content.append(f"Market Status:   ", style="bold")
-        content.append(f"{snapshot.market_status}\n", style=market_color + " bold")
+        content.append(f"Market Status:   ", style=ColorScheme.BOLD)
+        content.append(f"{snapshot.market_status}\n", style=market_color + " " + ColorScheme.BOLD)
 
         if snapshot.is_data_stale:
             content.append(
                 f"\n⚠️  Data may be stale (>{self._format_seconds(snapshot.data_age_seconds)})",
-                style="yellow",
+                style=ColorScheme.WARNING,
             )
 
         return Panel(
             content,
             title="Account Status",
-            border_style="blue",
+            border_style=ColorScheme.BLUE,
         )
 
     def render_positions_table(self, positions: Iterable[PositionDisplay]) -> Table:
         """Render positions table with P&L color coding."""
-        table = Table(title="Open Positions", show_header=True, header_style="bold cyan")
-        table.add_column("Symbol", style="white", no_wrap=True)
+        table = Table(title="Open Positions", show_header=True, header_style=ColorScheme.BOLD_CYAN)
+        table.add_column("Symbol", style=ColorScheme.WHITE, no_wrap=True)
         table.add_column("Qty", justify="right")
         table.add_column("Entry", justify="right")
         table.add_column("Current", justify="right")
@@ -252,7 +253,7 @@ class DisplayRenderer:
 
         content.append(f"Session Count: {metrics.session_count}")
 
-        return Panel(content, title="Performance Metrics", border_style="magenta")
+        return Panel(content, title="Performance Metrics", border_style=ColorScheme.MAGENTA)
 
     # ------------------------------------------------------------------ #
     # Helpers
@@ -261,16 +262,16 @@ class DisplayRenderer:
         """Render dashboard header banner."""
         timestamp = self._format_datetime(snapshot.generated_at)
         header_text = Text.assemble(
-            ("Trading Dashboard", "bold white"),
-            ("  •  ", "dim"),
-            (timestamp, "white"),
-            ("  •  ", "dim"),
-            (f"Market {snapshot.market_status}", "green bold" if snapshot.market_status == "OPEN" else "yellow bold"),
+            ("Trading Dashboard", ColorScheme.BOLD_WHITE),
+            ("  •  ", ColorScheme.DIM),
+            (timestamp, ColorScheme.WHITE),
+            ("  •  ", ColorScheme.DIM),
+            (f"Market {snapshot.market_status}", ColorScheme.BOLD_GREEN if snapshot.market_status == "OPEN" else ColorScheme.BOLD_YELLOW),
         )
 
         return Panel(
             header_text,
-            style="bold white on blue",
+            style=ColorScheme.BOLD_WHITE_ON_BLUE,
         )
 
     def _render_warnings(self, warnings: list[str]) -> Panel | None:
@@ -280,12 +281,12 @@ class DisplayRenderer:
 
         content = Text()
         for warning in warnings:
-            content.append(f"• {warning}\n", style="yellow")
+            content.append(f"• {warning}\n", style=ColorScheme.WARNING)
 
         return Panel(
             content,
             title="Warnings",
-            border_style="yellow",
+            border_style=ColorScheme.WARNING,
         )
 
     def _metric_with_target(
@@ -304,7 +305,7 @@ class DisplayRenderer:
 
         if target is not None and meets is not None:
             indicator = "✓" if meets else "✗"
-            indicator_color = "green" if meets else "red"
+            indicator_color = ColorScheme.TARGET_MET if meets else ColorScheme.TARGET_MISSED
             line.append(" ")
             line.append(indicator, style=indicator_color)
             line.append(f" (target: {target})")
@@ -317,19 +318,19 @@ class DisplayRenderer:
         """Determine color for P&L values."""
         numeric_value = float(value)
         if numeric_value > 0:
-            return "green"
+            return ColorScheme.PROFIT
         if numeric_value < 0:
-            return "red"
-        return "yellow"
+            return ColorScheme.LOSS
+        return ColorScheme.NEUTRAL
 
     @staticmethod
     def _streak_color(streak_type: str) -> str:
         """Color used for streak indicator."""
         if streak_type == "WIN":
-            return "green"
+            return ColorScheme.WIN_STREAK
         if streak_type == "LOSS":
-            return "red"
-        return "yellow"
+            return ColorScheme.LOSS_STREAK
+        return ColorScheme.NO_STREAK
 
     @staticmethod
     def _format_currency(value: Decimal) -> str:
