@@ -388,6 +388,16 @@ After any rollback, document in error-log.md:
 - **Expected**: RuleActivation with action="hold" (no add)
 - **Commit**: test(red): T009 write failing scale-in max limit test
 
+### T010 [RED]: Scale-in portfolio risk limit test
+✅ T010 [RED]: Scale-in blocked by portfolio risk limit (failing as expected)
+- **File**: tests/risk_management/test_trade_management_rules.py
+- **Test**: test_scale_in_blocked_by_portfolio_risk_limit()
+- **Status**: Test written and failing as expected (ModuleNotFoundError)
+- **Scenario**: Portfolio at 1.8% risk, scale-in would push to 2.4%, exceeds 2% limit
+- **Expected**: RuleActivation with action="hold" (blocked by risk limit)
+- **Actual**: ModuleNotFoundError - evaluate_scale_in_rule() doesn't accept portfolio_risk_pct parameter yet
+- **Commit**: test(red): T010 write failing scale-in portfolio risk test
+
 ### T013 [RED]: Average entry price for partial fills test
 ✅ T013 [RED]: Average entry price test (failing as expected)
 - **File**: tests/risk_management/test_stop_adjuster_atr.py
