@@ -55,5 +55,3 @@ class TestMarkdownExport:
         assert "|" in markdown  # Table formatting
         assert "Win Rate" in markdown
         assert "66.67%" in markdown
-
-        pytest.fail("T014: RED phase - test should fail until GREEN implementation")

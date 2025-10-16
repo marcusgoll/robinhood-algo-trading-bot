@@ -68,8 +68,6 @@ class TestSchemaValidation:
         # Validate
         jsonschema.validate(instance=json_data, schema=schema)
 
-        pytest.fail("T015: RED phase - test should fail until GREEN implementation")
-
     def test_alert_json_validates_against_schema(self):
         """
         Generated alert JSON validates against schema.
@@ -110,5 +108,3 @@ class TestSchemaValidation:
 
         # Validate
         jsonschema.validate(instance=json_data, schema=schema)
-
-        pytest.fail("T015: RED phase - test should fail until GREEN implementation")
