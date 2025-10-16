@@ -630,12 +630,16 @@ def test_cancel_entry_on_stop_placement_failure() -> None:
         submitted_at=datetime.now(UTC)
     )
 
-    # 2. Stop order placement fails (raises StopPlacementError on second call)
+    # 2. Stop order placement fails (raises StopPlacementError on all retry attempts)
+    # With T039 retry decorator: max_attempts=3 means 4 total attempts (initial + 3 retries)
+    # Configure to fail on all attempts so entry gets cancelled
+    error_message = "Broker timeout: Failed to place stop-loss order for TSLA at $248.00"
     mock_order_manager.place_limit_order.side_effect = [
-        entry_envelope,  # First call succeeds
-        StopPlacementError(
-            "Broker timeout: Failed to place stop-loss order for TSLA at $248.00"
-        )  # Second call fails
+        entry_envelope,  # First call: entry succeeds
+        StopPlacementError(error_message),  # Second call: stop attempt 1 fails
+        StopPlacementError(error_message),  # Third call: stop retry 1 fails
+        StopPlacementError(error_message),  # Fourth call: stop retry 2 fails
+        StopPlacementError(error_message),  # Fifth call: stop retry 3 fails (exhausted)
     ]
 
     # 3. Cancel order should succeed when called
@@ -662,9 +666,10 @@ def test_cancel_entry_on_stop_placement_failure() -> None:
     # Assert guardrail behavior (once implemented in T030):
     # These assertions document expected behavior
 
-    # 1. Entry order was placed first
-    assert mock_order_manager.place_limit_order.call_count == 2, \
-        "Expected 2 calls to place_limit_order (entry succeeded, stop failed)"
+    # 1. Entry order was placed first, then stop retried 4 times (1 initial + 3 retries)
+    # With T039 retry logic: 1 entry + 4 stop attempts (1 initial + 3 retries) = 5 total
+    assert mock_order_manager.place_limit_order.call_count == 5, \
+        f"Expected 5 calls to place_limit_order (1 entry + 4 stop attempts), got {mock_order_manager.place_limit_order.call_count}"
 
     # 2. Entry order was cancelled as guardrail cleanup
     mock_order_manager.cancel_order.assert_called_once_with(

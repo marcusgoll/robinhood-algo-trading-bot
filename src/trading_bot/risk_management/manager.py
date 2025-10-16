@@ -11,6 +11,10 @@ from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
+from src.trading_bot.error_handling import with_retry, RetryPolicy
+from src.trading_bot.error_handling.circuit_breaker import CircuitBreaker
+from src.trading_bot.error_handling.exceptions import CircuitBreakerTripped
+
 from .calculator import calculate_position_plan
 from .config import RiskManagementConfig
 from .models import PositionPlan, RiskManagementEnvelope
@@ -58,6 +62,16 @@ class RiskManager:
         self.pullback_analyzer = pullback_analyzer or PullbackAnalyzer(
             pullback_threshold_pct=5.0
         )
+
+        # Circuit breaker for stop placement failures (T040)
+        # Per spec.md guardrail: Trip if failure rate >2% (threshold=2 failures per 100 attempts)
+        # Window: 100 attempts (tracks last 100 stop placement attempts)
+        self._stop_placement_circuit_breaker = CircuitBreaker(
+            threshold=2,  # 2 failures
+            window_seconds=100  # Per 100 attempts (reused as attempt counter)
+        )
+        self._stop_placement_attempts = 0
+        self._stop_placement_failures = 0
 
     def create_position_plan(
         self,
@@ -180,6 +194,96 @@ class RiskManager:
             position_plan=position_plan,
         )
 
+    def _track_stop_placement_failure(self) -> None:
+        """Track stop placement failure and check circuit breaker threshold.
+
+        Increments failure counter and checks if failure rate exceeds 2% threshold.
+        Per spec.md guardrail: "If stop-loss orders fail to place >2% of the time,
+        trigger circuit breaker and revert to paper trading."
+
+        Raises:
+            CircuitBreakerTripped: If failure rate exceeds 2% (>2 failures per 100 attempts)
+
+        From: tasks.md T040
+        """
+        # Increment counters
+        self._stop_placement_attempts += 1
+        self._stop_placement_failures += 1
+
+        # Record failure in circuit breaker
+        self._stop_placement_circuit_breaker.record_failure()
+
+        # Calculate failure rate
+        if self._stop_placement_attempts >= 100:
+            failure_rate = (self._stop_placement_failures / self._stop_placement_attempts) * 100
+
+            # Check if failure rate exceeds 2% threshold
+            if failure_rate > 2.0:
+                raise CircuitBreakerTripped(
+                    f"Circuit breaker tripped: stop placement failure rate "
+                    f"({failure_rate:.2f}%) exceeded 2% threshold. "
+                    f"Failures: {self._stop_placement_failures}/{self._stop_placement_attempts} attempts. "
+                    f"Manual intervention required before resuming automated trading."
+                )
+
+    def _track_stop_placement_success(self) -> None:
+        """Track successful stop placement and reset circuit breaker.
+
+        Increments attempt counter and resets circuit breaker failure tracking
+        on successful placement. This implements sliding window behavior where
+        successes clear the failure window.
+
+        From: tasks.md T040
+        """
+        # Increment attempt counter
+        self._stop_placement_attempts += 1
+
+        # Record success in circuit breaker (clears failure window)
+        self._stop_placement_circuit_breaker.record_success()
+
+    @with_retry(policy=RetryPolicy(max_attempts=3, base_delay=1.0))
+    def _place_stop_and_target_orders(
+        self, symbol: str, plan: PositionPlan
+    ) -> tuple[Any, Any]:
+        """Place stop and target orders with retry logic for transient failures.
+
+        This method is decorated with @with_retry to handle transient broker failures
+        (network timeouts, 5xx errors) per NFR-007. Retry policy: 3 attempts with
+        exponential backoff (1s, 2s, 4s).
+
+        Args:
+            symbol: Trading symbol
+            plan: Position plan with stop/target prices and quantity
+
+        Returns:
+            Tuple of (stop_envelope, target_envelope)
+
+        Raises:
+            RetriableError: Network/broker transient failures (will trigger retry)
+            StopPlacementError: Permanent stop placement failure (after retries exhausted)
+        """
+        from src.trading_bot.order_management.models import OrderRequest
+
+        # Submit stop order
+        stop_request = OrderRequest(
+            symbol=symbol,
+            side="SELL",
+            quantity=plan.quantity,
+            reference_price=plan.stop_price,
+        )
+        stop_envelope = self.order_manager.place_limit_order(stop_request)
+
+        # Submit target order
+        target_request = OrderRequest(
+            symbol=symbol,
+            side="SELL",
+            quantity=plan.quantity,
+            reference_price=plan.target_price,
+        )
+        target_envelope = self.order_manager.place_limit_order(target_request)
+
+        return stop_envelope, target_envelope
+
     def place_trade_with_risk_management(
         self, plan: PositionPlan, symbol: str
     ) -> RiskManagementEnvelope:
@@ -195,6 +299,7 @@ class RiskManager:
         Raises:
             ValueError: If order_manager is not configured
             StopPlacementError: If stop order placement fails (after cancelling entry)
+            CircuitBreakerTripped: If stop placement failure rate exceeds 2%
         """
         from src.trading_bot.order_management.models import OrderRequest
         from .exceptions import StopPlacementError
@@ -214,25 +319,19 @@ class RiskManager:
         # Step 2: Submit stop and target orders with error handling guardrail
         # FR-003: If stop placement fails, cancel entry to avoid unprotected positions
         try:
-            # Submit stop order
-            stop_request = OrderRequest(
-                symbol=symbol,
-                side="SELL",
-                quantity=plan.quantity,
-                reference_price=plan.stop_price,
+            # Call helper method with retry logic
+            stop_envelope, target_envelope = self._place_stop_and_target_orders(
+                symbol=symbol, plan=plan
             )
-            stop_envelope = self.order_manager.place_limit_order(stop_request)
 
-            # Step 3: Submit target order
-            target_request = OrderRequest(
-                symbol=symbol,
-                side="SELL",
-                quantity=plan.quantity,
-                reference_price=plan.target_price,
-            )
-            target_envelope = self.order_manager.place_limit_order(target_request)
+            # Track successful stop placement (T040)
+            self._track_stop_placement_success()
 
         except Exception as e:
+            # Track stop placement failure (T040)
+            # This may raise CircuitBreakerTripped if failure rate exceeds 2%
+            self._track_stop_placement_failure()
+
             # Guardrail: Cancel entry order to prevent unprotected position
             # Per Constitution §Risk_Management: "Never enter a position without
             # predefined exit criteria"
@@ -241,11 +340,8 @@ class RiskManager:
             # TODO: Log error with correlation_id once logger is integrated (T026)
             # self.logger.log_error(correlation_id, e)
 
-            # Re-raise as StopPlacementError for caller handling
-            if isinstance(e, StopPlacementError):
-                raise
-            else:
-                raise StopPlacementError(f"Failed to place stop/target: {e}") from e
+            # Re-raise original exception to preserve error context
+            raise
 
         # Step 4: Create and return envelope with correlation_id for lifecycle tracking
         correlation_id = str(uuid.uuid4())
