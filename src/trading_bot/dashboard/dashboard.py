@@ -141,6 +141,8 @@ def run_dashboard_loop(
                 logger.warning("Session expired, attempting re-authentication...")
                 console.print("[yellow]Session expired - re-authenticating...[/yellow]")
                 try:
+                    # Logout first to clear stale pickle cache, then login fresh
+                    auth.logout()
                     auth.login()
                     logger.info("Re-authentication successful, retrying refresh")
                     console.print("[green]Re-authentication successful[/green]")
