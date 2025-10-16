@@ -26,7 +26,7 @@ class TestCacheIndex:
         index_path = tmp_path / "performance-index.json"
 
         # Initial empty index
-        index = load_index()
+        index = load_index(index_path)
         assert isinstance(index, dict)
 
         # Add entries
@@ -35,10 +35,8 @@ class TestCacheIndex:
 
         # Verify persistence
         assert index_path.exists()
-        loaded = load_index()
+        loaded = load_index(index_path)
         assert loaded["logs/trades/2025-10-15.jsonl"] == "abc123"
-
-        pytest.fail("T013: RED phase - test should fail until GREEN implementation")
 
     def test_needs_refresh_detects_changes(self, tmp_path):
         """
@@ -66,5 +64,3 @@ class TestCacheIndex:
         # Change file
         test_file.write_text('{"trade": "changed"}')
         assert needs_refresh(test_file, checksum) is True
-
-        pytest.fail("T013: RED phase - test should fail until GREEN implementation")
