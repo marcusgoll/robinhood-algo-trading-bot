@@ -126,6 +126,50 @@ class OrderManager:
         return envelope
 
     # --- Cancellation ---------------------------------------------------
+    def cancel_order(self, order_id: str) -> None:
+        """Cancel a specific order by ID.
+
+        Args:
+            order_id: The order ID to cancel
+
+        Raises:
+            OrderCancellationError: If cancellation fails
+        """
+        # Import the broker module
+        try:
+            import robin_stocks.robinhood as rh  # type: ignore
+        except ImportError:
+            raise OrderCancellationError("robin_stocks library is not available")
+
+        try:
+            rh.orders.cancel_stock_order(order_id)
+        except Exception as exc:
+            raise OrderCancellationError(f"Failed to cancel order {order_id}: {exc}") from exc
+
+        # Clean up tracking
+        symbol = self._tracked_orders.pop(order_id, None)
+        if symbol and self.safety_checks:
+            self.safety_checks.clear_pending_order(symbol)
+
+        # Log cancellation
+        append_order_log(
+            log_path=self.order_log_path,
+            session_id=self.session_id,
+            bot_version=self.bot_version,
+            config_hash=self.config_hash,
+            action="cancel",
+            strategy_name=None,
+            envelope=self._dummy_envelope(
+                order_id=order_id, symbol=symbol or "UNKNOWN"
+            ),
+            extra={"status": "cancelled"},
+        )
+
+        # Invalidate caches
+        if self.account_data:
+            self.account_data.invalidate_cache("buying_power")
+            self.account_data.invalidate_cache("positions")
+
     def cancel_all_open_orders(self) -> None:
         try:
             cancelled_ids = cancel_all_equity_orders()
@@ -153,6 +197,35 @@ class OrderManager:
         if cancelled_ids and self.account_data:
             self.account_data.invalidate_cache("buying_power")
             self.account_data.invalidate_cache("positions")
+
+    def get_order_status(self, order_id: str) -> dict[str, Any]:
+        """Get the current status of an order.
+
+        Args:
+            order_id: The order ID to check
+
+        Returns:
+            Dictionary with order status information including:
+            - order_id: str
+            - status: str (filled, open, cancelled, etc.)
+            - filled_quantity: int
+            - average_fill_price: Decimal | None
+
+        Raises:
+            OrderStatusError: If status check fails
+        """
+        try:
+            status = fetch_order_status(order_id)
+        except OrderStatusError:
+            raise
+
+        # Return as dictionary for compatibility
+        return {
+            "order_id": status.order_id,
+            "status": status.state,
+            "filled_quantity": status.filled_quantity,
+            "average_fill_price": status.average_fill_price,
+        }
 
     # --- Synchronization ------------------------------------------------
     def synchronize_open_orders(self) -> None:
