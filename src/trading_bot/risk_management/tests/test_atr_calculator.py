@@ -4,6 +4,7 @@ Tests for ATR (Average True Range) calculator.
 RED phase tests for TDD workflow - these tests should fail initially.
 """
 
+import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -223,4 +224,76 @@ def test_atr_stop_validation_max_distance():
     error_message = str(exc_info.value).lower()
     assert "10%" in error_message or "maximum" in error_message, (
         f"Error message should mention 10% maximum, got: {exc_info.value}"
+    )
+
+
+def test_atr_calculation_performance():
+    """
+    Test that ATR calculation meets performance target of <50ms per calculation.
+
+    Given:
+        - 50 PriceBar objects (simulating real market data volume)
+        - 100 repeated ATR calculations to measure average performance
+
+    When:
+        ATRCalculator.calculate() is called 100 times
+
+    Then:
+        - Average calculation time < 0.050 seconds (50ms)
+        - Ensures ATR calculation is fast enough for real-time trading decisions
+
+    Performance requirement (NFR-001):
+        - ATR calculation must complete in <50ms to avoid blocking trading logic
+        - Real-time stop adjustment requires fast volatility calculations
+        - Performance measured using time.perf_counter() for precise timing
+
+    From: specs/atr-stop-adjustment/tasks.md T013
+    Pattern: TDD RED phase - test MUST FAIL (ATRCalculator.calculate doesn't exist yet)
+    """
+    # Arrange: Create 50 PriceBar objects (realistic market data volume)
+    base_timestamp = datetime.now(UTC)
+    price_bars: list[PriceBar] = []
+
+    # Generate price bars with realistic AAPL-like volatility
+    base_price = Decimal("150.00")
+    for i in range(50):
+        # Simulate price movement with ±1% volatility
+        high = base_price + Decimal("1.50")
+        low = base_price - Decimal("1.50")
+        close = base_price + Decimal("0.50")
+
+        price_bars.append(
+            PriceBar(
+                symbol="AAPL",
+                timestamp=base_timestamp + timedelta(minutes=i),
+                open=base_price,
+                high=high,
+                low=low,
+                close=close,
+                volume=1000000,
+            )
+        )
+
+        # Increment price slightly for next bar
+        base_price += Decimal("0.25")
+
+    # Create ATRCalculator instance
+    calculator = ATRCalculator(period=14)
+
+    # Act: Measure time for 100 ATR calculations
+    start_time = time.perf_counter()
+
+    for _ in range(100):
+        calculator.calculate(price_bars)
+
+    end_time = time.perf_counter()
+
+    # Calculate average time per calculation
+    total_time = end_time - start_time
+    average_time = total_time / 100
+
+    # Assert: Average calculation time must be < 50ms (0.050 seconds)
+    assert average_time < 0.050, (
+        f"ATR calculation too slow: average {average_time:.4f}s per calculation "
+        f"(target: <0.050s). Total time for 100 calculations: {total_time:.4f}s"
     )
