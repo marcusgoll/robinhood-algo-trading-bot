@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from .config import RiskManagementConfig
 from .models import PositionPlan, RiskManagementEnvelope
+
+if TYPE_CHECKING:
+    from src.trading_bot.order_management.manager import OrderManager
 
 
 class AccountProvider(Protocol):
@@ -25,9 +28,19 @@ class AccountProvider(Protocol):
 class RiskManager:
     """Manages position sizing, stop-loss calculation, and target monitoring."""
 
-    def __init__(self, config: RiskManagementConfig | None = None) -> None:
-        """Initialize risk manager with configuration."""
-        self.config = config or RiskManagementConfig()
+    def __init__(
+        self,
+        config: RiskManagementConfig | None = None,
+        order_manager: OrderManager | None = None,
+    ) -> None:
+        """Initialize risk manager with configuration and optional order manager.
+
+        Args:
+            config: Risk management configuration
+            order_manager: Order management dependency for order placement
+        """
+        self.config = config or RiskManagementConfig.default()
+        self.order_manager = order_manager
 
     def create_position_plan(
         self,
@@ -83,4 +96,61 @@ class RiskManager:
             timestamp=datetime.now(),
             details=details or {},
             position_plan=position_plan,
+        )
+
+    def place_trade_with_risk_management(
+        self, plan: PositionPlan, symbol: str
+    ) -> RiskManagementEnvelope:
+        """Place entry, stop, and target orders for a position plan.
+
+        Args:
+            plan: Position plan with entry/stop/target prices and quantity
+            symbol: Trading symbol
+
+        Returns:
+            RiskManagementEnvelope with order IDs and status
+
+        Raises:
+            ValueError: If order_manager is not configured
+            StopPlacementError: If stop order placement fails (after cancelling entry)
+        """
+        from src.trading_bot.order_management.models import OrderRequest
+
+        if self.order_manager is None:
+            raise ValueError("OrderManager not configured")
+
+        # Step 1: Submit entry order
+        entry_request = OrderRequest(
+            symbol=symbol,
+            side="BUY",
+            quantity=plan.quantity,
+            reference_price=plan.entry_price,
+        )
+        entry_envelope = self.order_manager.place_limit_order(entry_request)
+
+        # Step 2: Submit stop order
+        stop_request = OrderRequest(
+            symbol=symbol,
+            side="SELL",
+            quantity=plan.quantity,
+            reference_price=plan.stop_price,
+        )
+        stop_envelope = self.order_manager.place_limit_order(stop_request)
+
+        # Step 3: Submit target order
+        target_request = OrderRequest(
+            symbol=symbol,
+            side="SELL",
+            quantity=plan.quantity,
+            reference_price=plan.target_price,
+        )
+        target_envelope = self.order_manager.place_limit_order(target_request)
+
+        # Step 4: Create and return envelope
+        return RiskManagementEnvelope(
+            position_plan=plan,
+            entry_order_id=entry_envelope.order_id,
+            stop_order_id=stop_envelope.order_id,
+            target_order_id=target_envelope.order_id,
+            status="pending",
         )
