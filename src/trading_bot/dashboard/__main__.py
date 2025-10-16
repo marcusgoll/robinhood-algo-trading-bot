@@ -35,6 +35,7 @@ def main() -> int:
         run_dashboard(
             account_data=account_data,
             trade_helper=trade_helper,
+            auth=auth,  # Pass auth for re-authentication on session expiry
             console=console,
         )
 

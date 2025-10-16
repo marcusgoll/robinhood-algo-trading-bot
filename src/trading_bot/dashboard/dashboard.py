@@ -93,6 +93,7 @@ def run_dashboard_loop(
     *,
     refresh_interval: float = REFRESH_INTERVAL_SECONDS,
     targets: DashboardTargets | None = None,
+    auth = None,  # RobinhoodAuth instance for re-authentication
     console: Optional[Console] = None,
 ) -> None:
     """Run live dashboard with simple command controls."""
@@ -134,8 +135,30 @@ def run_dashboard_loop(
                 warnings=len(snapshot.warnings),
             )
         except Exception as exc:  # pragma: no cover - runtime resilience
-            logger.error("Dashboard refresh failed: %s", exc, exc_info=True)
-            console.print(f"[red]Error refreshing dashboard: {exc}[/red]")
+            # Check if this is a session expiry error
+            error_msg = str(exc).lower()
+            if "can only be called when logged in" in error_msg and auth is not None:
+                logger.warning("Session expired, attempting re-authentication...")
+                console.print("[yellow]Session expired - re-authenticating...[/yellow]")
+                try:
+                    auth.login()
+                    logger.info("Re-authentication successful, retrying refresh")
+                    console.print("[green]Re-authentication successful[/green]")
+                    # Retry the refresh after re-authentication
+                    new_snapshot = data_provider.get_snapshot(targets)
+                    layout = renderer.render_full_dashboard(new_snapshot)
+                    live.update(layout)
+                    snapshot = new_snapshot
+                    last_refresh = time.monotonic()
+                    force_refresh = False
+                    log_dashboard_event("dashboard.reauth_success")
+                except Exception as reauth_exc:
+                    logger.error("Re-authentication failed: %s", reauth_exc, exc_info=True)
+                    console.print(f"[red]Re-authentication failed: {reauth_exc}[/red]")
+                    log_dashboard_event("dashboard.reauth_failed", error=str(reauth_exc))
+            else:
+                logger.error("Dashboard refresh failed: %s", exc, exc_info=True)
+                console.print(f"[red]Error refreshing dashboard: {exc}[/red]")
 
     def export_snapshot() -> None:
         if snapshot is None:
@@ -204,6 +227,7 @@ def main(
     account_data: AccountData,
     trade_helper: TradeQueryHelper,
     *,
+    auth = None,  # RobinhoodAuth instance for re-authentication
     console: Optional[Console] = None,
 ) -> None:
     """Entry point invoked from __main__ after authentication."""
@@ -226,5 +250,6 @@ def main(
         renderer=renderer,
         exporter=exporter,
         targets=targets,
+        auth=auth,  # Pass auth for session expiry handling
         console=console,
     )
