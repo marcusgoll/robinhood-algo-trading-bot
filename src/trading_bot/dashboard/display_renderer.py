@@ -194,23 +194,23 @@ class DisplayRenderer:
         content.append(
             self._metric_with_target(
                 label="Total P&L",
-                actual=f"[{total_pl_color}]{total_pl_text}[/{total_pl_color}]",
+                actual=total_pl_text,
+                actual_style=total_pl_color,
                 meets=meets_total,
                 target=target_total,
             )
         )
 
         # Realized / Unrealized breakdown
-        content.append(
-            f"  • Realized: [{self._get_pl_color(metrics.total_realized_pl)}]"
-            f"${self._format_currency(metrics.total_realized_pl)}"
-            f"[/{self._get_pl_color(metrics.total_realized_pl)}]\n"
-        )
-        content.append(
-            f"  • Unrealized: [{self._get_pl_color(metrics.total_unrealized_pl)}]"
-            f"${self._format_currency(metrics.total_unrealized_pl)}"
-            f"[/{self._get_pl_color(metrics.total_unrealized_pl)}]\n"
-        )
+        content.append("  • Realized: ")
+        content.append(f"${self._format_currency(metrics.total_realized_pl)}",
+                      style=self._get_pl_color(metrics.total_realized_pl))
+        content.append("\n")
+
+        content.append("  • Unrealized: ")
+        content.append(f"${self._format_currency(metrics.total_unrealized_pl)}",
+                      style=self._get_pl_color(metrics.total_unrealized_pl))
+        content.append("\n")
 
         # Max drawdown
         drawdown_color = self._get_pl_color(metrics.max_drawdown)
@@ -223,7 +223,8 @@ class DisplayRenderer:
         content.append(
             self._metric_with_target(
                 label="Max Drawdown",
-                actual=f"[{drawdown_color}]{drawdown_text}[/{drawdown_color}]",
+                actual=drawdown_text,
+                actual_style=drawdown_color,
                 meets=meets_drawdown,
                 target=target_drawdown,
             )
@@ -231,9 +232,9 @@ class DisplayRenderer:
 
         # Streak / Trades / Sessions
         streak_color = self._streak_color(metrics.streak_type)
-        content.append(
-            f"Current Streak: [{streak_color}]{metrics.current_streak} {metrics.streak_type}[/{streak_color}]\n"
-        )
+        content.append("Current Streak: ")
+        content.append(f"{metrics.current_streak} {metrics.streak_type}", style=streak_color)
+        content.append("\n")
 
         trades_meets = None
         trades_target = None
@@ -292,16 +293,24 @@ class DisplayRenderer:
         *,
         label: str,
         actual: str,
+        actual_style: str | None = None,
         meets: bool | None,
         target: str | None,
-    ) -> str:
+    ) -> Text:
         """Format metric line with optional target comparison."""
-        suffix = ""
+        line = Text()
+        line.append(f"{label}: ")
+        line.append(actual, style=actual_style)
+
         if target is not None and meets is not None:
             indicator = "✓" if meets else "✗"
             indicator_color = "green" if meets else "red"
-            suffix = f" [{indicator_color}]{indicator}[/{indicator_color}] (target: {target})"
-        return f"{label}: {actual}{suffix}\n"
+            line.append(" ")
+            line.append(indicator, style=indicator_color)
+            line.append(f" (target: {target})")
+
+        line.append("\n")
+        return line
 
     @staticmethod
     def _get_pl_color(value: Decimal | float) -> str:
