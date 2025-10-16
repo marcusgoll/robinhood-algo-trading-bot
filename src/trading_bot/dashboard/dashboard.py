@@ -7,7 +7,7 @@ import queue
 import threading
 import time
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from rich.console import Console
 from rich.live import Live

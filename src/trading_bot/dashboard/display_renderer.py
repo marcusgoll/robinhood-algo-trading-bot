@@ -103,7 +103,7 @@ class DisplayRenderer:
             f"Last Updated:    {self._format_datetime(account.last_updated)} "
             f"(age {data_age}s)\n"
         )
-        content.append(f"Market Status:   ", style=ColorScheme.BOLD)
+        content.append("Market Status:   ", style=ColorScheme.BOLD)
         content.append(f"{snapshot.market_status}\n", style=market_color + " " + ColorScheme.BOLD)
 
         if snapshot.is_data_stale:
