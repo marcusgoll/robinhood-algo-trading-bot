@@ -49,6 +49,18 @@ class PullbackData:
 
 
 @dataclass(slots=True)
+class ATRStopData:
+    """ATR-based stop-loss calculation result with volatility metrics."""
+
+    stop_price: Decimal
+    atr_value: Decimal
+    atr_multiplier: float
+    atr_period: int
+    source: str = "atr"
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+
+@dataclass(slots=True)
 class RiskManagementEnvelope:
     """Audit-friendly record tracking position lifecycle with stop and target orders.
 
