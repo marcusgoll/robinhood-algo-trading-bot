@@ -674,3 +674,161 @@ def test_cancel_entry_on_stop_placement_failure() -> None:
     # 3. Error was logged with correlation_id
     # TODO: Add logging assertion once logger is integrated (T026)
     # risk_manager.logger.log_error.assert_called_once()
+
+
+def test_retry_on_transient_stop_placement_failure() -> None:
+    """
+    Test that RiskManager retries on transient broker failures with exponential backoff.
+
+    This test validates the resilience requirement (NFR-007) from spec.md:
+    "Stop and target placement MUST retry transient failures (network timeout, 5xx)
+    up to 3 times before escalating to circuit breaker."
+
+    Given:
+        - Entry order submitted successfully (order_id="ENTRY_ORDER_123")
+        - First stop placement call raises RetriableError (network timeout)
+        - Second stop placement call succeeds
+        - Target placement succeeds
+
+    When:
+        place_trade_with_risk_management(plan, symbol="TSLA")
+
+    Then:
+        1. Calls OrderManager.place_limit_order() for entry → succeeds
+        2. Calls OrderManager.place_limit_order() for stop → fails with RetriableError
+        3. Retries stop placement after exponential backoff delay
+        4. Second stop placement attempt → succeeds (order_id="STOP456")
+        5. Calls OrderManager.place_limit_order() for target → succeeds
+        6. Returns RiskManagementEnvelope with all three order IDs
+        7. Does NOT cancel entry order (transient failure recovered)
+
+    Rationale:
+        Network timeouts and 5xx errors are transient and recoverable. Implementing
+        retry logic with exponential backoff improves system resilience without
+        requiring manual intervention. The @with_retry decorator from
+        src/trading_bot/error_handling/retry.py should be applied to the internal
+        order placement logic.
+
+    Pattern: src/trading_bot/error_handling/retry.py @with_retry decorator
+    From: spec.md NFR-007, tasks.md T038
+    Phase: TDD RED - test MUST FAIL until @with_retry decorator applied
+    """
+    # Arrange: Create sample PositionPlan (reuse spec scenario 1)
+    position_plan = PositionPlan(
+        symbol="TSLA",
+        entry_price=Decimal("250.30"),
+        stop_price=Decimal("248.00"),
+        target_price=Decimal("254.90"),
+        quantity=434,
+        risk_amount=Decimal("1000.00"),
+        reward_amount=Decimal("1996.40"),
+        reward_ratio=2.0,
+        pullback_source="detected",
+        pullback_price=Decimal("248.00"),
+        created_at=datetime.now(UTC)
+    )
+
+    # Import RetriableError from error handling framework
+    from src.trading_bot.error_handling.exceptions import RetriableError
+
+    # Create mock OrderManager with transient failure scenario
+    mock_order_manager = Mock()
+
+    # Import OrderEnvelope for realistic mock returns
+    from src.trading_bot.order_management.models import OrderEnvelope
+
+    # Configure mock behavior:
+    # 1. Entry order succeeds
+    entry_envelope = OrderEnvelope(
+        order_id="ENTRY_ORDER_123",
+        symbol="TSLA",
+        side="BUY",
+        quantity=434,
+        limit_price=Decimal("250.30"),
+        execution_mode="LIVE",
+        submitted_at=datetime.now(UTC)
+    )
+
+    # 2. Stop order succeeds on retry
+    stop_envelope = OrderEnvelope(
+        order_id="STOP456",
+        symbol="TSLA",
+        side="SELL",
+        quantity=434,
+        limit_price=Decimal("248.00"),
+        execution_mode="LIVE",
+        submitted_at=datetime.now(UTC)
+    )
+
+    # 3. Target order succeeds
+    target_envelope = OrderEnvelope(
+        order_id="TARGET789",
+        symbol="TSLA",
+        side="SELL",
+        quantity=434,
+        limit_price=Decimal("254.90"),
+        execution_mode="LIVE",
+        submitted_at=datetime.now(UTC)
+    )
+
+    # Configure place_limit_order to fail on first stop attempt, succeed on retry
+    # Order of calls: entry (success), stop (fail), stop (retry success), target (success)
+    mock_order_manager.place_limit_order.side_effect = [
+        entry_envelope,  # First call: entry succeeds
+        RetriableError("Network timeout: Connection failed after 30s"),  # Second call: stop fails
+        stop_envelope,  # Third call: stop retry succeeds
+        target_envelope  # Fourth call: target succeeds
+    ]
+
+    # Import RiskManager
+    from src.trading_bot.risk_management.manager import RiskManager
+
+    # Create RiskManager with mocked OrderManager
+    risk_manager = RiskManager(order_manager=mock_order_manager)
+
+    # Act: Call place_trade_with_risk_management
+    # This will FAIL in RED phase because @with_retry decorator is not applied yet
+    envelope = risk_manager.place_trade_with_risk_management(
+        plan=position_plan,
+        symbol="TSLA"
+    )
+
+    # Assert: Verify retry behavior and successful recovery
+    # 1. Total of 4 calls to place_limit_order (entry + stop fail + stop retry + target)
+    assert mock_order_manager.place_limit_order.call_count == 4, \
+        f"Expected 4 calls (entry, stop fail, stop retry, target), got {mock_order_manager.place_limit_order.call_count}"
+
+    # 2. Entry order was NOT cancelled (transient failure recovered)
+    mock_order_manager.cancel_order.assert_not_called()
+
+    # 3. Envelope contains all three order IDs (successful recovery)
+    assert envelope.entry_order_id == "ENTRY_ORDER_123"
+    assert envelope.stop_order_id == "STOP456"
+    assert envelope.target_order_id == "TARGET789"
+    assert envelope.status == "pending"
+
+    # 4. Verify order call sequence (entry → stop fail → stop retry → target)
+    calls = mock_order_manager.place_limit_order.call_args_list
+
+    # Entry order (first call)
+    entry_call = calls[0][0][0]
+    assert entry_call.symbol == "TSLA"
+    assert entry_call.side == "BUY"
+    assert entry_call.quantity == 434
+
+    # Stop order (second call - fails, third call - retries)
+    stop_call_1 = calls[1][0][0]
+    assert stop_call_1.symbol == "TSLA"
+    assert stop_call_1.side == "SELL"
+    assert stop_call_1.reference_price == Decimal("248.00")
+
+    stop_call_2 = calls[2][0][0]
+    assert stop_call_2.symbol == "TSLA"
+    assert stop_call_2.side == "SELL"
+    assert stop_call_2.reference_price == Decimal("248.00")
+
+    # Target order (fourth call)
+    target_call = calls[3][0][0]
+    assert target_call.symbol == "TSLA"
+    assert target_call.side == "SELL"
+    assert target_call.reference_price == Decimal("254.90")
