@@ -30,15 +30,19 @@ class PositionState:
     scale_in_count: int
     quantity: int
     current_atr: Decimal | None = None
+    break_even_activated: bool = False
+    stop_price: Decimal | None = None
+    target_price: Decimal | None = None
 
 
 @dataclass(frozen=True)
 class RuleActivation:
     """Rule activation decision."""
 
-    action: str  # "hold", "add", "close_position"
+    action: str  # "hold", "add", "close_position", "move_stop"
     reason: str
     quantity: int | None = None  # Full position quantity for close_position
+    new_stop_price: Decimal | None = None  # New stop price for move_stop action
 
 
 class TestScaleInRules:
