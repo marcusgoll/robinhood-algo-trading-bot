@@ -378,5 +378,15 @@ After any rollback, document in error-log.md:
 - ⏳ Monitor production metrics
 - ⏳ Enable ATR for select positions (atr_enabled=true)
 
+## Additional Tasks: Trade Management Rules (T009)
+
+### T009 [RED]: Scale-in max limit test
+✅ T009 [RED]: Write failing test for scale-in rule respects max 3 scale-ins limit
+- **File**: tests/risk_management/test_trade_management_rules.py
+- **Status**: Test written and failing as expected (ModuleNotFoundError)
+- **Scenario**: Position with scale_in_count=3 should NOT allow additional scale-in
+- **Expected**: RuleActivation with action="hold" (no add)
+- **Commit**: test(red): T009 write failing scale-in max limit test
+
 ## Last Updated
 2025-10-16T14:00:00
