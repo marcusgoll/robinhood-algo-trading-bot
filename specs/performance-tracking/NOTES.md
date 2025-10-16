@@ -70,5 +70,26 @@
   - Updated: `.env.example` with PERFORMANCE_SUMMARY_TIMEZONE=UTC
   - Evidence: Config section added with comments
 
+### Batch 2: RED Phase - Tests (T004-T015) ✅
+**Completed**: 2025-10-15
+
+✅ **T004**: Add schemas + fixtures for summaries/alerts
+  - Created: `performance-summary.schema.json` (17 fields, Draft-07)
+  - Created: `performance-alert.schema.json` (8 fields, Draft-07)
+  - Created: `examples/summary-daily.json` (sample daily summary)
+  - Created: `examples/alert-win-rate-breach.json` (sample alert)
+  - Evidence: Schema files validate, examples match spec
+
+✅ **T005-T015**: Write failing RED phase tests
+  - Created: `tests/performance_tracking/` directory with 6 test modules
+  - `test_tracker.py`: Daily/weekly/monthly aggregation + caching (4 tests)
+  - `test_alerts.py`: Alert evaluator breach/suppress logic (2 tests)
+  - `test_cli.py`: CLI daily summary + backfill (2 tests)
+  - `test_cache.py`: Index persistence + checksum detection (2 tests)
+  - `test_export.py`: Markdown formatting (1 test)
+  - `test_contracts.py`: Schema validation (2 tests)
+  - Evidence: **13/13 tests fail correctly** with NotImplementedError ✓
+  - TDD verified: Tests fail for right reason (no implementation yet)
+
 ## Last Updated
-2025-10-15T14:30:00+00:00
+2025-10-15T15:00:00+00:00
