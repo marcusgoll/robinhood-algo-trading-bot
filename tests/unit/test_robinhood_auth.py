@@ -521,6 +521,47 @@ class TestSessionManagement:
         # Note: Actual refresh logic tested in implementation
         assert auth.is_authenticated() is True
 
+    @patch('src.trading_bot.auth.robinhood_auth.pickle')
+    @patch('src.trading_bot.auth.robinhood_auth.Path')
+    @patch('src.trading_bot.auth.robinhood_auth.robin_stocks')
+    def test_logout_handles_expired_session_gracefully(self, mock_robin_stocks, mock_path, mock_pickle):
+        """
+        Test logout handles expired session without raising exception.
+
+        GIVEN: Session is expired (robin_stocks.logout() will fail)
+        WHEN: RobinhoodAuth.logout() called
+        THEN: robin_stocks.logout() failure is caught gracefully
+              Pickle file still deleted
+              is_authenticated() returns False
+              No exception raised
+        """
+        # Given: Authenticated session that is expired
+        mock_path.return_value.exists.return_value = True
+        mock_session = MagicMock()
+        mock_pickle.load.return_value = mock_session
+
+        # And: robin_stocks.logout() will fail (session expired)
+        mock_robin_stocks.logout.side_effect = Exception("logout can only be called when logged in")
+
+        # And: Config
+        config = Mock()
+        config.robinhood_username = "user@example.com"
+        config.robinhood_password = "secure_password"
+        config.robinhood_mfa_secret = None
+        config.robinhood_device_token = None
+
+        # When: RobinhoodAuth logs in then logs out (with expired session)
+        from src.trading_bot.auth.robinhood_auth import RobinhoodAuth
+        auth = RobinhoodAuth(config)
+        auth.login()
+
+        # Logout should not raise exception even though robin_stocks.logout fails
+        auth.logout()
+
+        # Then: Pickle still deleted despite robin_stocks.logout failure
+        mock_path.return_value.unlink.assert_called_once()
+        assert auth.is_authenticated() is False
+
 
 class TestDeviceTokenEdgeCases:
     """Additional coverage for device token branches."""

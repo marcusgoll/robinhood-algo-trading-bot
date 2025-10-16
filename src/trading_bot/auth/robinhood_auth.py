@@ -284,7 +284,12 @@ class RobinhoodAuth:
         """Logout and clear session."""
         # T016: Logout implementation
         if robin_stocks:
-            robin_stocks.logout()
+            try:
+                robin_stocks.logout()
+            except Exception:
+                # Session already expired or invalid - skip API logout
+                # Still clean up local state below
+                pass
 
         self._authenticated = False
         self._session = None
