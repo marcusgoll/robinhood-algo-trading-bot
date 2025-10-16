@@ -157,6 +157,7 @@ Cross-artifact analysis: Validated 100% requirement coverage (14 functional, 8 n
 ✅ T035 [P]: Write integration test for stop-out scenario (commit: f261ccd)
 ✅ T036 [P]: Add performance test for position plan calculation (commit: 4c06637)
 ✅ T037 [P]: Integrate RiskManager into TradingBot.execute_trade (live mode) (commit: b5b7502)
+✅ T038 [RED]: Write test for retry on transient broker failures (commit: d96e43f)
 
 ## Last Updated
-2025-10-16T01:45:00-05:00
+2025-10-16T05:20:00-05:00
