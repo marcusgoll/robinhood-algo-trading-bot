@@ -77,7 +77,8 @@ def calculate_position_plan(
     stop_price: Decimal,
     target_rr: float,
     account_balance: Decimal,
-    risk_pct: float
+    risk_pct: float,
+    min_risk_reward_ratio: float = 2.0
 ) -> PositionPlan:
     """
     Calculate position plan with risk-based sizing and 2:1 targets.
@@ -89,11 +90,15 @@ def calculate_position_plan(
         target_rr: Target risk-reward ratio (e.g., 2.0 for 2:1)
         account_balance: Total account balance
         risk_pct: Maximum risk percentage (e.g., 1.0 for 1%)
+        min_risk_reward_ratio: Minimum allowed risk-reward ratio (default: 2.0)
 
     Returns:
         PositionPlan with calculated quantities, prices, and risk metrics
 
-    From: specs/stop-loss-automation/tasks.md T023
+    Raises:
+        PositionPlanningError: If target_rr is below min_risk_reward_ratio
+
+    From: specs/stop-loss-automation/tasks.md T023, T013
     """
     # RED phase: Stub implementation that will fail the test
     raise NotImplementedError("calculate_position_plan not yet implemented")
