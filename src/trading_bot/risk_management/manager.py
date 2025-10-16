@@ -36,15 +36,19 @@ class RiskManager:
         self,
         config: RiskManagementConfig | None = None,
         order_manager: OrderManager | None = None,
+        log_dir: Path | None = None,
     ) -> None:
         """Initialize risk manager with configuration and optional order manager.
 
         Args:
             config: Risk management configuration
             order_manager: Order management dependency for order placement
+            log_dir: Directory for JSONL audit logs (default: logs/)
         """
         self.config = config or RiskManagementConfig.default()
         self.order_manager = order_manager
+        self.log_dir = log_dir or Path("logs")
+        self._log_lock = threading.Lock()
 
     def create_position_plan(
         self,
@@ -158,3 +162,55 @@ class RiskManager:
             target_order_id=target_envelope.order_id,
             status="pending",
         )
+
+    def _write_jsonl_log(self, log_entry: dict) -> None:
+        """Write a log entry to the JSONL audit trail.
+
+        Thread-safe operation with file locking per Constitution v1.0.0 §Data_Integrity.
+
+        Args:
+            log_entry: Dictionary to log as JSON line
+        """
+        try:
+            log_file = self.log_dir / "risk-management.jsonl"
+
+            # Thread-safe write with file locking
+            with self._log_lock:
+                # Create parent directories if needed
+                log_file.parent.mkdir(parents=True, exist_ok=True)
+
+                # Write to file with optimized buffering
+                with open(log_file, 'a', buffering=8192, encoding='utf-8') as f:
+                    # Serialize to compact JSON
+                    jsonl_line = json.dumps(log_entry, separators=(',', ':'))
+                    f.write(jsonl_line + '\n')
+        except OSError as e:
+            # Graceful degradation: Log error to stderr but don't crash
+            print(f"ERROR: Failed to write risk management log: {e}", file=sys.stderr)
+
+    def log_position_plan(
+        self,
+        plan: PositionPlan,
+        pullback_source: str = "unknown",
+    ) -> None:
+        """Log position plan creation to JSONL audit trail.
+
+        Args:
+            plan: Position plan to log
+            pullback_source: Source of pullback analysis ("detected" or "default")
+        """
+        # Convert Decimal fields to strings for JSON serialization
+        log_entry = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "action": "position_plan_created",
+            "symbol": plan.symbol,
+            "entry_price": str(plan.entry_price),
+            "stop_price": str(plan.stop_price),
+            "target_price": str(plan.target_price),
+            "quantity": plan.quantity,
+            "risk_amount": str(plan.risk_amount),
+            "reward_ratio": plan.reward_ratio,
+            "pullback_source": pullback_source,
+        }
+
+        self._write_jsonl_log(log_entry)
