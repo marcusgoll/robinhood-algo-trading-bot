@@ -112,5 +112,8 @@ Enhancement to existing stop-loss automation that adds ATR (Average True Range) 
 ✅ T003 [P]: Add ATR exception classes to src/trading_bot/risk_management/exceptions.py
 ✅ T004 [P]: Extend RiskManagementConfig with ATR fields in src/trading_bot/risk_management/config.py
 
+### Phase 3.2 RED (Test-Driven Development - Failing Tests)
+✅ T005 [RED]: Write test: ATR calculation with valid 14-period data
+
 ## Last Updated
-2025-10-16T09:35:00
+2025-10-16T09:45:00
