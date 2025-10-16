@@ -70,6 +70,39 @@ Enhancement to existing stop-loss automation that adds ATR (Average True Range) 
 
 ## Checkpoints
 - Phase 0 (Spec-flow): 2025-10-16
+- Phase 1 (Plan): 2025-10-16
+- Phase 2 (Tasks): 2025-10-16
+
+## Phase 2 Summary: Task Breakdown
+
+**Task Statistics**:
+- Total tasks: 37
+- TDD coverage: 27/37 tasks (73%) follow RED→GREEN→REFACTOR cycle
+- Parallel tasks: 14 tasks marked [P] can run in parallel
+
+**Task Breakdown by Phase**:
+- Phase 3.1 Setup: 4 tasks (dataclasses, exceptions, config extension)
+- Phase 3.2 RED: 13 tasks (failing tests for ATR calculation, validation, integration)
+- Phase 3.3 GREEN: 9 tasks (minimal implementation to pass tests)
+- Phase 3.4 REFACTOR: 3 tasks (code quality improvements)
+- Phase 3.5 Integration: 4 tasks (end-to-end workflow tests)
+- Phase 3.6 Error Handling: 3 tasks (resilience and edge cases)
+- Phase 3.7 Deployment: 3 tasks (smoke tests, documentation, rollback)
+
+**Task Breakdown by Category**:
+- Backend (risk_management): 26 tasks
+- Market data integration: 3 tasks
+- Test files: 13 tasks
+- Configuration & documentation: 5 tasks
+
+**Key Implementation Decisions**:
+- TDD discipline: RED→GREEN→REFACTOR cycle for all core behaviors
+- Reuse leverage: 8 existing components (Calculator, StopAdjuster, Config, etc.)
+- New components: 5 (ATRCalculator, ATRStopData, PriceBar, 3 exception classes)
+- Files modified: 6 existing files
+- Files created: 5 new files + 6 test files
+
+**Ready for**: /analyze (cross-artifact consistency analysis)
 
 ## Last Updated
-2025-10-16T00:00:00
+2025-10-16T09:30:00
