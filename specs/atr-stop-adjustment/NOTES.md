@@ -114,7 +114,8 @@ Enhancement to existing stop-loss automation that adds ATR (Average True Range) 
 
 ### Phase 3.2 RED (Test-Driven Development - Failing Tests)
 ✅ T005 [RED]: Write test: ATR calculation with valid 14-period data
+✅ T006 [RED]: Write test: ATR calculation fails with insufficient data
 ✅ T007 [RED]: Write test: ATR calculation validates price bar integrity
 
 ## Last Updated
-2025-10-16T10:00:00
+2025-10-16T10:15:00
