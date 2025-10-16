@@ -11,9 +11,9 @@ from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
-from src.trading_bot.error_handling import RetryPolicy, with_retry
-from src.trading_bot.error_handling.circuit_breaker import CircuitBreaker
-from src.trading_bot.error_handling.exceptions import CircuitBreakerTripped
+from trading_bot.error_handling import RetryPolicy, with_retry
+from trading_bot.error_handling.circuit_breaker import CircuitBreaker
+from trading_bot.error_handling.exceptions import CircuitBreakerTripped
 
 from .calculator import calculate_position_plan
 from .config import RiskManagementConfig
@@ -21,7 +21,7 @@ from .models import PositionPlan, RiskManagementEnvelope
 from .pullback_analyzer import PullbackAnalyzer
 
 if TYPE_CHECKING:
-    from src.trading_bot.order_management.manager import OrderManager
+    from trading_bot.order_management.manager import OrderManager
 
 
 class AccountProvider(Protocol):
@@ -222,7 +222,7 @@ class RiskManager:
             RetriableError: Network/broker transient failures (will trigger retry)
             StopPlacementError: Permanent stop placement failure (after retries exhausted)
         """
-        from src.trading_bot.order_management.models import OrderRequest
+        from trading_bot.order_management.models import OrderRequest
 
         # Submit stop order
         stop_request = OrderRequest(
@@ -261,9 +261,8 @@ class RiskManager:
             StopPlacementError: If stop order placement fails (after cancelling entry)
             CircuitBreakerTripped: If stop placement failure rate exceeds 2%
         """
-        from src.trading_bot.order_management.models import OrderRequest
+        from trading_bot.order_management.models import OrderRequest
 
-        from .exceptions import StopPlacementError
 
         if self.order_manager is None:
             raise ValueError("OrderManager not configured")

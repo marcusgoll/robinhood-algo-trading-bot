@@ -317,3 +317,94 @@ After rollback, verify:
 
 ## Last Updated
 2025-10-16T10:30:00-05:00
+
+## Phase 8: Production Deployment
+
+**Date**: 2025-10-16
+**Version**: v1.1.0
+**Deployment Type**: Local version tag (no remote deployment)
+**Status**: ✅ Complete
+
+### Version Tag Created
+
+**Tag**: v1.1.0
+**Commit**: 24ef741 (validation artifacts)
+**Tagged Commit**: e3e2834 (staging deployment)
+**Date**: 2025-10-16 08:47:23 -0500
+
+### Release Notes
+
+**Features**:
+- Pullback detection with swing low analysis
+- Automated position sizing (1% account risk)
+- 2:1 risk-reward ratio targeting
+- Trailing stop adjustments (breakeven at 50% progress)
+- JSONL audit logging with correlation IDs
+
+**Validated**: 2025-10-16 13:38 UTC
+
+**Test Results**:
+- Automated tests: 28/28 passing (24 unit + 4 smoke)
+- Manual calculation test: 6/6 checks passed
+- AC-001 (Position calculation): VERIFIED
+- AC-003 (Position sizing): VERIFIED
+- Bot initialization: SUCCESS
+
+### Deployment Artifacts
+
+**Ship Report**: specs/stop-loss-automation/ship-report.md
+**Validation Report**: specs/stop-loss-automation/artifacts/staging-validation-report.md
+**Validation Checklist**: specs/stop-loss-automation/staging-validation-checklist.md
+
+### Local Deployment Notes
+
+This is a **local-only project** (no remote GitHub repository). The production deployment consists of:
+
+1. **Version tag**: v1.1.0 created locally
+2. **Master branch**: Contains merged stop-loss-automation feature (commit e3e2834)
+3. **Production usage**: Enable by setting `paper_trading: false` in config.json
+
+**To use in production**:
+1. Ensure `config.json` has `risk_management` section configured
+2. Set `paper_trading: false` for live trading
+3. Start bot: `python -m trading_bot`
+4. Monitor logs: `Get-Content logs\risk-management.jsonl -Wait` (PowerShell)
+
+**Rollback**: Follow procedures in "Rollback Runbook" section above
+
+### Deployment Readiness
+
+**Automated Checks**: ✅ All passed
+- ✅ Unit tests: 24/24
+- ✅ Smoke tests: 4/4
+- ✅ Performance: <1ms (200x faster than 200ms target)
+- ✅ Integration: 15/15 bot tests
+- ✅ Code review: 4/5 issues auto-fixed
+
+**Manual Validation**: ✅ Core verified
+- ✅ AC-001: Position calculation with pullback detection
+- ✅ AC-003: Position sizing (1% risk)
+- ⏳ AC-002, AC-004, AC-005: Require live trading observation
+
+### Next Steps
+
+1. **Monitor first live trades** (when enabled):
+   - Watch for position plan calculation logs
+   - Verify stop/target order placement
+   - Observe trailing stop adjustments
+   - Monitor P&L on target fills
+
+2. **Production metrics** to track:
+   - Stop-loss hit rate (target: protect capital)
+   - Target hit rate (target: ≥40%)
+   - Max drawdown per trade (target: ≤1% account risk)
+   - Average risk-reward ratio (target: ≥1.8)
+
+3. **Monitoring** (if enabled for live trading):
+   - Logs: `logs/risk-management.jsonl`
+   - Performance: Position calc time <200ms
+   - Errors: Watch for StopPlacementError, TargetAdjustmentError
+   - Circuit breaker: >2% stop placement failures
+
+## Last Updated
+2025-10-16T08:50:00-05:00

@@ -18,19 +18,19 @@ from pathlib import Path
 from typing import Any
 
 # T038: Authentication module integration
-from src.trading_bot.auth import AuthenticationError, RobinhoodAuth
+from trading_bot.auth import AuthenticationError, RobinhoodAuth
 
 # Configuration types
-from src.trading_bot.config import Config
+from trading_bot.config import Config
 
 # T060: Session health monitoring integration
-from src.trading_bot.health import HealthCheckResult, SessionHealthMonitor
+from trading_bot.health import HealthCheckResult, SessionHealthMonitor
 
 # T030-T034: Structured logging integration
-from src.trading_bot.logging import StructuredTradeLogger, TradeRecord
+from trading_bot.logging import StructuredTradeLogger, TradeRecord
 
 # Order management integration
-from src.trading_bot.order_management import (
+from trading_bot.order_management import (
     OrderManager,
     OrderRequest,
     OrderSubmissionError,
@@ -38,13 +38,13 @@ from src.trading_bot.order_management import (
 )
 
 # T037: Risk management integration
-from src.trading_bot.risk_management import RiskManagementConfig, RiskManager
-from src.trading_bot.risk_management.target_monitor import TargetMonitor
+from trading_bot.risk_management import RiskManagementConfig, RiskManager
+from trading_bot.risk_management.target_monitor import TargetMonitor
 
 # REFACTORED: Import SafetyChecks instead of local CircuitBreaker
 # Old CircuitBreaker class removed in favor of comprehensive SafetyChecks module
 # See: src/trading_bot/safety_checks.py for enhanced circuit breaker functionality
-from src.trading_bot.safety_checks import SafetyChecks
+from trading_bot.safety_checks import SafetyChecks
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +169,7 @@ class TradingBot:
         # T044: Initialize account data module if authenticated
         self.account_data: Any | None = None
         if self.auth is not None:
-            from src.trading_bot.account import AccountData
+            from trading_bot.account import AccountData
             self.account_data = AccountData(auth=self.auth)
             logger.info("Account data module initialized")
 
@@ -252,7 +252,7 @@ class TradingBot:
         self.market_data: Any | None = None
         if self.auth is not None:
             try:
-                from src.trading_bot.market_data.market_data_service import MarketDataService
+                from trading_bot.market_data.market_data_service import MarketDataService
                 self.market_data = MarketDataService(auth=self.auth)
                 logger.info("MarketDataService initialized")
             except ImportError:

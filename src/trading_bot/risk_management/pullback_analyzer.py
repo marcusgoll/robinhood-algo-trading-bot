@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from src.trading_bot.risk_management.models import PullbackData
+from trading_bot.risk_management.models import PullbackData
 
 logger = logging.getLogger(__name__)
 

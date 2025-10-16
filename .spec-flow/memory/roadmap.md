@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-10 (order management foundation ready for staging)
+**Last updated**: 2025-10-16 (performance-tracking feature shipped to master)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -297,6 +297,34 @@
   - 39 test cases across order management + trading bot (95.03 % module coverage)
   - Documentation: spec, plan, tasks, optimization-report, code-review
 
+### performance-tracking
+- **Title**: Performance tracking and analytics
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-15
+- **Commit**: a021c81
+- **Spec**: specs/performance-tracking/
+- **Delivered**:
+  - PerformanceTracker class with daily/weekly/monthly aggregation
+  - AlertEvaluator for threshold monitoring against configured targets
+  - Cache utilities with incremental MD5-based updates
+  - CLI interface: `python -m trading_bot.performance` with export functionality
+  - JSON/Markdown exports for machine-readable and human-readable outputs
+  - Schema validation: 100% contract compliance
+  - Win/loss ratio calculator across time windows
+  - Streak tracking (current and historical win/loss streaks)
+  - Risk-reward metrics with alerts when R:R falls below 1:1
+  - Alert system via JSONL logging (logs/performance/performance-alerts.jsonl)
+  - 13 tests (100% pass rate)
+  - Test coverage: 92% average (alerts 95.56%, cache 87.50%, cli 94.64%, models 100%, tracker 92.00%)
+  - Performance: 1.24s test suite execution
+  - Security: 0 vulnerabilities (Bandit clean)
+  - Code quality: 0 linting issues (Ruff clean, 27 auto-fixes applied)
+  - Senior code review: APPROVED FOR SHIP
+  - Full Constitution v1.0.0 compliance (§Audit_Everything, §Data_Integrity, §Testing_Requirements)
+  - Documentation: spec, plan, tasks, local-ship-report, code-review-report, optimization-report
+
 ## In Progress
 
 <!-- Currently implementing -->
@@ -345,26 +373,6 @@
   - Log session duration
   - Auto-reauth if token expires
   - [UNBLOCKED: authentication-module shipped]
-
-### performance-tracking
-- **Title**: Performance tracking and analytics
-- **Area**: infra
-- **Role**: all
-- **Intra**: No
-- **Impact**: 4 | **Effort**: 2 | **Confidence**: 1.0 | **Score**: 2.00
-- **Requirements**:
-  - Win/loss ratio calculator (daily/weekly/monthly)
-  - Track total wins vs losses
-  - Display current streak (wins/losses)
-  - Alert when below target win rate
-  - Average profit per winning trade
-  - Average loss per losing trade
-  - Calculate and display current risk-reward ratio
-  - Alert if R:R falls below 1:1
-  - Daily trade log with timestamps and P&L
-  - [UNBLOCKED: trade-logging shipped - provides TradeQueryHelper with win rate calculation]
-  - [PIGGYBACK: extends trade-logging with analytics]
-  - [MERGED: win-rate-tracking, avg-win-loss-calculator]
 
 ### stock-screener
 - **Title**: Stock screener and filtering

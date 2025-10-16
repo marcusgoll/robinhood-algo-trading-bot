@@ -20,7 +20,7 @@ from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
 
-from src.trading_bot.risk_management.config import RiskManagementConfig
+from trading_bot.risk_management.config import RiskManagementConfig
 
 # Load .env file if exists (§Security: environment variables)
 load_dotenv()

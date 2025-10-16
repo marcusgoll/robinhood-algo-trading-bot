@@ -9,9 +9,9 @@ from threading import Lock, Timer
 from types import SimpleNamespace
 from typing import Any, Optional
 
-from src.trading_bot.auth import AuthenticationError, RobinhoodAuth
-from src.trading_bot.error_handling import RetryPolicy, circuit_breaker, with_retry
-from src.trading_bot.utils.security import mask_username
+from trading_bot.auth import AuthenticationError, RobinhoodAuth
+from trading_bot.error_handling import RetryPolicy, circuit_breaker, with_retry
+from trading_bot.utils.security import mask_username
 
 from .health_logger import HealthCheckLogger
 

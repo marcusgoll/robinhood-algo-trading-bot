@@ -318,6 +318,133 @@ Stocks/
 
 Order submissions are appended to `logs/orders.jsonl` for audit trails; rotate or archive that JSONL file with your existing log retention process.
 
+### 4. ATR-based stop-loss configuration
+
+**Purpose**: Enable volatility-based dynamic stop-loss calculation using Average True Range (ATR).
+
+**Location**: `config.json` → `"risk_management"` → `"atr_*"` fields
+
+ATR (Average True Range) is a volatility indicator that automatically adjusts stop distances based on market conditions:
+- **Volatile markets**: Wider stops to avoid premature stop-outs
+- **Calm markets**: Tighter stops for better capital protection
+
+**Configuration Fields**:
+
+```jsonc
+"risk_management": {
+  // ... existing risk management fields ...
+
+  // ATR Configuration (optional, disabled by default)
+  "atr_enabled": false,           // Enable ATR-based stop calculation
+  "atr_period": 14,                // Wilder's standard 14-period lookback
+  "atr_multiplier": 2.0,           // Stop distance = atr_value * 2.0
+  "atr_recalc_threshold": 0.20     // Recalculate stop if ATR changes >20%
+}
+```
+
+**Parameter Details**:
+
+| Parameter | Type | Default | Valid Range | Description |
+|-----------|------|---------|-------------|-------------|
+| `atr_enabled` | boolean | `false` | true/false | Master switch for ATR feature (opt-in) |
+| `atr_period` | integer | `14` | 1-50 | Lookback period for ATR calculation (Wilder's standard is 14) |
+| `atr_multiplier` | float | `2.0` | 0.5-5.0 | Multiplier applied to ATR value for stop distance |
+| `atr_recalc_threshold` | float | `0.20` | 0.10-1.0 | % ATR change that triggers dynamic stop adjustment |
+
+**Example Configurations**:
+
+**Conservative (Wider Stops)**:
+```json
+"atr_enabled": true,
+"atr_period": 14,
+"atr_multiplier": 3.0,      // 3x ATR for wider stops
+"atr_recalc_threshold": 0.30 // Adjust only on significant volatility changes
+```
+
+**Aggressive (Tighter Stops)**:
+```json
+"atr_enabled": true,
+"atr_period": 10,           // Shorter period = more responsive
+"atr_multiplier": 1.5,      // 1.5x ATR for tighter stops
+"atr_recalc_threshold": 0.15 // More frequent recalculation
+```
+
+**How ATR Works**:
+
+1. **Initial Stop Calculation**:
+   ```
+   ATR = average_true_range(last_14_bars)
+   stop_price = entry_price - (ATR * atr_multiplier)
+   ```
+
+2. **Dynamic Adjustment** (T019):
+   - System monitors ATR continuously during position lifecycle
+   - If ATR changes >20% (default threshold), stop is recalculated
+   - Example: If volatility increases 30%, stop widens to avoid premature stop-out
+
+3. **Validation**:
+   - All ATR-calculated stops must fall within **0.7%-10%** distance from entry
+   - If ATR stop violates bounds, system falls back to pullback/percentage stops
+
+4. **Fallback Behavior**:
+   - If ATR calculation fails (insufficient data, stale data), system automatically falls back to:
+     1. Pullback-based stops (preferred)
+     2. Percentage-based stops (default 2%)
+   - All fallback events logged for investigation
+
+**Enabling ATR**:
+
+1. **Edit config.json**:
+   ```bash
+   vim config.json
+   # Set "atr_enabled": true in the "risk_management" section
+   ```
+
+2. **Validate configuration**:
+   ```bash
+   python validate_startup.py
+   # Should show: ✅ ATR configuration valid
+   ```
+
+3. **Start bot and verify**:
+   ```bash
+   python -m src.trading_bot
+   # Check logs/trading_bot.log for "ATR enabled" message
+   tail -f logs/trading_bot.log | grep ATR
+   ```
+
+**Monitoring ATR Performance**:
+
+```bash
+# View ATR-based position entries
+grep '"pullback_source":"atr"' logs/trades.log | jq
+
+# Monitor ATR recalculation events
+grep "ATR recalculation" logs/trading_bot.log
+
+# Check ATR calculation failures (should be <5%)
+grep "ATRCalculationError" logs/errors.log | wc -l
+```
+
+**Troubleshooting**:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "Insufficient data for ATR" | Not enough price history (need 15+ bars) | Wait for more data accumulation |
+| "Stale data" | Price data >15 minutes old | Check market data feed connection |
+| "Stop distance too tight" | ATR too small for symbol | Increase `atr_multiplier` to 3.0+ |
+| "Stop distance exceeds 10%" | Extreme volatility | Reduce `atr_multiplier` to 1.5 or disable ATR temporarily |
+
+**Performance Metrics**:
+- ATR calculation: <1ms (50x faster than 50ms target)
+- Test coverage: 14 tests (8 calculator + 3 integration + 3 smoke)
+- Success rate target: >95% in production
+
+**Related Documentation**:
+- Error codes: `specs/atr-stop-adjustment/error-log.md`
+- Rollback procedures: `specs/atr-stop-adjustment/NOTES.md`
+- Smoke tests: `tests/smoke/test_atr_smoke.py`
+
 ### Why Two Files?
 - **.env**: Secrets that **never** change (credentials)
 - **config.json**: Parameters you **frequently adjust** (position size, hours, phase)

@@ -1,7 +1,7 @@
 """
 Market Data Models
 
-Dataclasses for market data: Quote, MarketStatus, MarketDataConfig
+Dataclasses for market data: Quote, PriceBar, MarketStatus, MarketDataConfig
 
 These immutable dataclasses represent validated market data from Robinhood API.
 All timestamps are in UTC, prices use Decimal for precision.
@@ -10,6 +10,65 @@ All timestamps are in UTC, prices use Decimal for precision.
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class PriceBar:
+    """
+    Immutable OHLC (Open-High-Low-Close) price bar for technical analysis.
+
+    Used for ATR (Average True Range) calculation and other volatility indicators.
+    Validates price consistency: high must be the maximum, low the minimum.
+
+    Attributes:
+        symbol: Stock ticker symbol (e.g., 'AAPL', 'TSLA')
+        timestamp: Bar timestamp in UTC
+        open: Opening price in USD (Decimal for precision)
+        high: Highest price in USD (Decimal for precision)
+        low: Lowest price in USD (Decimal for precision)
+        close: Closing price in USD (Decimal for precision)
+        volume: Trading volume (number of shares traded)
+
+    Raises:
+        ValueError: If price relationships are invalid (high < low, etc.)
+    """
+    symbol: str
+    timestamp: datetime
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
+    volume: int
+
+    def __post_init__(self) -> None:
+        """Validate price bar consistency after initialization."""
+        # Validate high >= low
+        if self.high < self.low:
+            raise ValueError(
+                f"Invalid PriceBar for {self.symbol}: high ({self.high}) "
+                f"must be >= low ({self.low})"
+            )
+
+        # Validate open is within high/low range
+        if not (self.low <= self.open <= self.high):
+            raise ValueError(
+                f"Invalid PriceBar for {self.symbol}: open ({self.open}) "
+                f"must be between low ({self.low}) and high ({self.high})"
+            )
+
+        # Validate close is within high/low range
+        if not (self.low <= self.close <= self.high):
+            raise ValueError(
+                f"Invalid PriceBar for {self.symbol}: close ({self.close}) "
+                f"must be between low ({self.low}) and high ({self.high})"
+            )
+
+        # Validate volume is non-negative
+        if self.volume < 0:
+            raise ValueError(
+                f"Invalid PriceBar for {self.symbol}: volume ({self.volume}) "
+                f"must be >= 0"
+            )
 
 
 @dataclass(frozen=True)

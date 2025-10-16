@@ -9,7 +9,7 @@ Follows error hierarchy from src/trading_bot/error_handling/exceptions.py:
 
 from __future__ import annotations
 
-from src.trading_bot.error_handling.exceptions import (
+from trading_bot.error_handling.exceptions import (
     NonRetriableError,
     RetriableError,
 )
@@ -67,6 +67,66 @@ class TargetAdjustmentError(RetriableError):
     Example:
         raise TargetAdjustmentError(
             "Failed to trail stop for AAPL: cancel-replace sequence interrupted"
+        )
+    """
+
+    pass
+
+
+class ATRCalculationError(PositionPlanningError):
+    """
+    Raised when ATR calculation fails due to insufficient or invalid data.
+
+    This is a NonRetriableError because it indicates data quality issues that
+    require correction before retry. Common causes:
+    - Insufficient price bars (need minimum period for ATR)
+    - Invalid input data (NaN, negative prices, missing OHLC fields)
+    - Empty price series or all-zero values
+    - Mismatched data types or array lengths
+
+    Example:
+        raise ATRCalculationError(
+            "ATR calculation requires 14 bars, got 5 for AAPL"
+        )
+    """
+
+    pass
+
+
+class ATRValidationError(PositionPlanningError):
+    """
+    Raised when ATR-based stop fails validation checks.
+
+    This is a NonRetriableError because it indicates invalid risk parameters
+    that require adjustment before retry. Common causes:
+    - Stop distance exceeds maximum allowed range (out of bounds)
+    - ATR multiplier produces stop too far from entry
+    - Calculated stop violates minimum distance rules
+    - Stale ATR value used in calculation
+
+    Example:
+        raise ATRValidationError(
+            "ATR stop distance 5.2 exceeds maximum 3.0 for AAPL"
+        )
+    """
+
+    pass
+
+
+class StaleDataError(PositionPlanningError):
+    """
+    Raised when price data is too old for reliable ATR calculation.
+
+    This is a NonRetriableError because it indicates data freshness issues
+    that require new data before retry. Common causes:
+    - Last price update timestamp exceeds staleness threshold
+    - Market closed and no recent real-time data available
+    - Data feed disconnected or delayed beyond acceptable limits
+    - Using end-of-day data during trading hours
+
+    Example:
+        raise StaleDataError(
+            "Price data for AAPL is 45 minutes old, max staleness is 5 minutes"
         )
     """
 

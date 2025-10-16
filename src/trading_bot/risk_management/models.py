@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any
 
 
 @dataclass(slots=True)
@@ -46,6 +46,18 @@ class PullbackData:
     confirmation_candles: int
     lookback_window: int
     fallback_used: bool
+
+
+@dataclass(slots=True)
+class ATRStopData:
+    """ATR-based stop-loss calculation result with volatility metrics."""
+
+    stop_price: Decimal
+    atr_value: Decimal
+    atr_multiplier: float
+    atr_period: int
+    source: str = "atr"
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass(slots=True)
