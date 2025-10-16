@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-16 (trade-management-rules v1.3.0 shipped to master)
+**Last updated**: 2025-10-16 (health-check v1.4.0 shipped to master)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -351,6 +351,38 @@
   - Production-ready, awaits position manager integration
   - Documentation: trade-rules-ship-report.md, NOTES.md (T006-T011 complete)
 
+### health-check
+- **Title**: Session health monitoring
+- **Area**: api
+- **Role**: all
+- **Intra**: Yes
+- **Date**: 2025-10-16
+- **Release**: v1.4.0 - Session health monitoring with auto-reauth and result caching
+- **Spec**: specs/health-check/
+- **Commit**: eb8ea86
+- **Delivered**:
+  - SessionHealthMonitor class with periodic health checks (every 5 minutes)
+  - Automatic authentication refresh on 401/403 errors
+  - 10-second result caching to reduce API load (~98% reduction)
+  - Thread-safe session status tracking with threading.Lock
+  - HealthCheckResult dataclass: Success/failure with latency and reauth metadata
+  - SessionHealthStatus dataclass: Uptime, health check count, reauth count tracking
+  - HealthCheckLogger: Structured JSONL logging for all health events
+  - @with_retry decorator integration for automatic retries with exponential backoff
+  - Circuit breaker integration for persistent failure handling
+  - Pre-trade health check validation (blocking trades on session failure)
+  - Graceful degradation for paper trading mode
+  - Integration with TradingBot: start/stop/execute_trade lifecycle
+  - 14 unit tests (100% pass rate, 14.11s execution)
+  - Code coverage: 92-94% (session_health 92.74%, health_logger 90%, __init__ 100%)
+  - Type safety: MyPy strict mode (0 errors)
+  - Security: Bandit scan (0 vulnerabilities, 407 lines analyzed)
+  - Code quality: Ruff linting (all checks passed)
+  - Performance: ~100-200ms health check latency (target <2000ms)
+  - Full Constitution v1.0.0 compliance (§Safety_First, §Risk_Management, §Audit_Everything)
+  - Production-ready, local-only feature (no staging/production deployment needed)
+  - Documentation: spec, plan, tasks, analysis, optimization-report, PRODUCTION-READY.md
+
 ## In Progress
 
 <!-- Currently implementing -->
@@ -386,19 +418,6 @@
   - Compare against targets
   - [UNBLOCKED: account-data-module shipped, performance-tracking ready (trade-logging provides data)]
   - [MERGED: performance-metrics-dashboard]
-
-### health-check
-- **Title**: Session health monitoring
-- **Area**: api
-- **Role**: all
-- **Intra**: Yes
-- **Impact**: 4 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 1.80
-- **Requirements**:
-  - Ping API every 5 minutes to maintain session
-  - Verify authentication status
-  - Log session duration
-  - Auto-reauth if token expires
-  - [UNBLOCKED: authentication-module shipped]
 
 ### stock-screener
 - **Title**: Stock screener and filtering
