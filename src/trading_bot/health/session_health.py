@@ -9,22 +9,22 @@ Usage:
 
     auth = RobinhoodAuth(config)
     health_monitor = SessionHealthMonitor(auth)
-    
+
     # Start periodic health checks (every 5 minutes)
     health_monitor.start_periodic_checks()
-    
+
     # Check health before critical operations
     result = health_monitor.check_health(context="pre_trade")
     if not result.success:
         logger.error("Health check failed, aborting trade")
         return
-    
+
     # Get current session metrics
     status = health_monitor.get_session_status()
     print(f"Session uptime: {status.session_uptime_seconds}s")
     print(f"Health checks: {status.health_check_count}")
     print(f"Reauth count: {status.reauth_count}")
-    
+
     # Stop periodic checks on shutdown
     health_monitor.stop_periodic_checks()
 """
@@ -36,15 +36,13 @@ import threading
 import time
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from typing import Optional
 
-import robin_stocks.robinhood.profiles
+import robin_stocks.robinhood.profiles  # type: ignore[import-untyped]
 
 from trading_bot.auth.robinhood_auth import RobinhoodAuth
 from trading_bot.error_handling.circuit_breaker import circuit_breaker
 from trading_bot.error_handling.retry import with_retry
 from trading_bot.health.health_logger import HealthCheckLogger
-from trading_bot.utils.security import mask_username
 
 __all__ = ["SessionHealthStatus", "HealthCheckResult", "SessionHealthMonitor"]
 
@@ -94,7 +92,7 @@ class HealthCheckResult:
     success: bool
     timestamp: datetime
     latency_ms: int
-    error_message: Optional[str]
+    error_message: str | None
     reauth_triggered: bool
 
 
@@ -150,14 +148,14 @@ class SessionHealthMonitor:
         )
 
         # Threading components
-        self._timer: Optional[threading.Timer] = None
+        self._timer: threading.Timer | None = None
         self._lock = threading.Lock()
 
         # Logger
         self._logger = HealthCheckLogger()
 
         # Caching
-        self._last_result: Optional[HealthCheckResult] = None
+        self._last_result: HealthCheckResult | None = None
         self._last_check_time: float = 0.0
 
     def check_health(self, context: str = "periodic") -> HealthCheckResult:
@@ -183,7 +181,7 @@ class SessionHealthMonitor:
 
         # Probe API with retry logic
         try:
-            success = self._probe_api()
+            self._probe_api()
             end_time = time.time()
             latency_ms = int((end_time - start_time) * 1000)
 

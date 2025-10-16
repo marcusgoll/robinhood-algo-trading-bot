@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from trading_bot.health.session_health import HealthCheckResult, SessionHealthStatus
@@ -36,7 +36,7 @@ class HealthCheckLogger:
         self.log_file_path = Path(log_file_path)
         self.log_file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def _write_event(self, event_data: dict) -> None:
+    def _write_event(self, event_data: dict[str, Any]) -> None:
         """Write a single event to the log file.
 
         Args:
