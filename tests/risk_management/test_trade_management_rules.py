@@ -316,7 +316,7 @@ class TestScaleInRules:
         position = PositionState(
             symbol="AAPL",
             entry_price=Decimal("150.00"),
-            current_price=Decimal("148.00"),  # Slight pullback for scale-in opportunity
+            current_price=Decimal("155.25"),  # 1.5xATR above entry ($150 + 1.5 * $3.50)
             scale_in_count=1,  # Already scaled in once
             quantity=100,
             current_atr=Decimal("3.50"),
@@ -326,15 +326,16 @@ class TestScaleInRules:
         # But adding scale-in would push total to 2.4% (exceeds 2% limit)
         current_portfolio_risk_pct = Decimal("1.8")
         scale_in_risk_pct = Decimal("0.6")
+        projected_total_risk_pct = current_portfolio_risk_pct + scale_in_risk_pct  # 2.4%
         max_portfolio_risk_pct = Decimal("2.0")
 
-        # Act: Evaluate scale-in with portfolio risk constraint
-        # This will fail because evaluate_scale_in_rule() doesn't accept portfolio_risk_pct yet
+        # Act: Evaluate scale-in with projected total risk (current + scale-in)
+        # Pass the projected total risk, not the current risk
         from src.trading_bot.risk_management.trade_rules import evaluate_scale_in_rule
 
         result = evaluate_scale_in_rule(
             position,
-            portfolio_risk_pct=current_portfolio_risk_pct,
+            portfolio_risk_pct=projected_total_risk_pct,  # 2.4% projected total
             max_portfolio_risk_pct=max_portfolio_risk_pct,
         )
 
