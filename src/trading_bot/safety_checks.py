@@ -108,7 +108,7 @@ class SafetyChecks:
     From: plan.md [ARCHITECTURE DECISIONS]
     """
 
-    def __init__(self, config: Config, account_data: Optional[Any] = None) -> None:
+    def __init__(self, config: Config, account_data: Any | None = None) -> None:
         """
         Initialize safety checks with configuration.
 
@@ -141,7 +141,7 @@ class SafetyChecks:
         action: str,  # "BUY" or "SELL"
         quantity: int,
         price: float,
-        current_buying_power: Optional[float] = None
+        current_buying_power: float | None = None
     ) -> SafetyResult:
         """
         Validate trade against all safety checks.

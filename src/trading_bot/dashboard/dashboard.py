@@ -42,7 +42,7 @@ class _CommandReader:
     def stop(self) -> None:
         self._stop.set()
 
-    def poll(self) -> Optional[str]:
+    def poll(self) -> str | None:
         """Return the next command if available (uppercase, stripped)."""
         try:
             return self._queue.get_nowait()
@@ -94,7 +94,7 @@ def run_dashboard_loop(
     refresh_interval: float = REFRESH_INTERVAL_SECONDS,
     targets: DashboardTargets | None = None,
     auth = None,  # RobinhoodAuth instance for re-authentication
-    console: Optional[Console] = None,
+    console: Console | None = None,
 ) -> None:
     """Run live dashboard with simple command controls."""
 
@@ -230,7 +230,7 @@ def main(
     trade_helper: TradeQueryHelper,
     *,
     auth = None,  # RobinhoodAuth instance for re-authentication
-    console: Optional[Console] = None,
+    console: Console | None = None,
 ) -> None:
     """Entry point invoked from __main__ after authentication."""
 

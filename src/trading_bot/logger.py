@@ -13,11 +13,11 @@ Log Files:
 """
 
 import logging
+import sys
+from datetime import UTC, datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
-import sys
-from datetime import datetime, timezone
 
 
 class UTCFormatter(logging.Formatter):
@@ -27,7 +27,7 @@ class UTCFormatter(logging.Formatter):
     Enforces §Data_Integrity: All timestamps must be UTC.
     """
 
-    def formatTime(self, record: logging.LogRecord, datefmt: Optional[str] = None) -> str:
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
         """
         Format time in UTC.
 
@@ -38,7 +38,7 @@ class UTCFormatter(logging.Formatter):
         Returns:
             Formatted UTC timestamp
         """
-        dt = datetime.fromtimestamp(record.created, tz=timezone.utc)
+        dt = datetime.fromtimestamp(record.created, tz=UTC)
         format_str = datefmt or self.datefmt
         if format_str:
             return dt.strftime(format_str)
@@ -72,7 +72,7 @@ class TradingLogger:
     _initialized = False
 
     @classmethod
-    def setup(cls, logs_dir: Optional[Path] = None) -> None:
+    def setup(cls, logs_dir: Path | None = None) -> None:
         """
         Initialize logging system.
 
@@ -271,7 +271,7 @@ class TradingLogger:
         return logger
 
 
-def setup_logging(logs_dir: Optional[Path] = None) -> None:
+def setup_logging(logs_dir: Path | None = None) -> None:
     """
     Convenience function to initialize logging system.
 

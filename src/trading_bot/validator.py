@@ -7,11 +7,11 @@ Enforces Constitution v1.0.0:
 - §Safety_First: Test API connection before live trading
 """
 
-from typing import List, Tuple, Optional
-from pathlib import Path
+import logging
 import os
 import re
-import logging
+from pathlib import Path
+from typing import List, Optional, Tuple
 
 from .config import Config
 
@@ -41,10 +41,10 @@ class ConfigValidator:
             config: Configuration instance to validate
         """
         self.config = config
-        self.errors: List[str] = []
-        self.warnings: List[str] = []
+        self.errors: list[str] = []
+        self.warnings: list[str] = []
 
-    def validate_all(self, test_api: bool = False) -> Tuple[bool, List[str], List[str]]:
+    def validate_all(self, test_api: bool = False) -> tuple[bool, list[str], list[str]]:
         """
         Run all validation checks.
 

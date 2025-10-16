@@ -28,7 +28,7 @@ class HealthCheckResult:
     success: bool
     timestamp: datetime
     latency_ms: int
-    error_message: Optional[str] = None
+    error_message: str | None = None
     reauth_triggered: bool = False
 
 
@@ -39,7 +39,7 @@ class SessionHealthStatus:
     is_healthy: bool
     session_start_time: datetime
     session_uptime_seconds: int
-    last_health_check: Optional[datetime]
+    last_health_check: datetime | None
     health_check_count: int
     reauth_count: int
     consecutive_failures: int
@@ -84,10 +84,10 @@ class SessionHealthMonitor:
             consecutive_failures=0,
         )
 
-        self._timer: Optional[Timer] = None
+        self._timer: Timer | None = None
         self._lock = Lock()
-        self._last_result: Optional[HealthCheckResult] = None
-        self._last_result_monotonic: Optional[float] = None
+        self._last_result: HealthCheckResult | None = None
+        self._last_result_monotonic: float | None = None
         self._masked_username = mask_username(self._auth.auth_config.username)
 
         # Pre-construct retry policy for transient errors
@@ -172,7 +172,7 @@ class SessionHealthMonitor:
     # Internal helpers
     # ------------------------------------------------------------------ #
 
-    def _get_cached_result(self) -> Optional[HealthCheckResult]:
+    def _get_cached_result(self) -> HealthCheckResult | None:
         if self._cache_ttl_seconds == 0:
             return None
 

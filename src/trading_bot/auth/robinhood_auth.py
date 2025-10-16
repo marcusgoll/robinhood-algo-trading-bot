@@ -9,17 +9,19 @@ Constitution v1.0.0:
 - §Safety_First: Bot fails to start if auth fails
 """
 
+import logging
+import os
+import pickle
+import re
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-import re
-import pickle
-import os
-import logging
-import time
-from typing import Optional, Any, Callable, TypeVar
+from typing import Any, Optional, TypeVar
+
 import dotenv
 
-from ..utils.security import mask_username, mask_password, mask_mfa_secret, mask_device_token
+from ..utils.security import mask_device_token, mask_mfa_secret, mask_password, mask_username
 
 logger = logging.getLogger(__name__)
 
@@ -100,8 +102,8 @@ class AuthConfig:
     """
     username: str
     password: str
-    mfa_secret: Optional[str] = None
-    device_token: Optional[str] = None
+    mfa_secret: str | None = None
+    device_token: str | None = None
     pickle_path: str = ".robinhood.pickle"
 
     @classmethod
@@ -164,7 +166,7 @@ class RobinhoodAuth:
             self.auth_config = config
 
         self._authenticated: bool = False
-        self._session: Optional[Any] = None
+        self._session: Any | None = None
 
     def is_authenticated(self) -> bool:
         """Check if currently authenticated."""
@@ -224,7 +226,7 @@ class RobinhoodAuth:
 
         # Attempt login with retry logic (T034)
         try:
-            mfa_code: Optional[str] = None
+            mfa_code: str | None = None
             if self.auth_config.mfa_secret:
                 if not pyotp:
                     raise AuthenticationError("MFA secret configured but pyotp is unavailable")

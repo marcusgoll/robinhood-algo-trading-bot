@@ -60,3 +60,24 @@ class RateLimitError(RetriableError):
     def __init__(self, message: str, retry_after: int = 60):
         super().__init__(message)
         self.retry_after = retry_after
+
+
+class CircuitBreakerTripped(NonRetriableError):
+    """
+    Exception raised when circuit breaker trips due to excessive failures.
+
+    This is a NonRetriableError because it requires manual intervention
+    to investigate and resolve underlying issues before resuming operations.
+
+    Use cases:
+    - Stop placement failure rate exceeds threshold (>2%)
+    - Consecutive API failures exceed limit
+    - System health degradation detected
+
+    Example:
+        raise CircuitBreakerTripped(
+            "Circuit breaker tripped: stop placement failure rate exceeded 2% threshold"
+        )
+    """
+
+    pass
