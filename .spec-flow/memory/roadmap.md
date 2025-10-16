@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-16 (performance-tracking feature shipped to master)
+**Last updated**: 2025-10-16 (trade-management-rules v1.3.0 shipped to master)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -325,6 +325,32 @@
   - Full Constitution v1.0.0 compliance (§Audit_Everything, §Data_Integrity, §Testing_Requirements)
   - Documentation: spec, plan, tasks, local-ship-report, code-review-report, optimization-report
 
+### trade-management-rules
+- **Title**: ATR-based trade management rules
+- **Area**: strategy
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-16
+- **Release**: v1.3.0 - Trade management rules with break-even, scale-in, catastrophic exit
+- **Spec**: specs/atr-stop-adjustment/ (extended with trade rules)
+- **Delivered**:
+  - PositionState dataclass: Immutable position state tracking (entry, current price, ATR, scale-in count, flags)
+  - RuleActivation dataclass: Rule decision output (action, reason, quantity, new_stop_price)
+  - evaluate_break_even_rule(): Move stop to entry at 2xATR favorable move (idempotent)
+  - evaluate_scale_in_rule(): Add 50% position at 1.5xATR (max 3 scale-ins, portfolio risk limit 2%)
+  - evaluate_catastrophic_exit_rule(): Close position at 3xATR adverse move
+  - Volatility-adaptive rules using ATR thresholds
+  - Portfolio risk management (2% maximum total portfolio risk)
+  - Idempotent break-even rule (executes once per position via flag tracking)
+  - Decimal precision for all financial calculations
+  - Comprehensive validation (ATR availability, thresholds, limits)
+  - Detailed audit reasons for every rule activation
+  - 6 trade management tests (100% pass rate in 0.31s)
+  - 14 risk_management suite tests passing (no regressions in 1.93s)
+  - Full Constitution v1.0.0 compliance (§Risk_Management, §Safety_First, §Testing_Requirements)
+  - Production-ready, awaits position manager integration
+  - Documentation: trade-rules-ship-report.md, NOTES.md (T006-T011 complete)
+
 ## In Progress
 
 <!-- Currently implementing -->
@@ -510,18 +536,6 @@
   - Identify daily/4H support and resistance levels
   - Track rejection and breakout patterns
   - [BLOCKED: technical-indicators]
-
-### trade-management-rules
-- **Title**: Trade management rules
-- **Area**: strategy
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.8 | **Score**: 2.00
-- **Requirements**:
-  - Prevent early break-even stops
-  - Add to winning positions (scaling in)
-  - Cut losing trades early (§Risk_Management)
-  - [BLOCKED: order-management]
 
 ### level2-integration
 - **Title**: Level 2 order flow integration
