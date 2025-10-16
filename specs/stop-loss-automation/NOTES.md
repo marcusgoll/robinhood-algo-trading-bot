@@ -120,6 +120,62 @@ Task generation: Created 43 concrete implementation tasks following TDD cycle (R
 ## Phase 3 Summary
 Cross-artifact analysis: Validated 100% requirement coverage (14 functional, 8 non-functional requirements all mapped to tasks). TDD discipline confirmed with strict RED → GREEN → REFACTOR sequence (14 RED tests, 11 GREEN implementations, 3 REFACTOR cleanups). Architecture consistency verified: Two-tier design (RiskManager + OrderManager) maintained across spec, plan, and tasks. Reuse validation: All 7 existing components (OrderManager, SafetyChecks, AccountData, TradeRecord, StructuredTradeLogger, error hierarchy, retry decorators) confirmed available. New components: All 8 specified (RiskManager, PullbackAnalyzer, RiskRewardCalculator, StopAdjuster, TargetMonitor, models, exceptions, config). Edge cases: All 5 covered with tests. Performance targets: 4 benchmarks included. Terminology: No drift detected. Integration points: TradingBot and OrderManager integration fully specified. Zero critical, high, medium, or low issues found. Status: Ready for implementation. Analysis report: specs/stop-loss-automation/analysis-report.md.
 
+## Configuration Setup
+
+The stop-loss automation feature extends the existing `risk_management` section in `config.json` with new fields for automated stop placement and target management. Follow the pattern from `config.example.json`.
+
+**Required fields to add:**
+
+```json
+{
+  "risk_management": {
+    "account_risk_pct": 1.0,
+    "min_risk_reward_ratio": 2.0,
+    "default_stop_pct": 2.0,
+    "trailing_enabled": true,
+    "pullback_lookback_candles": 20,
+    "trailing_breakeven_threshold": 0.5,
+    "strategy_overrides": {}
+  }
+}
+```
+
+**Field explanations:**
+
+- `account_risk_pct` (float): Maximum percentage of account balance to risk per trade (e.g., 1.0 = 1%). Used to calculate position size based on distance to stop-loss. Aligns with Constitution §Risk_Management.
+
+- `min_risk_reward_ratio` (float): Minimum required risk-reward ratio for trade entry (e.g., 2.0 = target must be 2x stop distance). Ensures positive expectancy over time.
+
+- `default_stop_pct` (float): Fallback stop-loss percentage below entry price when no clear pullback low is detected (e.g., 2.0 = 2% below entry). Used by PullbackAnalyzer as safety default.
+
+- `trailing_enabled` (bool): Enable automatic trailing stop adjustment. When true, moves stop to breakeven at 50% target progress (configurable via `trailing_breakeven_threshold`).
+
+- `pullback_lookback_candles` (int): Number of recent candles to analyze for swing low detection. Typical range: 10-30. Higher values capture deeper pullbacks, lower values react faster to recent price action.
+
+- `trailing_breakeven_threshold` (float): Price progress threshold to trigger breakeven stop (e.g., 0.5 = move stop to entry when price reaches 50% to target). Prevents profitable trades from becoming losers.
+
+- `strategy_overrides` (dict): Optional per-strategy customization. Follows same pattern as `order_management.strategy_overrides`. Example:
+  ```json
+  "strategy_overrides": {
+    "bull_flag_breakout": {
+      "account_risk_pct": 0.5,
+      "min_risk_reward_ratio": 3.0
+    }
+  }
+  ```
+
+**Migration steps:**
+
+1. Copy `config.example.json` to `config.json` if not exists
+2. Add new fields to existing `risk_management` section (preserve existing fields like `max_position_pct`, `max_daily_loss_pct`)
+3. Adjust values based on risk tolerance and trading style
+4. Restart trading bot to load new configuration
+5. Verify in logs: "RiskManagementConfig loaded" with field values
+
+**Validation:**
+
+Run config validation script (if exists) or check logs on startup for configuration errors. RiskManagementConfig uses Pydantic validation with strict types and bounds checking.
+
 ## Task Progress
 ✅ T001 [P]: Create risk_management package structure (commit: 90c574d)
 ✅ T002 [P]: Create domain exceptions (commit: 9229f75)
@@ -160,6 +216,7 @@ Cross-artifact analysis: Validated 100% requirement coverage (14 functional, 8 n
 ✅ T038 [RED]: Write test for retry on transient broker failures (commit: d96e43f)
 ✅ T039 [GREEN→T038]: Apply @retry_on_transient_failure decorator (commit: 52b3163)
 ✅ T040 [P]: Add circuit breaker integration for stop placement failures (commit: 54c7914)
+✅ T041 [P]: Add config migration instructions to NOTES.md
 ✅ T042 [P]: Document rollback procedure in NOTES.md
 
 ## Rollback Runbook
