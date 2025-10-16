@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Optional
 
 from trading_bot.risk_management.exceptions import PositionPlanningError
-from trading_bot.risk_management.models import PositionPlan
+from trading_bot.risk_management.models import ATRStopData, PositionPlan
 
 
 def validate_stop_distance(entry: Decimal, stop: Decimal) -> None:
@@ -199,7 +200,8 @@ def calculate_position_plan(
     account_balance: Decimal,
     risk_pct: float,
     min_risk_reward_ratio: float = 2.0,
-    pullback_source: str = "manual"
+    pullback_source: str = "manual",
+    atr_data: Optional[ATRStopData] = None
 ) -> PositionPlan:
     """
     Calculate position plan with risk-based sizing and 2:1 targets.
@@ -212,6 +214,8 @@ def calculate_position_plan(
         account_balance: Total account balance
         risk_pct: Maximum risk percentage (e.g., 1.0 for 1%)
         min_risk_reward_ratio: Minimum allowed risk-reward ratio (default: 2.0)
+        pullback_source: Source of stop price ("manual", "pullback", "atr")
+        atr_data: Optional ATR-based stop data (sets pullback_source="atr" if provided)
 
     Returns:
         PositionPlan with calculated quantities, prices, and risk metrics
@@ -220,6 +224,7 @@ def calculate_position_plan(
         PositionPlanningError: If target_rr is below min_risk_reward_ratio
 
     From: specs/stop-loss-automation/tasks.md T023, T013
+          specs/atr-stop-adjustment/tasks.md T018
     """
     # Validation: Enforce minimum risk-reward ratio (T013)
     validate_risk_reward_ratio(target_rr, min_risk_reward_ratio)
@@ -249,6 +254,10 @@ def calculate_position_plan(
 
     # Step 6: Calculate actual reward ratio (reward_amount / risk_amount)
     actual_reward_ratio = float(reward_amount / risk_amount)
+
+    # ATR integration: Override pullback_source if ATR data provided
+    if atr_data is not None:
+        pullback_source = "atr"
 
     return PositionPlan(
         symbol=symbol,
