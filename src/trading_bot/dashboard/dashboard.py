@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import queue
 import threading
 import time
 import uuid
-from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any, Optional
 
 from rich.console import Console
 from rich.live import Live
 
 from ..account.account_data import AccountData
+from ..logger import log_dashboard_event
 from ..logging.query_helper import TradeQueryHelper
 from .data_provider import DashboardDataProvider
 from .display_renderer import DisplayRenderer
@@ -25,7 +23,6 @@ from .models import DashboardSnapshot, DashboardTargets
 
 logger = logging.getLogger(__name__)
 
-USAGE_LOG_PATH = Path("logs/dashboard-usage.jsonl")
 REFRESH_INTERVAL_SECONDS = 5.0
 
 
@@ -67,24 +64,6 @@ class _CommandReader:
             command = raw.strip()
             if command:
                 self._queue.put(command.upper())
-
-
-def log_dashboard_event(event: str, **payload: object) -> None:
-    """Append structured dashboard events to logs/dashboard-usage.jsonl."""
-    try:
-        USAGE_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        entry = {
-            "timestamp": datetime.now(UTC).isoformat(),
-            "event": event,
-            **payload,
-        }
-        with USAGE_LOG_PATH.open("a", encoding="utf-8") as handle:
-            json.dump(entry, handle)
-            handle.write("\n")
-    except Exception as exc:  # pragma: no cover - logging should not break dashboard
-        logger.warning(
-            "Failed to write dashboard event %s: %s", event, exc, exc_info=True
-        )
 
 
 def run_dashboard_loop(

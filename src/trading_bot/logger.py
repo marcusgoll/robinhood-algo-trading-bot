@@ -12,12 +12,13 @@ Log Files:
 - logs/errors.log: Error and exception logs
 """
 
+import json
 import logging
 import sys
 from datetime import UTC, datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 
 class UTCFormatter(logging.Formatter):
@@ -300,7 +301,7 @@ def log_trade(
     quantity: int,
     price: float,
     mode: str,
-    **kwargs
+    **kwargs: Any
 ) -> None:
     """
     Log a trade execution (§Audit_Everything).
@@ -338,3 +339,47 @@ def log_error(error: Exception, context: str = "") -> None:
         logger.error(f"{context}: {type(error).__name__}: {str(error)}", exc_info=True)
     else:
         logger.error(f"{type(error).__name__}: {str(error)}", exc_info=True)
+
+
+def log_dashboard_event(
+    event: str,
+    log_path: Path | None = None,
+    **payload: object
+) -> None:
+    """
+    Append structured dashboard events to JSONL log file.
+
+    Provides consistent structured logging for dashboard usage events
+    following the existing structured logging pattern.
+
+    Args:
+        event: Event name (e.g., "dashboard.launched", "dashboard.refreshed")
+        log_path: Optional custom log path (default: logs/dashboard-usage.jsonl)
+        **payload: Additional event data to include in log entry
+
+    Example:
+        log_dashboard_event(
+            "dashboard.refreshed",
+            session_id="abc-123",
+            manual=True,
+            data_age_seconds=5.2
+        )
+    """
+    if log_path is None:
+        log_path = TradingLogger.LOGS_DIR / "dashboard-usage.jsonl"
+
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "event": event,
+            **payload,
+        }
+        with log_path.open("a", encoding="utf-8") as handle:
+            json.dump(entry, handle)
+            handle.write("\n")
+    except Exception as exc:  # pragma: no cover - logging should not break dashboard
+        error_logger = TradingLogger.get_errors_logger()
+        error_logger.warning(
+            "Failed to write dashboard event %s: %s", event, exc, exc_info=True
+        )
