@@ -120,7 +120,7 @@ Enhancement to existing stop-loss automation that adds ATR (Average True Range) 
 ✅ T009 [RED]: Write test: ATRCalculator.validate_atr_stop() checks distance bounds
 ✅ T010 [RED]: Write test: ATRCalculator.validate_atr_stop() rejects >10% stops
 ✅ T011 [RED]: Write test: Calculator.calculate_position_plan() with ATR data
-✅ T013 [RED]: Write test: ATR calculation performance <50ms
+✅ T013 [RED]: Write test: StopAdjuster.calculate_adjustment() with ATR recalculation
 
 ### Phase 3.5 Integration (T028-T031)
 ✅ T028 [RED]: Write test: End-to-end ATR workflow (test_integration_atr.py)
