@@ -5,10 +5,9 @@ Cache utilities for incremental performance summary updates.
 import hashlib
 import json
 from pathlib import Path
-from typing import Dict, Optional
 
 
-def load_index(index_path: Path = Path("logs/performance/performance-index.json")) -> Dict[str, str]:
+def load_index(index_path: Path = Path("logs/performance/performance-index.json")) -> dict[str, str]:
     """
     Load the cache index file containing checksums and metadata.
 
@@ -30,7 +29,7 @@ def load_index(index_path: Path = Path("logs/performance/performance-index.json"
         return {}
 
 
-def update_index(index: Dict[str, str], index_path: Path) -> None:
+def update_index(index: dict[str, str], index_path: Path) -> None:
     """
     Update the cache index file atomically.
 
@@ -53,7 +52,7 @@ def update_index(index: Dict[str, str], index_path: Path) -> None:
     temp_path.replace(index_path)
 
 
-def needs_refresh(file_path: Path, checksum: Optional[str]) -> bool:
+def needs_refresh(file_path: Path, checksum: str | None) -> bool:
     """
     Check if a file needs to be reprocessed based on MD5 checksum.
 
@@ -73,7 +72,8 @@ def needs_refresh(file_path: Path, checksum: Optional[str]) -> bool:
         return False
 
     # Compute current checksum
-    current_checksum = hashlib.md5(file_path.read_bytes()).hexdigest()
+    # MD5 is used for file integrity checking, not cryptographic security
+    current_checksum = hashlib.md5(file_path.read_bytes(), usedforsecurity=False).hexdigest()  # nosec B324
 
     # Compare
     return current_checksum != checksum

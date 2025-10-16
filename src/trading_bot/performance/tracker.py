@@ -6,11 +6,9 @@ import json
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional
 
 from ..dashboard.metrics_calculator import MetricsCalculator
 from ..logging.query_helper import TradeQueryHelper
-from .cache import load_index, needs_refresh, update_index
 from .models import PerformanceSummary
 
 
@@ -44,8 +42,8 @@ class PerformanceTracker:
     def get_summary(
         self,
         window: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
     ) -> PerformanceSummary:
         """
         Get performance summary for the specified window.
@@ -227,7 +225,7 @@ class PerformanceTracker:
         summary: PerformanceSummary,
         export_json: bool = True,
         export_md: bool = True
-    ) -> tuple[Optional[Path], Optional[Path]]:
+    ) -> tuple[Path | None, Path | None]:
         """
         Export summary to JSON and/or Markdown files.
 

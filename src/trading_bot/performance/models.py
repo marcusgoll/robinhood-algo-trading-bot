@@ -5,7 +5,6 @@ Performance tracking data models.
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 
 
 @dataclass
@@ -41,4 +40,4 @@ class AlertEvent:
     target: Decimal
     severity: str  # "WARN", "CRITICAL"
     raised_at: datetime
-    acknowledged_at: Optional[datetime] = None
+    acknowledged_at: datetime | None = None

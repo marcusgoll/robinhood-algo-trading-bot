@@ -5,14 +5,12 @@ CLI entrypoint for performance tracking commands.
 import argparse
 import sys
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import List, Optional
 
 from .alerts import AlertEvaluator
 from .tracker import PerformanceTracker
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """
     CLI entrypoint for performance tracking.
 
@@ -94,7 +92,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     # Display summary
     print(f"\n=== Performance Summary ({summary.window}) ===")
     print(f"Period: {summary.start_date.date()} to {summary.end_date.date()}")
-    print(f"\nMetrics:")
+    print("\nMetrics:")
     print(f"  Total Trades: {summary.total_trades}")
     print(f"  Wins: {summary.total_wins}")
     print(f"  Losses: {summary.total_losses}")
@@ -112,12 +110,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         for alert in alerts:
             print(f"  - {alert.metric}: {alert.actual} (target: {alert.target})")
     else:
-        print(f"\n✅ All metrics within targets")
+        print("\n✅ All metrics within targets")
 
     # Export if requested
     if args.export:
         json_path, md_path = tracker.export_to_files(summary)
-        print(f"\nExported:")
+        print("\nExported:")
         if json_path:
             print(f"  JSON: {json_path}")
         if md_path:

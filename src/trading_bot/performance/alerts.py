@@ -8,7 +8,6 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import List
 
 import yaml
 
@@ -63,7 +62,7 @@ class AlertEvaluator:
                 "avg_risk_reward_target": 1.0,
             }
 
-    def evaluate(self, summary: PerformanceSummary) -> List[AlertEvent]:
+    def evaluate(self, summary: PerformanceSummary) -> list[AlertEvent]:
         """
         Evaluate a performance summary against targets.
 
@@ -73,7 +72,7 @@ class AlertEvaluator:
         Returns:
             List of AlertEvent objects for any breaches
         """
-        alerts: List[AlertEvent] = []
+        alerts: list[AlertEvent] = []
 
         # Check win rate
         win_rate_target = self.targets.get("win_rate_target", 60.0)
@@ -121,7 +120,7 @@ class AlertEvaluator:
 
         return alerts
 
-    def _write_alerts(self, alerts: List[AlertEvent]) -> None:
+    def _write_alerts(self, alerts: list[AlertEvent]) -> None:
         """Write alerts to JSONL log file."""
         # Ensure directory exists
         self.alert_log.parent.mkdir(parents=True, exist_ok=True)
