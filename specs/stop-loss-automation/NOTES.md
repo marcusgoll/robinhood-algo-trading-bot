@@ -134,7 +134,11 @@ Cross-artifact analysis: Validated 100% requirement coverage (14 functional, 8 n
 ✅ T011 [RED]: Write failing test for stop distance validation (commit: 44fc9eb)
 ✅ T012 [RED]: Write failing test for stop direction validation (commit: 5d36464)
 ✅ T013 [RED]: Write failing test for minimum risk-reward ratio enforcement (commit: 44fc9eb)
+✅ T014 [RED]: Write failing test for RiskManager places orders (commit: bc4189f)
+✅ T015 [RED]: Write failing test for position plan JSONL logging (commit: 55588a0)
+✅ T016 [RED]: Write failing test for trailing stop at 50% progress (commit: 4d5d757)
+✅ T017 [RED]: Write failing test for trailing disabled (commit: 4d5d757)
 ✅ T019 [RED]: Write failing test for stop fill cleanup (commit: 4b9a08a)
 
 ## Last Updated
-2025-10-16T00:20:00-05:00
+2025-10-16T00:47:00-05:00
