@@ -380,6 +380,36 @@ After any rollback, document in error-log.md:
 
 ## Additional Tasks: Trade Management Rules
 
+### T006 [RED]: Break-even rule activation test
+✅ T006 [RED]: Break-even rule activates at 2xATR (failing as expected)
+- **File**: tests/risk_management/test_trade_management_rules.py
+- **Test**: test_break_even_rule_activates_at_2x_atr()
+- **Status**: Test written and failing as expected (ModuleNotFoundError)
+- **Scenario**: Position with entry=$100, current_price=$106, current_atr=$3 (2xATR=$6 favorable move)
+- **Expected**: RuleActivation with action="move_stop", new_stop_price=$100 (break-even)
+- **Actual**: ModuleNotFoundError - evaluate_break_even_rule() doesn't exist yet
+- **Commit**: aeba765 - test(red): T006-T007 write failing break-even tests
+
+### T007 [RED]: Break-even idempotency test
+✅ T007 [RED]: Break-even idempotency prevents multiple activations (failing as expected)
+- **File**: tests/risk_management/test_trade_management_rules.py
+- **Test**: test_break_even_rule_prevents_multiple_activations()
+- **Status**: Test written and failing as expected (ModuleNotFoundError)
+- **Scenario**: Position with break_even_activated=True, current_price=$110 (well above 2xATR)
+- **Expected**: RuleActivation with action="hold" (no stop adjustment)
+- **Actual**: ModuleNotFoundError - evaluate_break_even_rule() doesn't exist yet
+- **Commit**: aeba765 - test(red): T006-T007 write failing break-even tests
+
+### T008 [RED]: Scale-in rule test
+✅ T008 [RED]: Write test that scale-in rule adds 50% position at 1.5xATR
+- **File**: tests/risk_management/test_trade_management_rules.py
+- **Test**: test_scale_in_at_1_5x_atr_above_entry()
+- **Status**: Test written and failing as expected (ModuleNotFoundError)
+- **Scenario**: Position at entry=$100, current_price=$104.50 (1.5xATR above), current_atr=$3, quantity=100
+- **Expected**: RuleActivation with action="add_position", quantity=50 (50% of 100)
+- **Actual**: ModuleNotFoundError - evaluate_scale_in_rule() doesn't exist yet
+- **Commit**: 2ea71a2 - test(red): T008 write failing scale-in rule test
+
 ### T009 [RED]: Scale-in max limit test
 ✅ T009 [RED]: Write failing test for scale-in rule respects max 3 scale-ins limit
 - **File**: tests/risk_management/test_trade_management_rules.py
