@@ -154,6 +154,43 @@ def validate_risk_limits(
     return risk_pct <= max_risk_pct
 
 
+def _calculate_shares(
+    entry_price: Decimal,
+    stop_price: Decimal,
+    account_balance: Decimal,
+    risk_pct: float
+) -> tuple[int, Decimal]:
+    """
+    Calculate position size (shares) and risk amount based on risk parameters.
+
+    Private helper method for calculate_position_plan(). Extracts steps 1-3
+    of position planning to enforce single responsibility principle.
+
+    Args:
+        entry_price: Entry price per share
+        stop_price: Stop-loss price per share
+        account_balance: Total account balance
+        risk_pct: Maximum risk percentage (e.g., 1.0 for 1%)
+
+    Returns:
+        Tuple of (quantity, risk_amount):
+        - quantity: Number of shares to buy
+        - risk_amount: Dollar amount at risk for this position
+
+    From: specs/stop-loss-automation/tasks.md T031
+    """
+    # Step 1: Calculate risk per share
+    risk_per_share = entry_price - stop_price
+
+    # Step 2: Calculate risk amount (account_balance * risk_pct / 100)
+    risk_amount = account_balance * (Decimal(str(risk_pct)) / Decimal("100"))
+
+    # Step 3: Calculate quantity (int(risk_amount / risk_per_share))
+    quantity = int(risk_amount / risk_per_share)
+
+    return quantity, risk_amount
+
+
 def calculate_position_plan(
     symbol: str,
     entry_price: Decimal,
@@ -192,14 +229,16 @@ def calculate_position_plan(
     # Validation: Stop distance bounds (T011)
     validate_stop_distance(entry_price, stop_price)
 
-    # Step 1: Calculate risk per share
+    # Calculate position size and risk amount (extracted to separate method)
+    quantity, risk_amount = _calculate_shares(
+        entry_price=entry_price,
+        stop_price=stop_price,
+        account_balance=account_balance,
+        risk_pct=risk_pct
+    )
+
+    # Calculate risk per share for target calculation
     risk_per_share = entry_price - stop_price
-
-    # Step 2: Calculate risk amount (account_balance * risk_pct / 100)
-    risk_amount = account_balance * (Decimal(str(risk_pct)) / Decimal("100"))
-
-    # Step 3: Calculate quantity (int(risk_amount / risk_per_share))
-    quantity = int(risk_amount / risk_per_share)
 
     # Step 4: Calculate target price (entry + (entry - stop) * target_rr)
     target_price = entry_price + (risk_per_share * Decimal(str(target_rr)))
