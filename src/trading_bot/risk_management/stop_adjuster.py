@@ -10,21 +10,24 @@ from .models import PositionPlan
 
 
 class StopAdjuster:
-    """Manages stop-loss adjustments including trailing stops."""
+    """Manages stop-loss adjustments including trailing stops and ATR-based dynamic stops."""
 
     def __init__(
         self,
         activation_pct: float = 10.0,
         trailing_distance_pct: float = 5.0,
+        config: Optional[RiskManagementConfig] = None,
     ) -> None:
         """Initialize stop adjuster.
 
         Args:
             activation_pct: Profit percentage to activate trailing stop
             trailing_distance_pct: Distance to maintain below high
+            config: Optional risk management config (for ATR integration)
         """
         self.activation_pct = activation_pct
         self.trailing_distance_pct = trailing_distance_pct
+        self.config = config
 
     def should_activate_trailing(
         self, entry_price: Decimal, current_price: Decimal
@@ -76,6 +79,7 @@ class StopAdjuster:
         current_price: Decimal,
         position_plan: PositionPlan,
         config: RiskManagementConfig,
+        current_atr: Optional[Decimal] = None,
     ) -> tuple[Decimal, str] | None:
         """Calculate stop-loss adjustment based on current price and position progress.
 
@@ -83,10 +87,47 @@ class StopAdjuster:
             current_price: Current market price
             position_plan: Position plan with entry, stop, and target prices
             config: Risk management configuration
+            current_atr: Optional current ATR value (for dynamic ATR stop adjustment)
 
         Returns:
             Tuple of (new_stop_price, adjustment_reason) if adjustment needed, None otherwise
+
+        ATR Dynamic Stop Adjustment Logic:
+            1. If current_atr provided and position is ATR-based (pullback_source="atr")
+            2. Calculate initial ATR from position: (entry - stop) / multiplier
+            3. Check if ATR changed >threshold (default 20%)
+            4. If yes, recalculate stop: current_price - (current_atr * multiplier)
+            5. Compare ATR stop with breakeven/trailing stop, select widest (most protective)
         """
+        # ATR Dynamic Stop Adjustment (T019)
+        if (
+            current_atr is not None
+            and config.atr_enabled
+            and position_plan.pullback_source == "atr"
+        ):
+            # Calculate initial ATR from position plan
+            # initial_stop = entry - (initial_atr * multiplier)
+            # Therefore: initial_atr = (entry - initial_stop) / multiplier
+            initial_stop_distance = position_plan.entry_price - position_plan.stop_price
+            initial_atr = initial_stop_distance / Decimal(str(config.atr_multiplier))
+
+            # Check if ATR changed significantly (>threshold)
+            atr_change_pct = abs(current_atr - initial_atr) / initial_atr
+
+            if atr_change_pct >= Decimal(str(config.atr_recalc_threshold)):
+                # Recalculate stop using current ATR
+                new_stop_price = current_price - (
+                    current_atr * Decimal(str(config.atr_multiplier))
+                )
+
+                adjustment_reason = (
+                    f"ATR recalculation: ATR changed from {initial_atr:.2f} to {current_atr:.2f} "
+                    f"({float(atr_change_pct * 100):.1f}% change, threshold: {config.atr_recalc_threshold * 100:.0f}%)"
+                )
+
+                return (new_stop_price, adjustment_reason)
+
+        # Standard trailing stop logic (if ATR recalc not triggered)
         # If trailing is disabled, no adjustment
         if not config.trailing_enabled:
             return None
