@@ -1,0 +1,344 @@
+# Risk Management API Contract
+
+## RiskManager Service
+
+### calculate_position_with_stop
+**Purpose**: Calculate position plan with stop-loss and target prices based on pullback analysis
+
+**Signature**:
+```python
+def calculate_position_with_stop(
+    symbol: str,
+    entry_price: float,
+    account_balance: float,
+    account_risk_pct: float,
+    price_data: List[Dict[str, Any]]
+) -> PositionPlan
+```
+
+**Parameters**:
+- `symbol`: Stock ticker (e.g., "TSLA")
+- `entry_price`: Intended entry price per share
+- `account_balance`: Total account balance
+- `account_risk_pct`: Max risk per trade as % of account (e.g., 1.0 for 1%)
+- `price_data`: Recent price candles for pullback analysis (list of dicts with 'low', 'high', 'close', 'timestamp')
+
+**Returns**: `PositionPlan` dataclass with:
+- `symbol`: str
+- `entry_price`: Decimal
+- `stop_price`: Decimal (pullback low or default % below entry)
+- `target_price`: Decimal (2:1 risk-reward from entry)
+- `quantity`: int (shares based on risk calculation)
+- `risk_amount`: Decimal (dollar amount at risk to stop)
+- `reward_amount`: Decimal (dollar amount at target)
+- `reward_ratio`: float (actual R:R ratio)
+- `pullback_source`: str ("detected" | "default")
+- `pullback_price`: Optional[Decimal]
+
+**Raises**:
+- `PositionPlanningError`: If stop distance <0.5% or >10% of entry price
+- `ValueError`: If input parameters invalid (negative values, empty price_data)
+
+**Example**:
+```python
+price_data = [
+    {'low': 248.00, 'high': 252.00, 'close': 250.00, 'timestamp': '2025-10-15T10:00:00Z'},
+    {'low': 249.00, 'high': 253.00, 'close': 251.00, 'timestamp': '2025-10-15T10:05:00Z'},
+    # ... 18 more candles
+]
+
+plan = risk_manager.calculate_position_with_stop(
+    symbol="TSLA",
+    entry_price=250.30,
+    account_balance=100000.00,
+    account_risk_pct=1.0,
+    price_data=price_data
+)
+
+# plan.stop_price = Decimal('248.00')  # Detected pullback low
+# plan.target_price = Decimal('254.90')  # 2:1 R:R
+# plan.quantity = 434  # Shares (risk $1000 over $2.30 distance)
+# plan.pullback_source = "detected"
+```
+
+---
+
+### place_trade_with_risk_management
+**Purpose**: Submit entry, stop-loss, and target orders for a position plan
+
+**Signature**:
+```python
+def place_trade_with_risk_management(
+    plan: PositionPlan,
+    symbol: str,
+    strategy_name: Optional[str] = None
+) -> RiskManagementEnvelope
+```
+
+**Parameters**:
+- `plan`: PositionPlan from calculate_position_with_stop()
+- `symbol`: Stock ticker (redundant but for validation)
+- `strategy_name`: Optional strategy name for order tracking
+
+**Returns**: `RiskManagementEnvelope` dataclass with:
+- `position_plan`: PositionPlan
+- `entry_order_id`: str (broker order ID for entry)
+- `stop_order_id`: str (broker order ID for stop-loss)
+- `target_order_id`: str (broker order ID for target)
+- `status`: str ("pending" | "active" | "stopped" | "target_hit" | "cancelled")
+- `adjustments`: List[Dict] (trailing stop changes)
+- `created_at`: datetime
+- `updated_at`: datetime
+
+**Raises**:
+- `StopPlacementError`: If stop-loss order submission fails
+- `OrderSubmissionError`: If entry or target order submission fails
+
+**Side Effects**:
+- Submits 3 orders to broker (entry limit buy, stop limit sell, target limit sell)
+- Registers pending orders in SafetyChecks
+- Logs to logs/risk-management.jsonl
+
+**Example**:
+```python
+envelope = risk_manager.place_trade_with_risk_management(
+    plan=position_plan,
+    symbol="TSLA",
+    strategy_name="momentum_v1"
+)
+
+# envelope.entry_order_id = "abc123"
+# envelope.stop_order_id = "def456"
+# envelope.target_order_id = "ghi789"
+# envelope.status = "pending"
+```
+
+---
+
+### adjust_trailing_stop
+**Purpose**: Cancel existing stop and place new stop at breakeven or trailing level
+
+**Signature**:
+```python
+def adjust_trailing_stop(
+    symbol: str,
+    current_price: float,
+    risk_envelope: RiskManagementEnvelope
+) -> RiskManagementEnvelope
+```
+
+**Parameters**:
+- `symbol`: Stock ticker
+- `current_price`: Current market price
+- `risk_envelope`: Existing position envelope with stop order ID
+
+**Returns**: Updated `RiskManagementEnvelope` with:
+- New `stop_order_id` (old stop cancelled, new stop placed)
+- Updated `adjustments` list with timestamp, old_stop, new_stop, reason
+- Updated `updated_at` timestamp
+
+**Raises**:
+- `TargetAdjustmentError`: If stop cancellation or placement fails
+
+**Side Effects**:
+- Cancels old stop order via OrderManager
+- Submits new stop order at adjusted price
+- Logs adjustment to logs/risk-management.jsonl
+
+**Example**:
+```python
+# Position: entry=$250.30, stop=$248.00, target=$254.90
+# Current price: $252.60 (50% to target)
+
+updated_envelope = risk_manager.adjust_trailing_stop(
+    symbol="TSLA",
+    current_price=252.60,
+    risk_envelope=envelope
+)
+
+# updated_envelope.stop_order_id = "jkl012" (new stop at $250.30 breakeven)
+# updated_envelope.adjustments = [
+#   {
+#     'timestamp': '2025-10-15T14:35:00Z',
+#     'old_stop': 248.00,
+#     'new_stop': 250.30,
+#     'reason': 'moved to breakeven - price reached 50% of target'
+#   }
+# ]
+```
+
+---
+
+## PullbackAnalyzer
+
+### identify_swing_low
+**Purpose**: Detect most recent swing low from price data with confirmation
+
+**Signature**:
+```python
+def identify_swing_low(
+    price_data: List[Dict[str, Any]],
+    lookback_candles: int = 20,
+    confirmation_candles: int = 2
+) -> Optional[PullbackData]
+```
+
+**Parameters**:
+- `price_data`: Recent price candles (list of dicts with 'low', 'high', 'close', 'timestamp')
+- `lookback_candles`: Number of candles to analyze (default 20)
+- `confirmation_candles`: Candles closing above low for confirmation (default 2)
+
+**Returns**: `PullbackData` dataclass with:
+- `pullback_price`: Decimal (swing low price)
+- `pullback_timestamp`: datetime
+- `confirmation_candles`: int
+- `lookback_window`: int
+- `fallback_used`: bool (always False for detected swings)
+
+Or `None` if no swing low detected
+
+**Example**:
+```python
+pullback = analyzer.identify_swing_low(
+    price_data=recent_candles,
+    lookback_candles=20,
+    confirmation_candles=2
+)
+
+if pullback:
+    # pullback.pullback_price = Decimal('248.00')
+    # pullback.confirmation_candles = 2
+    # pullback.fallback_used = False
+else:
+    # No swing low detected - use default % stop
+    pass
+```
+
+---
+
+## StopAdjuster
+
+### should_adjust_to_breakeven
+**Purpose**: Determine if stop should move to breakeven based on price progress
+
+**Signature**:
+```python
+def should_adjust_to_breakeven(
+    current_price: float,
+    entry_price: float,
+    target_price: float,
+    threshold: float = 0.5
+) -> bool
+```
+
+**Parameters**:
+- `current_price`: Current market price
+- `entry_price`: Original entry price
+- `target_price`: Target price
+- `threshold`: Progress threshold (default 0.5 for 50%)
+
+**Returns**: `bool` - True if price reached threshold progress to target
+
+**Example**:
+```python
+should_adjust = adjuster.should_adjust_to_breakeven(
+    current_price=252.60,
+    entry_price=250.30,
+    target_price=254.90,
+    threshold=0.5
+)
+# Returns: True (price is 50% to target)
+```
+
+---
+
+## TargetMonitor
+
+### register_position
+**Purpose**: Start monitoring a position for fill detection
+
+**Signature**:
+```python
+def register_position(
+    envelope: RiskManagementEnvelope
+) -> None
+```
+
+**Parameters**:
+- `envelope`: RiskManagementEnvelope with order IDs to monitor
+
+**Returns**: None
+
+**Side Effects**:
+- Adds envelope to internal tracking dict
+- Starts polling order status at configured interval
+
+---
+
+### on_fill_detected
+**Purpose**: Callback triggered when stop or target order fills
+
+**Signature**:
+```python
+def on_fill_detected(
+    envelope: RiskManagementEnvelope,
+    filled_order_id: str,
+    fill_price: float,
+    filled_quantity: int
+) -> None
+```
+
+**Parameters**:
+- `envelope`: Position envelope
+- `filled_order_id`: Order ID that filled
+- `fill_price`: Actual fill price
+- `filled_quantity`: Shares filled
+
+**Returns**: None
+
+**Side Effects**:
+- Cancels opposing order (if stop filled, cancel target; if target filled, cancel stop)
+- Updates envelope status to "stopped" or "target_hit"
+- Calculates realized P&L
+- Emits event to TradeRecord
+- Invalidates AccountData caches
+- Logs closure to risk-management.jsonl
+
+---
+
+## Configuration
+
+### RiskManagementConfig
+**Fields**:
+- `account_risk_pct`: float (default 1.0) - Max risk per trade as % of account
+- `min_risk_reward_ratio`: float (default 2.0) - Minimum R:R ratio for trades
+- `default_stop_pct`: float (default 2.0) - Fallback stop % below entry
+- `trailing_enabled`: bool (default True) - Enable trailing stops
+- `pullback_lookback_candles`: int (default 20) - Swing low lookback window
+- `trailing_breakeven_threshold`: float (default 0.5) - Move to BE at 50% to target
+- `strategy_overrides`: Dict[str, Any] (default {}) - Per-strategy config overrides
+
+**Validation**:
+- All percentage fields must be > 0
+- min_risk_reward_ratio must be >= 1.0
+- pullback_lookback_candles must be >= 5
+
+**Example config.json**:
+```json
+{
+  "risk_management": {
+    "account_risk_pct": 1.0,
+    "min_risk_reward_ratio": 2.0,
+    "default_stop_pct": 2.0,
+    "trailing_enabled": true,
+    "pullback_lookback_candles": 20,
+    "trailing_breakeven_threshold": 0.5,
+    "strategy_overrides": {
+      "aggressive_v1": {
+        "account_risk_pct": 2.0,
+        "min_risk_reward_ratio": 1.5
+      }
+    }
+  }
+}
+```
