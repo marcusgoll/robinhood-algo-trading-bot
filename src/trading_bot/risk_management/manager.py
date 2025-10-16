@@ -123,6 +123,7 @@ class RiskManager:
             StopPlacementError: If stop order placement fails (after cancelling entry)
         """
         from src.trading_bot.order_management.models import OrderRequest
+        from .exceptions import StopPlacementError
 
         if self.order_manager is None:
             raise ValueError("OrderManager not configured")
@@ -136,23 +137,41 @@ class RiskManager:
         )
         entry_envelope = self.order_manager.place_limit_order(entry_request)
 
-        # Step 2: Submit stop order
-        stop_request = OrderRequest(
-            symbol=symbol,
-            side="SELL",
-            quantity=plan.quantity,
-            reference_price=plan.stop_price,
-        )
-        stop_envelope = self.order_manager.place_limit_order(stop_request)
+        # Step 2: Submit stop and target orders with error handling guardrail
+        # FR-003: If stop placement fails, cancel entry to avoid unprotected positions
+        try:
+            # Submit stop order
+            stop_request = OrderRequest(
+                symbol=symbol,
+                side="SELL",
+                quantity=plan.quantity,
+                reference_price=plan.stop_price,
+            )
+            stop_envelope = self.order_manager.place_limit_order(stop_request)
 
-        # Step 3: Submit target order
-        target_request = OrderRequest(
-            symbol=symbol,
-            side="SELL",
-            quantity=plan.quantity,
-            reference_price=plan.target_price,
-        )
-        target_envelope = self.order_manager.place_limit_order(target_request)
+            # Step 3: Submit target order
+            target_request = OrderRequest(
+                symbol=symbol,
+                side="SELL",
+                quantity=plan.quantity,
+                reference_price=plan.target_price,
+            )
+            target_envelope = self.order_manager.place_limit_order(target_request)
+
+        except Exception as e:
+            # Guardrail: Cancel entry order to prevent unprotected position
+            # Per Constitution §Risk_Management: "Never enter a position without
+            # predefined exit criteria"
+            self.order_manager.cancel_order(order_id=entry_envelope.order_id)
+
+            # TODO: Log error with correlation_id once logger is integrated (T026)
+            # self.logger.log_error(correlation_id, e)
+
+            # Re-raise as StopPlacementError for caller handling
+            if isinstance(e, StopPlacementError):
+                raise
+            else:
+                raise StopPlacementError(f"Failed to place stop/target: {e}") from e
 
         # Step 4: Create and return envelope
         return RiskManagementEnvelope(
