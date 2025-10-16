@@ -34,6 +34,16 @@ class ATRCalculator:
     ATR measures market volatility by decomposing the entire range of price
     movement for a given period. Uses Wilder's smoothing formula for consistency.
 
+    Constants:
+        DEFAULT_PERIOD: Wilder's standard 14-period lookback
+        DEFAULT_MULTIPLIER: Standard 2.0x ATR for stop distance
+        MIN_STOP_DISTANCE_PCT: Minimum stop distance (0.7%)
+        MAX_STOP_DISTANCE_PCT: Maximum stop distance (10%)
+
+    References:
+        - Wilder, J. Wells (1978). "New Concepts in Technical Trading Systems"
+        - ATR calculation: https://school.stockcharts.com/doku.php?id=technical_indicators:average_true_range_atr
+
     Example:
         calculator = ATRCalculator(period=14)
         atr_value = calculator.calculate(price_bars)  # Returns Decimal ATR
@@ -45,7 +55,13 @@ class ATRCalculator:
         )
     """
 
-    def __init__(self, period: int = 14):
+    # ATR formula constants (T025)
+    DEFAULT_PERIOD = 14  # Wilder's standard period
+    DEFAULT_MULTIPLIER = 2.0  # Standard stop distance multiplier
+    MIN_STOP_DISTANCE_PCT = Decimal("0.7")  # Minimum stop distance
+    MAX_STOP_DISTANCE_PCT = Decimal("10.0")  # Maximum stop distance
+
+    def __init__(self, period: int = DEFAULT_PERIOD):
         """
         Initialize ATR calculator.
 
@@ -102,12 +118,8 @@ class ATRCalculator:
             current_bar = price_bars[i]
             prev_bar = price_bars[i - 1]
 
-            # True Range = max(high - low, |high - prev_close|, |low - prev_close|)
-            high_low = current_bar.high - current_bar.low
-            high_prev_close = abs(current_bar.high - prev_bar.close)
-            low_prev_close = abs(current_bar.low - prev_bar.close)
-
-            true_range = max(high_low, high_prev_close, low_prev_close)
+            # Extract true range calculation to private method (T026)
+            true_range = self._calculate_true_range(current_bar, prev_bar)
             true_ranges.append(true_range)
 
         # Need at least 'period' true ranges
@@ -137,6 +149,49 @@ class ATRCalculator:
 
         # Round to 2 decimal places for $0.01 precision
         return current_atr.quantize(Decimal("0.01"))
+
+    def _calculate_true_range(self, current_bar: PriceBar, prev_bar: PriceBar) -> Decimal:
+        """
+        Calculate True Range for a single bar (private helper method).
+
+        True Range is the greatest of:
+        1. Current high - current low
+        2. |current high - previous close|
+        3. |current low - previous close|
+
+        This captures both intraday volatility and gaps between sessions.
+
+        Args:
+            current_bar: Current price bar
+            prev_bar: Previous price bar (for close comparison)
+
+        Returns:
+            True Range as Decimal
+
+        Formula:
+            TR = max(H - L, |H - C_prev|, |L - C_prev|)
+
+        Example:
+            Current:  H=$252, L=$248, C=$250
+            Previous: C=$245
+
+            TR = max($252-$248, |$252-$245|, |$248-$245|)
+               = max($4, $7, $3)
+               = $7  (gap up from previous close captured)
+
+        From: T026 - Extract true range calculation to improve testability
+        """
+        # Component 1: Intraday range (high - low)
+        high_low = current_bar.high - current_bar.low
+
+        # Component 2: Gap from previous close to current high
+        high_prev_close = abs(current_bar.high - prev_bar.close)
+
+        # Component 3: Gap from previous close to current low
+        low_prev_close = abs(current_bar.low - prev_bar.close)
+
+        # True Range is the maximum of the three components
+        return max(high_low, high_prev_close, low_prev_close)
 
     @staticmethod
     def calculate_atr_stop(
@@ -185,8 +240,9 @@ class ATRCalculator:
         # Validate stop distance is within 0.7%-10% bounds
         stop_distance_pct = (abs(entry_price - stop_price) / entry_price) * Decimal("100")
 
-        MIN_STOP_DISTANCE_PCT = Decimal("0.7")
-        MAX_STOP_DISTANCE_PCT = Decimal("10.0")
+        # Use class constants instead of local variables (T025)
+        MIN_STOP_DISTANCE_PCT = ATRCalculator.MIN_STOP_DISTANCE_PCT
+        MAX_STOP_DISTANCE_PCT = ATRCalculator.MAX_STOP_DISTANCE_PCT
 
         if stop_distance_pct < MIN_STOP_DISTANCE_PCT:
             raise ATRValidationError(
@@ -235,8 +291,9 @@ class ATRCalculator:
         # Calculate stop distance percentage
         stop_distance_pct = (abs(entry_price - stop_price) / entry_price) * Decimal("100")
 
-        MIN_STOP_DISTANCE_PCT = Decimal("0.7")
-        MAX_STOP_DISTANCE_PCT = Decimal("10.0")
+        # Use class constants (T025)
+        MIN_STOP_DISTANCE_PCT = ATRCalculator.MIN_STOP_DISTANCE_PCT
+        MAX_STOP_DISTANCE_PCT = ATRCalculator.MAX_STOP_DISTANCE_PCT
 
         if stop_distance_pct < MIN_STOP_DISTANCE_PCT:
             raise ATRValidationError(
