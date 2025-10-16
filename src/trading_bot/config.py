@@ -11,12 +11,15 @@ Dual configuration system:
 - config.json: Trading parameters (position sizes, hours, strategy)
 """
 
-from typing import Optional, Dict, Any, Mapping
+import json
+import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-import os
-import json
+from typing import Any, Dict, Optional
+
 from dotenv import load_dotenv
+
 from src.trading_bot.risk_management.config import RiskManagementConfig
 
 # Load .env file if exists (§Security: environment variables)
@@ -36,7 +39,7 @@ class OrderManagementConfig:
     sell_offset: float
     max_slippage_pct: float
     poll_interval_seconds: int
-    strategy_overrides: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    strategy_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     VALID_OFFSET_MODES = {"bps", "absolute"}
 
@@ -53,7 +56,7 @@ class OrderManagementConfig:
         )
 
     @classmethod
-    def from_dict(cls, data: Optional[Mapping[str, Any]]) -> "OrderManagementConfig":
+    def from_dict(cls, data: Mapping[str, Any] | None) -> "OrderManagementConfig":
         """Create configuration from JSON payload."""
         data = data or {}
 
@@ -75,7 +78,7 @@ class OrderManagementConfig:
         if poll_interval_seconds <= 0:
             raise ValueError("order_management.poll_interval_seconds must be > 0")
 
-        overrides: Dict[str, Dict[str, Any]] = {}
+        overrides: dict[str, dict[str, Any]] = {}
         overrides_raw = data.get("strategy_overrides") or {}
         if not isinstance(overrides_raw, Mapping):
             raise ValueError("order_management.strategy_overrides must be a mapping if provided")
@@ -85,7 +88,7 @@ class OrderManagementConfig:
                 raise ValueError(
                     f"order_management.strategy_overrides.{strategy} must be an object"
                 )
-            override_dict: Dict[str, float] = {}
+            override_dict: dict[str, float] = {}
 
             override_mode = override.get("offset_mode")
             if override_mode is not None:
@@ -140,8 +143,8 @@ class Config:
     # Robinhood API credentials (§Security: from .env)
     robinhood_username: str
     robinhood_password: str
-    robinhood_mfa_secret: Optional[str] = None
-    robinhood_device_token: Optional[str] = None
+    robinhood_mfa_secret: str | None = None
+    robinhood_device_token: str | None = None
 
     # Trading mode (§Risk_Management)
     paper_trading: bool = True
@@ -205,11 +208,11 @@ class Config:
             )
 
         # Load trading parameters from config.json (optional)
-        config_data: Dict[str, Any] = {}
+        config_data: dict[str, Any] = {}
         config_path = Path(config_file)
 
         if config_path.exists():
-            with open(config_path, "r") as f:
+            with open(config_path) as f:
                 config_data = json.load(f)
 
         # Extract parameters from JSON with defaults

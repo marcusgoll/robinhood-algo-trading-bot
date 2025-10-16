@@ -9,18 +9,19 @@ Constitution v1.0.0:
 - §Safety_First: Bot fails to start if auth fails
 """
 
+import logging
+import os
+import pickle
+import re
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-import re
-import pickle
-import os
-import logging
-import time
-from typing import Optional, Any, TypeVar
-from collections.abc import Callable
+from typing import Any, Optional, TypeVar
+
 import dotenv
 
-from ..utils.security import mask_username, mask_password, mask_mfa_secret, mask_device_token
+from ..utils.security import mask_device_token, mask_mfa_secret, mask_password, mask_username
 
 logger = logging.getLogger(__name__)
 

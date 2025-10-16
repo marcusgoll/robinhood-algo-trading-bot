@@ -11,8 +11,9 @@ Usage:
 T040 [P]: Parallel task - Add __main__.py for python -m invocation
 """
 
-from .main import main
 import sys
+
+from .main import main
 
 if __name__ == "__main__":
     sys.exit(main())

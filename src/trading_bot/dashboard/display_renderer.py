@@ -9,9 +9,9 @@ so the UI layer stays thin and reusable.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
-from collections.abc import Iterable
 
 from rich.layout import Layout
 from rich.panel import Panel

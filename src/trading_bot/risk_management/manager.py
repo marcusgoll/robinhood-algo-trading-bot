@@ -11,7 +11,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
-from src.trading_bot.error_handling import with_retry, RetryPolicy
+from src.trading_bot.error_handling import RetryPolicy, with_retry
 from src.trading_bot.error_handling.circuit_breaker import CircuitBreaker
 from src.trading_bot.error_handling.exceptions import CircuitBreakerTripped
 
@@ -262,6 +262,7 @@ class RiskManager:
             CircuitBreakerTripped: If stop placement failure rate exceeds 2%
         """
         from src.trading_bot.order_management.models import OrderRequest
+
         from .exceptions import StopPlacementError
 
         if self.order_manager is None:

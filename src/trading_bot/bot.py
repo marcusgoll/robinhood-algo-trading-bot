@@ -37,14 +37,14 @@ from src.trading_bot.order_management import (
     UnsupportedOrderTypeError,
 )
 
+# T037: Risk management integration
+from src.trading_bot.risk_management import RiskManagementConfig, RiskManager
+from src.trading_bot.risk_management.target_monitor import TargetMonitor
+
 # REFACTORED: Import SafetyChecks instead of local CircuitBreaker
 # Old CircuitBreaker class removed in favor of comprehensive SafetyChecks module
 # See: src/trading_bot/safety_checks.py for enhanced circuit breaker functionality
 from src.trading_bot.safety_checks import SafetyChecks
-
-# T037: Risk management integration
-from src.trading_bot.risk_management import RiskManager, RiskManagementConfig
-from src.trading_bot.risk_management.target_monitor import TargetMonitor
 
 logger = logging.getLogger(__name__)
 

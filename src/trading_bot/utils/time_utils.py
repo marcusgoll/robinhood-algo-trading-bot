@@ -6,13 +6,13 @@ Provides timezone-aware trading hours checking with DST support.
 Constitution v1.0.0 - §Code_Quality: Type hints required
 """
 
-from typing import Optional
 from datetime import datetime
+from typing import Optional
 
 import pytz
 
 
-def is_trading_hours(timezone: str, current_time: Optional[datetime] = None) -> bool:
+def is_trading_hours(timezone: str, current_time: datetime | None = None) -> bool:
     """
     Check if current time is within trading hours (7am-10am) for given timezone.
 
@@ -60,7 +60,7 @@ def get_current_time_in_tz(timezone: str) -> datetime:
     return datetime.now(tz)
 
 
-def is_market_open(check_time: Optional[datetime] = None) -> bool:
+def is_market_open(check_time: datetime | None = None) -> bool:
     """
     Check if US stock market is open at the given time.
 

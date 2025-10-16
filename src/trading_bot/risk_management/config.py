@@ -9,9 +9,9 @@ Enforces Constitution v1.0.0:
 - §Data_Integrity: Validate all inputs
 """
 
-from typing import Dict, Any, Optional
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Any, Dict, Optional
 
 
 @dataclass

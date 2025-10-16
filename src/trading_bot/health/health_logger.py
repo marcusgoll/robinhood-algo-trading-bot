@@ -30,7 +30,7 @@ class HealthCheckLogger:
     # Public logging helpers
     # ------------------------------------------------------------------ #
 
-    def log_health_check_executed(self, *, result: "HealthCheckResult", context: str = "periodic") -> None:
+    def log_health_check_executed(self, *, result: HealthCheckResult, context: str = "periodic") -> None:
         """Record that a health check ran (with final result)."""
         self._write_event(
             "health_check.executed",
@@ -43,7 +43,7 @@ class HealthCheckLogger:
             },
         )
 
-    def log_health_check_passed(self, *, status: "SessionHealthStatus") -> None:
+    def log_health_check_passed(self, *, status: SessionHealthStatus) -> None:
         """Record a successful health check outcome."""
         self._write_event(
             "health_check.passed",
@@ -54,7 +54,7 @@ class HealthCheckLogger:
             },
         )
 
-    def log_health_check_failed(self, *, result: "HealthCheckResult") -> None:
+    def log_health_check_failed(self, *, result: HealthCheckResult) -> None:
         """Record a failed health check outcome."""
         self._write_event(
             "health_check.failed",
@@ -92,7 +92,7 @@ class HealthCheckLogger:
             },
         )
 
-    def log_session_metrics_snapshot(self, *, status: "SessionHealthStatus") -> None:
+    def log_session_metrics_snapshot(self, *, status: SessionHealthStatus) -> None:
         """Persist a snapshot of session metrics for trend analysis."""
         self._write_event(
             "session.metrics_snapshot",

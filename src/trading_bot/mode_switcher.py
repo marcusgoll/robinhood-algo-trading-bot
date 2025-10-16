@@ -8,9 +8,9 @@ Enforces Constitution v1.0.0:
 - §Risk_Management: Phase-based progression to live trading
 """
 
-from typing import Literal, Optional
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
+from typing import Literal, Optional
 
 from .config import Config
 
@@ -30,7 +30,7 @@ class ModeStatus:
     current_mode: TradingMode
     phase: str
     can_switch_to_live: bool
-    switch_blocked_reason: Optional[str] = None
+    switch_blocked_reason: str | None = None
 
 
 class ModeSwitcher:
@@ -84,7 +84,7 @@ class ModeSwitcher:
             switch_blocked_reason=reason
         )
 
-    def _can_switch_to_live(self) -> tuple[bool, Optional[str]]:
+    def _can_switch_to_live(self) -> tuple[bool, str | None]:
         """
         Check if switching to live trading is allowed.
 
