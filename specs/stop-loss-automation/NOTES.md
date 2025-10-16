@@ -128,6 +128,12 @@ Cross-artifact analysis: Validated 100% requirement coverage (14 functional, 8 n
 ✅ T005 [P]: Create PositionPlan dataclass (commit: aac9c07)
 ✅ T006 [P]: Create RiskManagementEnvelope dataclass (commit: aac9c07)
 ✅ T007 [P]: Create PullbackData dataclass (commit: 690e1f0)
+✅ T008 [RED]: Write failing test for swing low detection (commit: 97a918c)
+✅ T009 [RED]: Write failing test for default fallback (commit: 97a918c)
+✅ T010 [RED]: Write failing test for position size calculation with pullback (commit: 5d36464)
+✅ T011 [RED]: Write failing test for stop distance validation (commit: 5d36464)
+✅ T012 [RED]: Write failing test for stop direction validation (commit: 5d36464)
+✅ T013 [RED]: Write failing test for minimum risk-reward ratio (commit: 5d36464)
 
 ## Last Updated
-2025-10-15T23:45:00-05:00
+2025-10-16T00:10:00-05:00
