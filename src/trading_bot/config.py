@@ -17,6 +17,7 @@ from pathlib import Path
 import os
 import json
 from dotenv import load_dotenv
+from trading_bot.risk_management.config import RiskManagementConfig
 
 # Load .env file if exists (§Security: environment variables)
 load_dotenv()
@@ -170,6 +171,9 @@ class Config:
     order_management: OrderManagementConfig = field(
         default_factory=OrderManagementConfig.default
     )
+    risk_management: RiskManagementConfig = field(
+        default_factory=RiskManagementConfig.default
+    )
 
     @classmethod
     def from_env_and_json(cls, config_file: str = "config.json") -> "Config":
@@ -217,6 +221,9 @@ class Config:
         order_management_config = OrderManagementConfig.from_dict(
             config_data.get("order_management")
         )
+        risk_management_config = RiskManagementConfig.from_dict(
+            config_data.get("risk_management")
+        )
 
         return cls(
             # Credentials from .env
@@ -243,6 +250,7 @@ class Config:
             # Paths
             config_file=config_path,
             order_management=order_management_config,
+            risk_management=risk_management_config,
         )
 
     @classmethod
@@ -322,6 +330,7 @@ class Config:
             )
 
         self.order_management.validate()
+        self.risk_management.validate()
 
     def ensure_directories(self) -> None:
         """Create required directories if they don't exist."""
