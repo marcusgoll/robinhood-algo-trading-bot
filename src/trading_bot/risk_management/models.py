@@ -35,6 +35,17 @@ class RiskManagementConfig:
 
 
 @dataclass(slots=True)
+class PullbackData:
+    """Pullback detection result for stop-loss calculation."""
+
+    pullback_price: Decimal
+    pullback_timestamp: datetime
+    confirmation_candles: int
+    lookback_window: int
+    fallback_used: bool
+
+
+@dataclass(slots=True)
 class RiskManagementEnvelope:
     """Audit-friendly record of risk management actions."""
 
