@@ -117,3 +117,117 @@ class TestStopAdjusterATR:
             f"New stop ${new_stop_price} should be wider than original ${position_plan.stop_price} "
             "to accommodate increased volatility"
         )
+
+    def test_average_entry_price_for_partial_fills(self) -> None:
+        """Test that stop rules evaluate against average entry price for scaled positions.
+
+        Scenario (from T013 [RED] requirement - partial fills):
+        - Given: Position scaled in 3 times:
+                 Initial: 100 shares @ $100.00
+                 Scale 1: 50 shares @ $104.00
+                 Scale 2: 50 shares @ $108.00
+        - When: Calculating average entry price
+        - Then: Average entry = (100*100 + 50*104 + 50*108) / 200 = $103.00
+                Rules should evaluate against $103.00, not original $100.00 entry
+
+        Test validates:
+        - Weighted average calculation for partial fills
+        - Stop rules use average entry price, not first entry price
+        - Proper handling of position scaling scenarios
+        - Audit trail includes average entry price calculation
+
+        References:
+        - Trade management rules for scaled positions
+        - Position sizing with partial fills
+        - Risk management with average entry price
+        """
+        # Arrange: Create position plan representing scaled-in position
+        # This test will FAIL because PositionPlan doesn't support partial fills yet
+
+        # Initial fill: 100 shares @ $100
+        initial_entry = Decimal("100.00")
+        initial_quantity = 100
+
+        # Scale-in fills:
+        # Fill 1: 50 shares @ $104
+        # Fill 2: 50 shares @ $108
+        scale_fills = [
+            (50, Decimal("104.00")),
+            (50, Decimal("108.00")),
+        ]
+
+        # Expected average entry:
+        # (100 * 100 + 50 * 104 + 50 * 108) / 200
+        # = (10000 + 5200 + 5400) / 200
+        # = 20600 / 200
+        # = 103.00
+        expected_average_entry = Decimal("103.00")
+
+        total_quantity = initial_quantity + sum(qty for qty, _ in scale_fills)
+
+        # Currently PositionPlan only has single entry_price
+        # This test expects a new field or method to calculate average entry
+        position_plan = PositionPlan(
+            symbol="TSLA",
+            entry_price=initial_entry,  # Original entry
+            stop_price=Decimal("97.00"),  # 3% below original entry
+            target_price=Decimal("109.00"),  # 2:1 reward ratio from average entry
+            quantity=total_quantity,  # Total position size: 200 shares
+            risk_amount=Decimal("1200.00"),  # Based on average entry
+            reward_amount=Decimal("2400.00"),
+            reward_ratio=2.0,
+            pullback_source="detected",
+            pullback_price=Decimal("97.00"),
+            # NEW FIELD (doesn't exist yet - will cause test to fail):
+            # partial_fills=[(initial_quantity, initial_entry)] + scale_fills,
+        )
+
+        config = RiskManagementConfig.default()
+
+        # Current price at 50% progress from AVERAGE entry (not original entry)
+        # Progress from average entry: $103.00 + (($109.00 - $103.00) * 0.5) = $106.00
+        current_price = Decimal("106.00")
+
+        adjuster = StopAdjuster()
+
+        # Act: Calculate stop adjustment
+        # This will FAIL because:
+        # 1. PositionPlan doesn't have average_entry_price property/method
+        # 2. calculate_adjustment() uses entry_price directly instead of average
+        result = adjuster.calculate_adjustment(
+            current_price=current_price,
+            position_plan=position_plan,
+            config=config,
+        )
+
+        # Assert: Should return breakeven at AVERAGE entry price, not original entry
+        assert result is not None, (
+            "Should return adjustment at 50% progress from average entry"
+        )
+
+        new_stop_price, adjustment_reason = result
+
+        # Stop should move to average entry price ($103.00), not original entry ($100.00)
+        assert new_stop_price == expected_average_entry, (
+            f"Stop should move to average entry price ${expected_average_entry} "
+            f"(not original entry ${initial_entry}), got ${new_stop_price}"
+        )
+
+        assert "breakeven" in adjustment_reason.lower(), (
+            "Should indicate breakeven adjustment in reason"
+        )
+
+        # Verify that average entry is calculated correctly
+        # This will fail because the functionality doesn't exist yet
+        if hasattr(position_plan, 'average_entry_price'):
+            calculated_average = position_plan.average_entry_price
+            assert calculated_average == expected_average_entry, (
+                f"Average entry price calculation incorrect: "
+                f"expected ${expected_average_entry}, got ${calculated_average}"
+            )
+        else:
+            # Test will fail here - attribute doesn't exist
+            pytest.fail(
+                "PositionPlan missing average_entry_price property. "
+                "Need to add partial_fills tracking and average_entry_price calculation."
+            )

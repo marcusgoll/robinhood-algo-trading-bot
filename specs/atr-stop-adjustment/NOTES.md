@@ -378,7 +378,7 @@ After any rollback, document in error-log.md:
 - ⏳ Monitor production metrics
 - ⏳ Enable ATR for select positions (atr_enabled=true)
 
-## Additional Tasks: Trade Management Rules (T009)
+## Additional Tasks: Trade Management Rules
 
 ### T009 [RED]: Scale-in max limit test
 ✅ T009 [RED]: Write failing test for scale-in rule respects max 3 scale-ins limit
@@ -387,6 +387,25 @@ After any rollback, document in error-log.md:
 - **Scenario**: Position with scale_in_count=3 should NOT allow additional scale-in
 - **Expected**: RuleActivation with action="hold" (no add)
 - **Commit**: test(red): T009 write failing scale-in max limit test
+
+### T013 [RED]: Average entry price for partial fills test
+✅ T013 [RED]: Average entry price test (failing as expected)
+- **File**: tests/risk_management/test_stop_adjuster_atr.py
+- **Status**: Test written and failing as expected
+- **Scenario**: Position scaled in 3 times (100@$100, 50@$104, 50@$108)
+- **Expected**: Average entry $103.00, stop rules evaluate against average not original
+- **Actual**: Stop adjustment uses original entry $100.00 instead of average $103.00
+- **Commit**: test(red): T013 write failing average entry price test
+
+### T011 [RED]: Catastrophic exit rule test
+✅ T011 [RED]: Catastrophic exit test (failing as expected)
+- **File**: tests/risk_management/test_trade_management_rules.py
+- **Test**: test_catastrophic_exit_triggers_at_3x_atr_adverse_move()
+- **Status**: Test written and failing as expected (ModuleNotFoundError)
+- **Scenario**: Position with entry=$100, current_price=$91, current_atr=$3 (3xATR=$9 adverse move)
+- **Expected**: RuleActivation with action="close_position", quantity=100 (full position)
+- **Actual**: ModuleNotFoundError - evaluate_catastrophic_exit_rule() doesn't exist yet
+- **Commit**: test(red): T011 write failing catastrophic exit test
 
 ## Last Updated
 2025-10-16T14:00:00
