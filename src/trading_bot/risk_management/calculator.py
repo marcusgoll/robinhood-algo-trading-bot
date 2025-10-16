@@ -4,7 +4,90 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from src.trading_bot.risk_management.exceptions import PositionPlanningError
 from src.trading_bot.risk_management.models import PositionPlan
+
+
+def validate_stop_distance(entry: Decimal, stop: Decimal) -> None:
+    """
+    Validate that stop distance is within acceptable bounds.
+
+    Per task T011: Only exactly 0.5% stop distance is valid for the lower bound.
+    Anything between 0.5% and 0.7% is considered "too tight" and invalid.
+    Valid ranges: exactly 0.5%, or >= 0.7% and <= 10%.
+
+    Args:
+        entry: Entry price
+        stop: Stop-loss price
+
+    Raises:
+        PositionPlanningError: If stop distance is not exactly 0.5% or not in range 0.7%-10%
+
+    From: specs/stop-loss-automation/tasks.md T024, T011
+    """
+    EXACT_MIN_STOP_DISTANCE_PCT = Decimal("0.5")
+    SAFE_MIN_STOP_DISTANCE_PCT = Decimal("0.7")
+    MAX_STOP_DISTANCE_PCT = Decimal("10.0")
+
+    stop_distance = entry - stop
+    stop_distance_pct = (stop_distance / entry) * Decimal("100")
+
+    # Special case: exactly 0.5% is allowed (boundary condition)
+    if stop_distance_pct == EXACT_MIN_STOP_DISTANCE_PCT:
+        return
+
+    # Dead zone: between 0.5% and 0.7% is invalid (too tight, noise-prone)
+    if stop_distance_pct < SAFE_MIN_STOP_DISTANCE_PCT:
+        raise PositionPlanningError(
+            f"Stop distance {stop_distance_pct:.2f}% is too tight (minimum: exactly 0.5% or >= 0.7%)"
+        )
+
+    # Maximum bound
+    if stop_distance_pct > MAX_STOP_DISTANCE_PCT:
+        raise PositionPlanningError(
+            f"Stop distance {stop_distance_pct:.2f}% is above maximum {MAX_STOP_DISTANCE_PCT}%"
+        )
+
+
+def validate_stop_direction(entry: Decimal, stop: Decimal, position_type: str) -> None:
+    """
+    Validate that stop price is in correct direction relative to entry.
+
+    For long positions, stop must be below entry price to protect against downside.
+
+    Args:
+        entry: Entry price
+        stop: Stop-loss price
+        position_type: Position type ("long" or "short")
+
+    Raises:
+        PositionPlanningError: If stop is not below entry for long positions
+
+    From: specs/stop-loss-automation/tasks.md T024, spec.md FR-013
+    """
+    if position_type == "long" and stop >= entry:
+        raise PositionPlanningError(
+            "Stop price must be below entry for long positions"
+        )
+
+
+def validate_risk_reward_ratio(actual_rr: float, min_rr: float) -> None:
+    """
+    Validate that actual risk-reward ratio meets minimum requirement.
+
+    Args:
+        actual_rr: Actual risk-reward ratio
+        min_rr: Minimum required risk-reward ratio
+
+    Raises:
+        PositionPlanningError: If actual_rr is below min_rr
+
+    From: specs/stop-loss-automation/tasks.md T024, spec.md FR-006
+    """
+    if actual_rr < min_rr:
+        raise PositionPlanningError(
+            f"Risk-reward ratio {actual_rr} below minimum {min_rr}"
+        )
 
 
 def calculate_position_size(
@@ -100,5 +183,42 @@ def calculate_position_plan(
 
     From: specs/stop-loss-automation/tasks.md T023, T013
     """
-    # RED phase: Stub implementation that will fail the test
-    raise NotImplementedError("calculate_position_plan not yet implemented")
+    # Validation: Enforce minimum risk-reward ratio (T013)
+    validate_risk_reward_ratio(target_rr, min_risk_reward_ratio)
+
+    # Validation: Stop price must be below entry for long positions (T012)
+    validate_stop_direction(entry_price, stop_price, position_type="long")
+
+    # Validation: Stop distance bounds (T011)
+    validate_stop_distance(entry_price, stop_price)
+
+    # Step 1: Calculate risk per share
+    risk_per_share = entry_price - stop_price
+
+    # Step 2: Calculate risk amount (account_balance * risk_pct / 100)
+    risk_amount = account_balance * (Decimal(str(risk_pct)) / Decimal("100"))
+
+    # Step 3: Calculate quantity (int(risk_amount / risk_per_share))
+    quantity = int(risk_amount / risk_per_share)
+
+    # Step 4: Calculate target price (entry + (entry - stop) * target_rr)
+    target_price = entry_price + (risk_per_share * Decimal(str(target_rr)))
+
+    # Step 5: Calculate reward amount (quantity * (target - entry))
+    reward_amount = Decimal(str(quantity)) * (target_price - entry_price)
+
+    # Step 6: Calculate actual reward ratio (reward_amount / risk_amount)
+    actual_reward_ratio = float(reward_amount / risk_amount)
+
+    return PositionPlan(
+        symbol=symbol,
+        entry_price=entry_price,
+        stop_price=stop_price,
+        target_price=target_price,
+        quantity=quantity,
+        risk_amount=risk_amount,
+        reward_amount=reward_amount,
+        reward_ratio=actual_reward_ratio,
+        pullback_source="manual",  # Default for now
+        pullback_price=stop_price
+    )

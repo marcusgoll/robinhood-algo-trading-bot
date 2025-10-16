@@ -140,6 +140,7 @@ Cross-artifact analysis: Validated 100% requirement coverage (14 functional, 8 n
 ✅ T017 [RED]: Write failing test for trailing disabled (commit: 4d5d757)
 ✅ T018 [RED]: Write failing test for target fill cleanup (commit: 4b9a08a)
 ✅ T019 [RED]: Write failing test for stop fill cleanup (commit: 4b9a08a)
+✅ T020 [RED]: Write failing test for cancel entry on stop fail (commit: fd732bd)
 
 ## Last Updated
-2025-10-16T00:50:00-05:00
+2025-10-16T00:51:00-05:00
