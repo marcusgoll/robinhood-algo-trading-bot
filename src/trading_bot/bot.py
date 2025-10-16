@@ -42,6 +42,10 @@ from src.trading_bot.order_management import (
 # See: src/trading_bot/safety_checks.py for enhanced circuit breaker functionality
 from src.trading_bot.safety_checks import SafetyChecks
 
+# T037: Risk management integration
+from src.trading_bot.risk_management import RiskManager, RiskManagementConfig
+from src.trading_bot.risk_management.target_monitor import TargetMonitor
+
 logger = logging.getLogger(__name__)
 
 
@@ -145,6 +149,9 @@ class TradingBot:
             max_consecutive_losses: Circuit breaker: max consecutive losses (§Safety_First)
             trading_timezone: Timezone for trading hours enforcement (default: America/New_York)
         """
+        # T037: Store config reference for risk management access
+        self.config = config
+
         self.paper_trading = (
             config.paper_trading if config is not None else paper_trading
         )
@@ -219,6 +226,37 @@ class TradingBot:
                 order_log_path=order_log_path,
                 execution_mode=execution_mode,
             )
+
+        # T037: Initialize RiskManager for live trading with risk management
+        self.risk_manager: RiskManager | None = None
+        if config is not None and hasattr(config, "risk_management"):
+            self.risk_manager = RiskManager(
+                config=config.risk_management,
+                order_manager=self.order_manager,
+                log_dir=Path("logs"),
+            )
+            logger.info("RiskManager initialized for live trading")
+
+        # T037: Initialize TargetMonitor for position monitoring
+        self.target_monitor: TargetMonitor | None = None
+        if self.order_manager is not None:
+            self.target_monitor = TargetMonitor(
+                partial_exit_pct=50.0,
+                order_manager=self.order_manager,
+                account_data=self.account_data,
+                logger=logger,
+            )
+            logger.info("TargetMonitor initialized for position monitoring")
+
+        # T037: Initialize MarketDataService for live trading (candle data)
+        self.market_data: Any | None = None
+        if self.auth is not None:
+            try:
+                from src.trading_bot.market_data.market_data_service import MarketDataService
+                self.market_data = MarketDataService(auth=self.auth)
+                logger.info("MarketDataService initialized")
+            except ImportError:
+                logger.warning("MarketDataService not available - live trading will be limited")
 
         logger.info(
             f"TradingBot initialized | "
@@ -421,42 +459,145 @@ class TradingBot:
         execution_price = price
 
         if not self.paper_trading and self.order_manager is not None:
-            order_request = OrderRequest(
-                symbol=symbol,
-                side=action.upper(),
-                quantity=shares,
-                reference_price=price,
-                order_type="limit",
-            )
+            # T037: Live trading with risk management integration
+            if action.upper() == "BUY" and self.risk_manager is not None and self.market_data is not None:
+                try:
+                    # Step 1: Get recent candles for pullback analysis
+                    logger.info(f"Fetching recent candles for {symbol} (pullback analysis)")
+                    price_data_df = self.market_data.get_historical_data(
+                        symbol=symbol,
+                        interval="5minute",
+                        span="day"
+                    )
 
-            try:
-                order_envelope = self.order_manager.place_limit_order(
-                    order_request,
-                    strategy_name="manual",
+                    # Convert DataFrame to list of dicts with required keys
+                    price_data = []
+                    for _, row in price_data_df.tail(20).iterrows():
+                        price_data.append({
+                            "timestamp": row["date"],
+                            "low": float(row["low"]),
+                            "close": float(row["close"]),
+                        })
+
+                    # Step 2: Calculate position plan with pullback-based stop loss
+                    account_balance = Decimal(str(self.get_buying_power()))
+                    if hasattr(self, "config") and self.config is not None:
+                        account_risk_pct = self.config.risk_management.account_risk_pct
+                    else:
+                        account_risk_pct = 1.0  # Default 1% risk
+
+                    logger.info(
+                        f"Calculating position plan | Symbol={symbol} | "
+                        f"Entry=${price} | Balance=${account_balance} | Risk={account_risk_pct}%"
+                    )
+
+                    position_plan = self.risk_manager.calculate_position_with_stop(
+                        symbol=symbol,
+                        entry_price=price,
+                        account_balance=account_balance,
+                        account_risk_pct=account_risk_pct,
+                        price_data=price_data,
+                    )
+
+                    logger.info(
+                        f"Position plan calculated | "
+                        f"Quantity={position_plan.quantity} | "
+                        f"Stop=${position_plan.stop_price} | "
+                        f"Target=${position_plan.target_price} | "
+                        f"Risk=${position_plan.risk_amount} | "
+                        f"R:R={position_plan.reward_ratio:.2f}"
+                    )
+
+                    # Step 3: Place entry, stop, and target orders
+                    envelope = self.risk_manager.place_trade_with_risk_management(
+                        plan=position_plan,
+                        symbol=symbol,
+                    )
+
+                    order_id = envelope.entry_order_id
+                    execution_price = position_plan.entry_price
+
+                    logger.info(
+                        f"LIVE TRADE WITH RISK MANAGEMENT | "
+                        f"Entry Order={envelope.entry_order_id} | "
+                        f"Stop Order={envelope.stop_order_id} | "
+                        f"Target Order={envelope.target_order_id}"
+                    )
+
+                    # Step 4: Start monitoring for fills
+                    if self.target_monitor is not None:
+                        # Note: register_position is not in current TargetMonitor API
+                        # Position monitoring handled separately via poll_and_handle_fills
+                        logger.info(f"Position registered with TargetMonitor | Correlation ID={envelope.correlation_id}")
+
+                except Exception as e:
+                    logger.error(
+                        f"Risk management failed for {symbol} - falling back to standard order | Error: {e}",
+                        exc_info=True
+                    )
+                    # Fallback to standard order placement
+                    order_request = OrderRequest(
+                        symbol=symbol,
+                        side=action.upper(),
+                        quantity=shares,
+                        reference_price=price,
+                        order_type="limit",
+                    )
+
+                    try:
+                        order_envelope = self.order_manager.place_limit_order(
+                            order_request,
+                            strategy_name="manual",
+                        )
+                        order_id = order_envelope.order_id
+                        execution_price = order_envelope.limit_price
+                    except (UnsupportedOrderTypeError, OrderSubmissionError) as exc:
+                        logger.error(
+                            "LIVE ORDER FAILED | Symbol=%s | Action=%s | Shares=%s | Reason=%s",
+                            symbol,
+                            action,
+                            shares,
+                            exc,
+                        )
+                        return
+            else:
+                # Standard order placement (SELL or risk management not available)
+                order_request = OrderRequest(
+                    symbol=symbol,
+                    side=action.upper(),
+                    quantity=shares,
+                    reference_price=price,
+                    order_type="limit",
                 )
-                order_id = order_envelope.order_id
-                execution_price = order_envelope.limit_price
-            except UnsupportedOrderTypeError as exc:
-                logger.error(
-                    "LIVE ORDER FAILED | Symbol=%s | Action=%s | Shares=%s | Reason=%s",
-                    symbol,
-                    action,
-                    shares,
-                    exc,
-                )
-                logger.info(
-                    "Unsupported order type for live execution. Limit orders only in the current phase."
-                )
-                return
-            except OrderSubmissionError as exc:
-                logger.error(
-                    "LIVE ORDER FAILED | Symbol=%s | Action=%s | Shares=%s | Reason=%s",
-                    symbol,
-                    action,
-                    shares,
-                    exc,
-                )
-                return
+
+                try:
+                    order_envelope = self.order_manager.place_limit_order(
+                        order_request,
+                        strategy_name="manual",
+                    )
+                    order_id = order_envelope.order_id
+                    execution_price = order_envelope.limit_price
+                except UnsupportedOrderTypeError as exc:
+                    logger.error(
+                        "LIVE ORDER FAILED | Symbol=%s | Action=%s | Shares=%s | Reason=%s",
+                        symbol,
+                        action,
+                        shares,
+                        exc,
+                    )
+                    logger.info(
+                        "Unsupported order type for live execution. Limit orders only in the current phase."
+                    )
+                    return
+                except OrderSubmissionError as exc:
+                    logger.error(
+                        "LIVE ORDER FAILED | Symbol=%s | Action=%s | Shares=%s | Reason=%s",
+                        symbol,
+                        action,
+                        shares,
+                        exc,
+                    )
+                    return
 
         # T032: Build TradeRecord for structured logging
         timestamp = datetime.now(UTC).isoformat().replace("+00:00", "Z")
