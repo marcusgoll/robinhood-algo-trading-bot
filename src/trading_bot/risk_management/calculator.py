@@ -198,7 +198,8 @@ def calculate_position_plan(
     target_rr: float,
     account_balance: Decimal,
     risk_pct: float,
-    min_risk_reward_ratio: float = 2.0
+    min_risk_reward_ratio: float = 2.0,
+    pullback_source: str = "manual"
 ) -> PositionPlan:
     """
     Calculate position plan with risk-based sizing and 2:1 targets.
@@ -258,6 +259,6 @@ def calculate_position_plan(
         risk_amount=risk_amount,
         reward_amount=reward_amount,
         reward_ratio=actual_reward_ratio,
-        pullback_source="manual",  # Default for now
+        pullback_source=pullback_source,
         pullback_price=stop_price
     )

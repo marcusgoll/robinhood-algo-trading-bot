@@ -221,25 +221,10 @@ def test_full_position_lifecycle_with_target_fill(tmp_path: Path) -> None:
         trailing_stop_envelope,  # Trailing stop (breakeven)
     ]
 
-    # Configure get_order_status() to simulate lifecycle:
-    # - First poll: orders unfilled
-    # - Second poll (after trailing): target filled
-    order_status_calls = 0
-
+    # Configure get_order_status() to simulate target fill in poll_and_handle_fills()
+    # The test will manually call poll_and_handle_fills() which will check status
     def mock_get_order_status(order_id: str) -> dict:
-        nonlocal order_status_calls
-        order_status_calls += 1
-
-        # Initial poll: nothing filled
-        if order_status_calls <= 2:
-            return {
-                "order_id": order_id,
-                "status": "open",
-                "filled_quantity": 0,
-                "average_fill_price": Decimal("0.00"),
-            }
-
-        # Simulate target fill after trailing stop adjustment
+        # Simulate target fill - TARGET_001 is filled, everything else is open
         if order_id == "TARGET_001":
             return {
                 "order_id": order_id,
@@ -248,6 +233,7 @@ def test_full_position_lifecycle_with_target_fill(tmp_path: Path) -> None:
                 "average_fill_price": Decimal("254.90"),
             }
         else:
+            # All other orders (stops) are still open
             return {
                 "order_id": order_id,
                 "status": "open",
@@ -395,11 +381,13 @@ def test_full_position_lifecycle_with_target_fill(tmp_path: Path) -> None:
 
     # 5. Verify old stop was cancelled before placing new trailing stop
     cancel_calls = mock_order_manager.cancel_order.call_args_list
-    assert len(cancel_calls) == 2, "Should cancel old stop and final stop after target fill"
-    # First cancel: old stop order when adjusting
-    assert cancel_calls[0][1]["order_id"] == "STOP_001"
-    # Second cancel: trailing stop when target fills
-    assert cancel_calls[1][0][0] == "STOP_002"
+    assert len(cancel_calls) == 2, f"Should cancel old stop and final stop after target fill, got {len(cancel_calls)} calls"
+    # First cancel: old stop order when adjusting (called with positional arg in test code)
+    first_cancel_arg = cancel_calls[0][0][0] if cancel_calls[0][0] else cancel_calls[0][1].get("order_id")
+    assert first_cancel_arg == "STOP_001", f"First cancel should be STOP_001, got {first_cancel_arg}"
+    # Second cancel: trailing stop when target fills (called by TargetMonitor)
+    second_cancel_arg = cancel_calls[1][0][0] if cancel_calls[1][0] else cancel_calls[1][1].get("order_id")
+    assert second_cancel_arg == "STOP_002", f"Second cancel should be STOP_002, got {second_cancel_arg}"
 
     # 6. Verify position was closed (target filled)
     assert position_closed is True, "TargetMonitor should detect target fill"

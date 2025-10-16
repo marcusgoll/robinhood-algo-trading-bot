@@ -144,6 +144,9 @@ class RiskManager:
         )
 
         # Step 2: Calculate position plan using stop price from pullback analysis
+        # Determine pullback source for audit trail
+        pullback_source = "default" if pullback_data.fallback_used else "detected"
+
         position_plan = calculate_position_plan(
             symbol=symbol,
             entry_price=entry_price,
@@ -152,10 +155,10 @@ class RiskManager:
             account_balance=account_balance,
             risk_pct=account_risk_pct,
             min_risk_reward_ratio=self.config.min_risk_reward_ratio,
+            pullback_source=pullback_source,
         )
 
         # Step 3: Log position plan creation to audit trail
-        pullback_source = "default" if pullback_data.fallback_used else "detected"
         self.log_position_plan(position_plan, pullback_source=pullback_source)
 
         # Step 4: Return the calculated position plan
