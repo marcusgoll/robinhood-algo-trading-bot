@@ -153,8 +153,8 @@ Cross-artifact analysis: Validated 100% requirement coverage (14 functional, 8 n
 ✅ T030 [GREEN→T020]: Add error handling to RiskManager.place_trade_with_risk_management() (commit: 5f13222)
 ✅ T031 [REFACTOR]: Extract position size calculation to separate method (commit: ff15484)
 ✅ T033 [REFACTOR]: Add comprehensive logging with correlation IDs (commit: 5b2fdbc)
-✅ T034 [P]: Write integration test for end-to-end position lifecycle with target fill (commit: 9b0b4a1)
-✅ T035 [P]: Write integration test for stop-out scenario (commit: 9b0b4a1)
+✅ T034 [P]: Write integration test for end-to-end position lifecycle with target fill (commit: f261ccd)
+✅ T035 [P]: Write integration test for stop-out scenario (commit: f261ccd)
 ✅ T036 [P]: Add performance test for position plan calculation (commit: 4c06637)
 ✅ T037 [P]: Integrate RiskManager into TradingBot.execute_trade (live mode) (commit: b5b7502)
 
