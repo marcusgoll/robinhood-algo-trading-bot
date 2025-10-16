@@ -11,7 +11,7 @@ Enforces Constitution v1.0.0:
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 @dataclass
@@ -26,6 +26,16 @@ class RiskManagementConfig:
     - atr_period: Lookback period for ATR calculation (Wilder's standard is 14)
     - atr_multiplier: Multiplier applied to ATR for stop distance
     - atr_recalc_threshold: % change in ATR that triggers stop recalculation
+
+    Trade Management Rules:
+    - enable_break_even_protection: Enable break-even stop adjustment
+    - enable_scaling_in: Enable position scaling
+    - enable_catastrophic_exit: Enable catastrophic exit protection
+    - break_even_atr_multiple: ATR multiple for break-even trigger
+    - scaling_atr_multiple: ATR multiple for scaling in
+    - scaling_max_count: Maximum number of scale-ins
+    - scaling_size_pct: Size of each scale-in as % of original position
+    - catastrophic_exit_atr_multiple: ATR multiple for catastrophic exit
     """
 
     account_risk_pct: float
@@ -38,6 +48,14 @@ class RiskManagementConfig:
     atr_period: int = 14
     atr_multiplier: float = 2.0
     atr_recalc_threshold: float = 0.20
+    enable_break_even_protection: bool = True
+    enable_scaling_in: bool = True
+    enable_catastrophic_exit: bool = True
+    break_even_atr_multiple: float = 2.0
+    scaling_atr_multiple: float = 1.5
+    scaling_max_count: int = 3
+    scaling_size_pct: float = 0.5
+    catastrophic_exit_atr_multiple: float = 3.0
     strategy_overrides: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -54,6 +72,14 @@ class RiskManagementConfig:
             atr_period=14,
             atr_multiplier=2.0,
             atr_recalc_threshold=0.20,
+            enable_break_even_protection=True,
+            enable_scaling_in=True,
+            enable_catastrophic_exit=True,
+            break_even_atr_multiple=2.0,
+            scaling_atr_multiple=1.5,
+            scaling_max_count=3,
+            scaling_size_pct=0.5,
+            catastrophic_exit_atr_multiple=3.0,
             strategy_overrides={},
         )
 
@@ -74,6 +100,18 @@ class RiskManagementConfig:
         atr_period = int(data.get("atr_period", 14))
         atr_multiplier = float(data.get("atr_multiplier", 2.0))
         atr_recalc_threshold = float(data.get("atr_recalc_threshold", 0.20))
+        enable_break_even_protection = bool(
+            data.get("enable_break_even_protection", True)
+        )
+        enable_scaling_in = bool(data.get("enable_scaling_in", True))
+        enable_catastrophic_exit = bool(data.get("enable_catastrophic_exit", True))
+        break_even_atr_multiple = float(data.get("break_even_atr_multiple", 2.0))
+        scaling_atr_multiple = float(data.get("scaling_atr_multiple", 1.5))
+        scaling_max_count = int(data.get("scaling_max_count", 3))
+        scaling_size_pct = float(data.get("scaling_size_pct", 0.5))
+        catastrophic_exit_atr_multiple = float(
+            data.get("catastrophic_exit_atr_multiple", 3.0)
+        )
 
         # Validate risk parameters are positive
         if account_risk_pct <= 0:

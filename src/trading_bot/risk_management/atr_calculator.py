@@ -14,7 +14,6 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import List
 
 from trading_bot.market_data.data_models import PriceBar
 from trading_bot.risk_management.exceptions import (
@@ -76,7 +75,7 @@ class ATRCalculator:
 
         self.period = period
 
-    def calculate(self, price_bars: List[PriceBar]) -> Decimal:
+    def calculate(self, price_bars: list[PriceBar]) -> Decimal:
         """
         Calculate ATR from price bars using Wilder's smoothing formula.
 
@@ -112,7 +111,7 @@ class ATRCalculator:
                 )
 
         # Calculate True Range for each bar (starting from index 1, need prev_close)
-        true_ranges: List[Decimal] = []
+        true_ranges: list[Decimal] = []
 
         for i in range(1, len(price_bars)):
             current_bar = price_bars[i]
@@ -306,7 +305,7 @@ class ATRCalculator:
             )
 
     def validate_price_bars(
-        self, price_bars: List[PriceBar], max_age_minutes: int = 15
+        self, price_bars: list[PriceBar], max_age_minutes: int = 15
     ) -> None:
         """
         Validate price bars are fresh and suitable for ATR calculation.

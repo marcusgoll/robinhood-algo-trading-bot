@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Optional
 
 from trading_bot.risk_management.exceptions import PositionPlanningError
 from trading_bot.risk_management.models import ATRStopData, PositionPlan
@@ -201,7 +200,7 @@ def calculate_position_plan(
     risk_pct: float,
     min_risk_reward_ratio: float = 2.0,
     pullback_source: str = "manual",
-    atr_data: Optional[ATRStopData] = None
+    atr_data: ATRStopData | None = None
 ) -> PositionPlan:
     """
     Calculate position plan with risk-based sizing and 2:1 targets.

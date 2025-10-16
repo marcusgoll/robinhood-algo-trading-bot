@@ -8,8 +8,6 @@ From: specs/atr-stop-adjustment/tasks.md T011
 
 from decimal import Decimal
 
-import pytest
-
 from trading_bot.risk_management.calculator import calculate_position_plan
 from trading_bot.risk_management.models import ATRStopData
 

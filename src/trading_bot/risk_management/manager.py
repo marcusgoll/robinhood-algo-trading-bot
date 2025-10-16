@@ -263,7 +263,6 @@ class RiskManager:
         """
         from trading_bot.order_management.models import OrderRequest
 
-        from .exceptions import StopPlacementError
 
         if self.order_manager is None:
             raise ValueError("OrderManager not configured")

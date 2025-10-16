@@ -12,7 +12,11 @@ import pytest
 
 from trading_bot.market_data.data_models import PriceBar
 from trading_bot.risk_management.atr_calculator import ATRCalculator
-from trading_bot.risk_management.exceptions import ATRCalculationError, ATRValidationError, StaleDataError
+from trading_bot.risk_management.exceptions import (
+    ATRCalculationError,
+    ATRValidationError,
+    StaleDataError,
+)
 from trading_bot.risk_management.models import ATRStopData
 
 

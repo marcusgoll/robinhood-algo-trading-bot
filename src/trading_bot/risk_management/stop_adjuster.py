@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Optional, Tuple
 
 from .config import RiskManagementConfig
 from .models import PositionPlan
@@ -16,7 +15,7 @@ class StopAdjuster:
         self,
         activation_pct: float = 10.0,
         trailing_distance_pct: float = 5.0,
-        config: Optional[RiskManagementConfig] = None,
+        config: RiskManagementConfig | None = None,
     ) -> None:
         """Initialize stop adjuster.
 
@@ -79,7 +78,7 @@ class StopAdjuster:
         current_price: Decimal,
         position_plan: PositionPlan,
         config: RiskManagementConfig,
-        current_atr: Optional[Decimal] = None,
+        current_atr: Decimal | None = None,
     ) -> tuple[Decimal, str] | None:
         """Calculate stop-loss adjustment based on current price and position progress.
 
