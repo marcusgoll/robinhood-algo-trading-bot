@@ -2,6 +2,7 @@
 
 Tests cover:
 - Scale-in limit enforcement (max 3 scale-ins per position)
+- Break-even rule evaluation with 2xATR threshold
 - Position state tracking
 - Rule activation logic
 
