@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from src.trading_bot.risk_management.models import PositionPlan
+
 
 def calculate_position_size(
     risk_amount: Decimal, entry_price: Decimal, stop_loss: Decimal
@@ -67,3 +69,31 @@ def validate_risk_limits(
 
     risk_pct = float(position_value / account_value * 100)
     return risk_pct <= max_risk_pct
+
+
+def calculate_position_plan(
+    symbol: str,
+    entry_price: Decimal,
+    stop_price: Decimal,
+    target_rr: float,
+    account_balance: Decimal,
+    risk_pct: float
+) -> PositionPlan:
+    """
+    Calculate position plan with risk-based sizing and 2:1 targets.
+
+    Args:
+        symbol: Stock symbol
+        entry_price: Entry price per share
+        stop_price: Stop-loss price per share
+        target_rr: Target risk-reward ratio (e.g., 2.0 for 2:1)
+        account_balance: Total account balance
+        risk_pct: Maximum risk percentage (e.g., 1.0 for 1%)
+
+    Returns:
+        PositionPlan with calculated quantities, prices, and risk metrics
+
+    From: specs/stop-loss-automation/tasks.md T023
+    """
+    # RED phase: Stub implementation that will fail the test
+    raise NotImplementedError("calculate_position_plan not yet implemented")

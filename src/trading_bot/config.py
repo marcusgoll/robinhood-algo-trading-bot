@@ -17,7 +17,7 @@ from pathlib import Path
 import os
 import json
 from dotenv import load_dotenv
-from trading_bot.risk_management.config import RiskManagementConfig
+from src.trading_bot.risk_management.config import RiskManagementConfig
 
 # Load .env file if exists (§Security: environment variables)
 load_dotenv()

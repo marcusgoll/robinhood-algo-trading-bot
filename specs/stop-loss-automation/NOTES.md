@@ -126,7 +126,7 @@ Cross-artifact analysis: Validated 100% requirement coverage (14 functional, 8 n
 ✅ T003 [P]: Create RiskManagementConfig dataclass (commit: 0d5a74d)
 ✅ T004 [P]: Extend Config to include risk_management section (commit: d7a5aea)
 ✅ T005 [P]: Create PositionPlan dataclass (commit: aac9c07)
-✅ T006 [P]: Create RiskManagementEnvelope dataclass (commit: TBD)
+✅ T006 [P]: Create RiskManagementEnvelope dataclass (commit: aac9c07)
 ✅ T007 [P]: Create PullbackData dataclass (commit: 690e1f0)
 
 ## Last Updated
