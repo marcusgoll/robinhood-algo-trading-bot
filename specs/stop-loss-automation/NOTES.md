@@ -218,6 +218,7 @@ Run config validation script (if exists) or check logs on startup for configurat
 ✅ T040 [P]: Add circuit breaker integration for stop placement failures (commit: 54c7914)
 ✅ T041 [P]: Add config migration instructions to NOTES.md
 ✅ T042 [P]: Document rollback procedure in NOTES.md
+✅ T043 [P]: Add smoke test script for risk management (commit: pending)
 
 ## Rollback Runbook
 
