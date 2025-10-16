@@ -281,10 +281,17 @@ class ScreenerService:
             cache_hit=False,
         )
 
-        # Log query
+        # Log query (convert Decimal to string for JSON serialization)
+        query_params_dict = asdict(query)
+        # Convert Decimal fields to strings
+        if query_params_dict.get("min_price") is not None:
+            query_params_dict["min_price"] = str(query_params_dict["min_price"])
+        if query_params_dict.get("max_price") is not None:
+            query_params_dict["max_price"] = str(query_params_dict["max_price"])
+
         self.logger.log_query(
             query_id=query_id,
-            query_params=asdict(query),
+            query_params=query_params_dict,
             result_count=result.result_count,
             total_count=result.total_count,
             execution_time_ms=execution_time_ms,
