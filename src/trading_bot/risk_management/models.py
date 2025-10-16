@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Dict, List
 
 
 @dataclass(slots=True)
@@ -14,12 +14,15 @@ class PositionPlan:
 
     symbol: str
     entry_price: Decimal
-    initial_stop_loss: Decimal
+    stop_price: Decimal
     target_price: Decimal
-    position_size: int
+    quantity: int
     risk_amount: Decimal
-    risk_reward_ratio: float
-    created_at: datetime = field(default_factory=datetime.now)
+    reward_amount: Decimal
+    reward_ratio: float
+    pullback_source: str
+    pullback_price: Decimal | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass(slots=True)
@@ -47,10 +50,16 @@ class PullbackData:
 
 @dataclass(slots=True)
 class RiskManagementEnvelope:
-    """Audit-friendly record of risk management actions."""
+    """Audit-friendly record tracking position lifecycle with stop and target orders.
 
-    action_type: str  # "initial_plan", "stop_adjustment", "target_hit", etc.
-    symbol: str
-    timestamp: datetime
-    details: dict[str, Any] = field(default_factory=dict)
-    position_plan: PositionPlan | None = None
+    Similar to OrderEnvelope pattern, tracks entry/stop/target orders and their status.
+    """
+
+    position_plan: PositionPlan
+    entry_order_id: str
+    stop_order_id: str
+    target_order_id: str
+    status: str  # "pending" | "active" | "stopped" | "target_hit" | "cancelled"
+    adjustments: List[Dict[str, Any]] = field(default_factory=list)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
