@@ -121,48 +121,30 @@ def test_calculate_atr_validates_price_bars():
     From: specs/atr-stop-adjustment/tasks.md T007
     Pattern: TDD RED phase - test MUST FAIL (validation doesn't exist yet)
     """
-    # Arrange: Create price bars with INVALID data (high < low)
+    # Arrange: Create price bars with INVALID data (negative prices)
     base_timestamp = datetime.now(UTC)
     price_bars: list[PriceBar] = []
 
-    # First bar is valid
+    # Add 14 valid bars first (to pass minimum bar count check)
+    for i in range(14):
+        price_bars.append(
+            PriceBar(
+                symbol="AAPL",
+                timestamp=base_timestamp + timedelta(minutes=i),
+                open=Decimal("150.00"),
+                high=Decimal("152.00"),
+                low=Decimal("149.00"),
+                close=Decimal("151.00"),
+                volume=1000000,
+            )
+        )
+
+    # Add bar with INVALID negative prices (passes PriceBar validation, but domain-invalid)
+    # PriceBar validation only checks high >= low, not that prices are positive
     price_bars.append(
         PriceBar(
             symbol="AAPL",
-            timestamp=base_timestamp,
-            open=Decimal("150.00"),
-            high=Decimal("152.00"),
-            low=Decimal("149.00"),
-            close=Decimal("151.00"),
-            volume=1000000,
-        )
-    )
-
-    # Second bar has INVALID high < low (should be caught by PriceBar validation)
-    # This will raise ValueError from PriceBar.__post_init__, not ATRCalculationError
-    # So we test that ATRCalculator properly validates the data
-    try:
-        invalid_bar = PriceBar(
-            symbol="AAPL",
-            timestamp=base_timestamp + timedelta(minutes=1),
-            open=Decimal("150.00"),
-            high=Decimal("148.00"),  # HIGH < LOW (invalid!)
-            low=Decimal("149.00"),
-            close=Decimal("149.50"),
-            volume=1000000,
-        )
-        price_bars.append(invalid_bar)
-    except ValueError:
-        # PriceBar validation catches this - that's good!
-        # For this test, we'll create bars that pass PriceBar validation
-        # but have other integrity issues ATRCalculator should catch
-        pass
-
-    # Alternative: Test with negative prices (valid OHLC structure, but invalid domain)
-    price_bars.append(
-        PriceBar(
-            symbol="AAPL",
-            timestamp=base_timestamp + timedelta(minutes=1),
+            timestamp=base_timestamp + timedelta(minutes=14),
             open=Decimal("-150.00"),
             high=Decimal("-148.00"),
             low=Decimal("-152.00"),
@@ -403,8 +385,6 @@ def test_atr_stop_validation_min_distance():
         ATRCalculator.validate_atr_stop(
             entry_price=entry_price,
             stop_price=expected_stop,
-            atr_value=atr_value,
-            multiplier=multiplier,
             position_type=position_type
         )
 
