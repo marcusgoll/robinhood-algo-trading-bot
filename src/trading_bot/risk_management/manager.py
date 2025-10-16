@@ -73,46 +73,6 @@ class RiskManager:
         self._stop_placement_attempts = 0
         self._stop_placement_failures = 0
 
-    def create_position_plan(
-        self,
-        symbol: str,
-        entry_price: Decimal,
-        stop_loss: Decimal,
-        target_price: Decimal,
-        account_value: Decimal,
-    ) -> PositionPlan:
-        """Create a risk-adjusted position plan.
-
-        Args:
-            symbol: Trading symbol
-            entry_price: Intended entry price
-            stop_loss: Initial stop-loss price
-            target_price: Price target
-            account_value: Current account value for position sizing
-
-        Returns:
-            PositionPlan with calculated position size and risk metrics
-        """
-        # Placeholder implementation - will be filled in implementation tasks
-        risk_amount = account_value * Decimal(self.config.max_risk_per_trade_pct / 100)
-        risk_per_share = abs(entry_price - stop_loss)
-        position_size = int(risk_amount / risk_per_share) if risk_per_share > 0 else 0
-
-        reward_per_share = abs(target_price - entry_price)
-        risk_reward_ratio = (
-            float(reward_per_share / risk_per_share) if risk_per_share > 0 else 0.0
-        )
-
-        return PositionPlan(
-            symbol=symbol,
-            entry_price=entry_price,
-            initial_stop_loss=stop_loss,
-            target_price=target_price,
-            position_size=position_size,
-            risk_amount=risk_amount,
-            risk_reward_ratio=risk_reward_ratio,
-        )
-
     def calculate_position_with_stop(
         self,
         symbol: str,
