@@ -125,5 +125,195 @@ Enhancement to existing stop-loss automation that adds ATR (Average True Range) 
 ### Phase 3.5 Integration (T028-T031)
 ✅ T028 [RED]: Write test: End-to-end ATR workflow (test_integration_atr.py)
 
+## Rollback Procedures
+
+### Pre-Deployment Validation
+Before enabling ATR in production, verify these prerequisites:
+- [ ] All 14 ATR tests passing (8 calculator + 1 calculator integration + 2 stop adjuster + 3 integration)
+- [ ] Performance benchmarks met (ATR calculation <50ms, actual: <1ms)
+- [ ] Error documentation reviewed by operations team
+- [ ] Monitoring alerts configured (P0/P1/P2/P3 as documented in error-log.md)
+- [ ] Staging validation completed with real market data
+
+### Emergency Rollback (Same-Day Issues)
+
+**Trigger Conditions**:
+- ATR calculation failures >10% of attempts
+- Position sizing errors causing incorrect stop placements
+- Performance degradation (ATR calculation >100ms consistently)
+- Data corruption affecting multiple symbols
+- Systematic test failures in production
+
+**Rollback Steps** (15-30 minutes):
+
+1. **Immediate Stop** (0-5 minutes):
+   ```bash
+   # SSH into production server
+   cd /path/to/stocks
+
+   # Disable ATR feature flag
+   git checkout config/risk_management.json
+   sed -i 's/"atr_enabled": true/"atr_enabled": false/' config/risk_management.json
+
+   # Restart trading service
+   systemctl restart trading-bot
+
+   # Verify rollback
+   journalctl -u trading-bot -f | grep "ATR: disabled"
+   ```
+
+2. **Verify System State** (5-10 minutes):
+   - Confirm all open positions using pullback/percentage stops (not ATR)
+   - Check error logs for ATR-related errors stopped occurring
+   - Verify position planning working with fallback stops
+   - Monitor next 3 trade entries to ensure pullback logic active
+
+3. **Preserve Evidence** (10-15 minutes):
+   ```bash
+   # Capture logs for investigation
+   journalctl -u trading-bot --since "1 hour ago" > /tmp/atr-rollback-$(date +%Y%m%d-%H%M).log
+
+   # Export ATR calculation metrics
+   sqlite3 trading.db "SELECT * FROM atr_calculations WHERE timestamp > datetime('now', '-1 hour')" > /tmp/atr-data.csv
+
+   # Copy error logs
+   cp specs/atr-stop-adjustment/error-log.md /tmp/error-log-rollback.md
+   ```
+
+4. **Communication** (within 30 minutes):
+   - Notify operations team: "ATR feature rolled back to pullback/percentage stops"
+   - Document issue in error-log.md under "Deployment Phase (Phase 6-7)"
+   - Create incident report with symptoms, timeline, and rollback actions
+   - Schedule postmortem within 24 hours
+
+**Rollback Verification Checklist**:
+- [ ] `atr_enabled=false` confirmed in config
+- [ ] Service restarted successfully
+- [ ] All open positions show pullback_source="pullback" or "manual"
+- [ ] Next 3 trades use non-ATR stops successfully
+- [ ] No ATR-related errors in logs post-rollback
+- [ ] System performance metrics normal (no degradation)
+
+### Gradual Rollback (Multi-Day Issues)
+
+**Trigger Conditions**:
+- ATR strategy underperforming pullback stops (based on 7-day backtest)
+- Regulatory concerns with dynamic stop methodology
+- Operational complexity not justified by risk-adjusted returns
+- Strategic decision to simplify risk management
+
+**Rollback Steps** (1-2 weeks):
+
+**Week 1: Disable New ATR Positions**
+```bash
+# Set atr_enabled=false for new positions only
+# Allow existing ATR positions to complete naturally
+vim config/risk_management.json
+# Change: "atr_enabled": false
+
+# Monitor existing ATR positions
+python scripts/monitor_atr_positions.py --report daily
+```
+
+**Week 2: Complete Transition**
+- Wait for all ATR-based positions to close (stop hit or target reached)
+- Archive ATR calculation data for analysis
+- Remove ATR configuration from production config
+- Update documentation to mark ATR as "deactivated"
+
+### Code Rollback (Critical Bug)
+
+If ATR code contains critical bugs requiring immediate removal:
+
+```bash
+# Create rollback branch
+git checkout -b rollback-atr-stop-adjustment
+
+# Revert all ATR commits (commits from last stable version to current)
+git log --oneline --grep="ATR" --since="2 weeks ago"  # List ATR commits
+git revert <commit-sha-range> --no-edit
+
+# Run full test suite
+pytest src/trading_bot/risk_management/tests/ -v
+
+# Deploy rollback branch
+git push origin rollback-atr-stop-adjustment
+# Follow deployment procedure for rollback branch
+```
+
+**Note**: Code rollback is extreme measure - prefer feature flag disable first.
+
+### Partial Rollback (Symbol-Specific)
+
+If ATR works for most symbols but fails for specific ones (e.g., low-volume penny stocks):
+
+```python
+# Add to config/risk_management.json
+{
+  "atr_enabled": true,
+  "atr_excluded_symbols": ["MEME", "PENNY", "LOWVOL"],
+  "atr_min_avg_volume": 1000000,  // Exclude symbols with <1M avg volume
+  "atr_min_price": 5.00            // Exclude penny stocks <$5
+}
+```
+
+Update ATRCalculator to check exclusion list before calculation.
+
+### Recovery Procedures
+
+After rollback and issue resolution:
+
+1. **Root Cause Analysis** (1-3 days):
+   - Review error logs and ATR calculation data
+   - Reproduce issue in staging environment
+   - Identify code fix or configuration adjustment
+   - Update error-log.md with new error code if novel issue
+
+2. **Fix Implementation** (1-5 days):
+   - Create bugfix branch: `bugfix/atr-<issue-description>`
+   - Write failing test that reproduces issue (TDD RED)
+   - Implement fix (TDD GREEN)
+   - Refactor if needed (TDD REFACTOR)
+   - All 14+ tests passing
+
+3. **Staging Re-validation** (3-7 days):
+   - Deploy fix to staging
+   - Run 3-7 days of live market validation
+   - Monitor ATR calculation success rate (target: >95%)
+   - Validate stop distance distribution (0.7%-10% range)
+   - Compare ATR vs pullback performance metrics
+
+4. **Production Re-deployment**:
+   - Schedule deployment during low-volume period (10am-2pm ET)
+   - Enable ATR with `atr_enabled=true`
+   - Monitor closely for 2-4 hours post-deployment
+   - Gradual rollout: Start with 1-2 positions, scale to full if successful
+
+### Rollback Decision Matrix
+
+| Severity | Scope | Response Time | Action |
+|----------|-------|---------------|--------|
+| **Critical** | System-wide | Immediate (<30 min) | Emergency rollback (feature flag disable) |
+| **High** | Multi-symbol | Within 2 hours | Partial rollback (exclude affected symbols) |
+| **Medium** | Single symbol | Within 1 day | Symbol-specific exclusion |
+| **Low** | Edge case | Within 1 week | Gradual rollback, schedule fix |
+
+### Success Metrics (Post-Rollback)
+
+After rollback, validate these metrics return to baseline:
+- [ ] Position entry success rate: >98% (same as pre-ATR)
+- [ ] Stop-loss hit rate: 15-25% (historical range)
+- [ ] Average stop distance: 1.5-3.0% (pullback/percentage baseline)
+- [ ] Position planning latency: <10ms (no ATR overhead)
+- [ ] Risk-adjusted return: Sharpe ratio >1.5 (strategy-dependent)
+
+### Lessons Learned Template
+
+After any rollback, document in error-log.md:
+- **What went wrong**: Technical root cause
+- **Why we didn't catch it**: Gap in testing, staging validation, monitoring
+- **What we changed**: Code fix, test addition, process improvement
+- **How we prevent it**: New validation, alert, or architectural change
+
 ## Last Updated
-2025-10-16T10:45:00
+2025-10-16T11:00:00
