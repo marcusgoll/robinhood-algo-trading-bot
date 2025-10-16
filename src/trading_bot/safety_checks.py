@@ -7,8 +7,8 @@ and position sizing to comply with Constitution §Safety_First and §Risk_Manage
 Constitution v1.0.0 - §Code_Quality: Type hints required
 
 Usage Example:
-    from src.trading_bot.safety_checks import SafetyChecks
-    from src.trading_bot.config import Config
+    from trading_bot.safety_checks import SafetyChecks
+    from trading_bot.config import Config
 
     # Initialize
     config = Config.from_env_and_json()
@@ -55,10 +55,10 @@ from typing import Any, Optional
 
 import pytz
 
-from src.trading_bot.config import Config
+from trading_bot.config import Config
 
 # REUSE: Import time utilities
-from src.trading_bot.utils.time_utils import is_trading_hours
+from trading_bot.utils.time_utils import is_trading_hours
 
 
 @dataclass

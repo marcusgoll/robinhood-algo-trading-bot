@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from src.trading_bot.risk_management.exceptions import PositionPlanningError
-from src.trading_bot.risk_management.models import PositionPlan
+from trading_bot.risk_management.exceptions import PositionPlanningError
+from trading_bot.risk_management.models import PositionPlan
 
 
 def validate_stop_distance(entry: Decimal, stop: Decimal) -> None:

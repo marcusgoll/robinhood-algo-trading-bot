@@ -9,6 +9,6 @@ Enforces Constitution v1.0.0:
 - §Safety_First: Bot fails to start if auth fails
 """
 
-from src.trading_bot.auth.robinhood_auth import AuthenticationError, RobinhoodAuth
+from trading_bot.auth.robinhood_auth import AuthenticationError, RobinhoodAuth
 
 __all__ = ["RobinhoodAuth", "AuthenticationError"]
