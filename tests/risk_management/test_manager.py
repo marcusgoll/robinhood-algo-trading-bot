@@ -272,3 +272,118 @@ def test_log_position_plan_to_jsonl(tmp_path: Path) -> None:
     assert "T" in log_entry["timestamp"], "Expected ISO 8601 timestamp format"
     assert "Z" in log_entry["timestamp"] or "+" in log_entry["timestamp"], \
         "Expected timezone in timestamp"
+
+
+def test_cancel_entry_on_stop_placement_failure() -> None:
+    """
+    Test that RiskManager cancels entry order when stop placement fails.
+
+    This is a critical guardrail (FR-003): If we cannot place a stop-loss order,
+    we must cancel the entry to avoid unprotected positions.
+
+    Given:
+        - Entry order submitted successfully (order_id="ENTRY_ORDER_123")
+        - Stop placement raises StopPlacementError (broker failure)
+
+    When:
+        place_trade_with_risk_management(plan, symbol="TSLA")
+
+    Then:
+        1. Calls OrderManager.place_limit_order() for entry → succeeds
+        2. Calls OrderManager.place_limit_order() for stop → raises StopPlacementError
+        3. Calls OrderManager.cancel_order(entry_order_id="ENTRY_ORDER_123") → cleanup
+        4. Logs error with correlation_id for audit trail
+        5. Re-raises StopPlacementError to caller
+
+    Guardrail rationale:
+        Without this safety mechanism, we could have open entry orders or filled
+        positions without protective stop-loss orders. This violates the
+        Constitution's §Risk_Management principle: "Never enter a position
+        without predefined exit criteria."
+
+    From: spec.md FR-003 guardrail, tasks.md T020
+    Pattern: TDD RED phase - test MUST FAIL until manager error handling implemented
+    """
+    # Arrange: Create sample PositionPlan
+    # Based on spec.md acceptance scenario 1:
+    # - Symbol: TSLA
+    # - Entry: $250.30
+    # - Stop: $248.00 (pullback low)
+    # - Target: $254.90 (2:1 risk-reward)
+    # - Quantity: 434 shares
+    position_plan = PositionPlan(
+        symbol="TSLA",
+        entry_price=Decimal("250.30"),
+        stop_price=Decimal("248.00"),
+        target_price=Decimal("254.90"),
+        quantity=434,
+        risk_amount=Decimal("1000.00"),
+        reward_amount=Decimal("1996.40"),
+        reward_ratio=2.0,
+        pullback_source="detected",
+        pullback_price=Decimal("248.00"),
+        created_at=datetime.now(UTC)
+    )
+
+    # Create mock OrderManager
+    mock_order_manager = Mock()
+
+    # Import OrderEnvelope for realistic mock returns
+    from src.trading_bot.order_management.models import OrderEnvelope
+
+    # Configure mock behavior:
+    # 1. Entry order succeeds (returns OrderEnvelope)
+    entry_envelope = OrderEnvelope(
+        order_id="ENTRY_ORDER_123",
+        symbol="TSLA",
+        side="BUY",
+        quantity=434,
+        limit_price=Decimal("250.30"),
+        execution_mode="LIVE",
+        submitted_at=datetime.now(UTC)
+    )
+
+    # 2. Stop order placement fails (raises StopPlacementError on second call)
+    mock_order_manager.place_limit_order.side_effect = [
+        entry_envelope,  # First call succeeds
+        StopPlacementError(
+            "Broker timeout: Failed to place stop-loss order for TSLA at $248.00"
+        )  # Second call fails
+    ]
+
+    # 3. Cancel order should succeed when called
+    mock_order_manager.cancel_order.return_value = True
+
+    # Import RiskManager (this will work since manager.py exists)
+    from src.trading_bot.risk_management.manager import RiskManager
+
+    # Create RiskManager with mocked OrderManager
+    # NOTE: This will FAIL because RiskManager constructor doesn't accept
+    # order_manager parameter yet (will be added in T025 GREEN phase)
+    risk_manager = RiskManager(order_manager=mock_order_manager)
+
+    # Act & Assert: Expect StopPlacementError to be raised
+    with pytest.raises(StopPlacementError, match="Broker timeout.*stop-loss"):
+        # This will FAIL in RED phase because place_trade_with_risk_management
+        # doesn't exist yet OR doesn't implement the guardrail logic
+        # (will be implemented in T025/T030 GREEN phase)
+        risk_manager.place_trade_with_risk_management(
+            plan=position_plan,
+            symbol="TSLA"
+        )
+
+    # Assert guardrail behavior (once implemented in T030):
+    # These assertions document expected behavior
+
+    # 1. Entry order was placed first
+    assert mock_order_manager.place_limit_order.call_count == 2, \
+        "Expected 2 calls to place_limit_order (entry succeeded, stop failed)"
+
+    # 2. Entry order was cancelled as guardrail cleanup
+    mock_order_manager.cancel_order.assert_called_once_with(
+        order_id="ENTRY_ORDER_123"
+    )
+
+    # 3. Error was logged with correlation_id
+    # TODO: Add logging assertion once logger is integrated (T026)
+    # risk_manager.logger.log_error.assert_called_once()
