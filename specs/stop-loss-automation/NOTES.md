@@ -149,6 +149,9 @@ Cross-artifact analysis: Validated 100% requirement coverage (14 functional, 8 n
 ✅ T026 [GREEN→T015]: Add JSONL logging to RiskManager (commit: 25252e4)
 ✅ T027 [GREEN→T016]: Implement StopAdjuster.calculate_adjustment() (commit: 690bb3a)
 ✅ T028 [GREEN→T017]: Add trailing_enabled check in StopAdjuster (commit: 690bb3a)
+✅ T029 [GREEN→T018,T019]: Implement TargetMonitor.poll_and_handle_fills() (commit: 29823bf)
+✅ T030 [GREEN→T020]: Add error handling to RiskManager.place_trade_with_risk_management() (commit: 5f13222)
+✅ T031 [REFACTOR]: Extract position size calculation to separate method (commit: ff15484)
 
 ## Last Updated
 2025-10-15T00:00:00-05:00

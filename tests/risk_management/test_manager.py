@@ -274,6 +274,293 @@ def test_log_position_plan_to_jsonl(tmp_path: Path) -> None:
         "Expected timezone in timestamp"
 
 
+def test_correlation_id_generated_for_position_plan(tmp_path: Path) -> None:
+    """
+    Test that RiskManager generates correlation_id for position lifecycle tracking.
+
+    T033 Enhancement: Every position should have a unique correlation_id (UUID)
+    that traces the complete lifecycle: plan → entry → stop → target → fill.
+
+    Given:
+        - PositionPlan created for TSLA
+        - RiskManager configured with log_dir=tmp_path
+
+    When:
+        log_position_plan() is called
+
+    Then:
+        - Log entry contains correlation_id field
+        - correlation_id is a valid UUID4
+        - correlation_id is consistent across all log entries for same position
+
+    Rationale:
+        Correlation IDs enable tracing position lifecycle across distributed logs,
+        simplifying debugging, audit compliance, and performance analysis.
+
+    Pattern: src/trading_bot/logging/structured_logger.py correlation_id usage
+    From: tasks.md T033
+    Phase: TDD RED - test MUST FAIL until correlation_id implemented
+    """
+    # Arrange
+    from src.trading_bot.risk_management.manager import RiskManager
+
+    symbol = "TSLA"
+    entry_price = Decimal("250.30")
+    stop_price = Decimal("248.00")
+    account_balance = Decimal("100000.00")
+    account_risk_pct = 1.0
+    target_rr = 2.0
+
+    position_plan = calculate_position_plan(
+        symbol=symbol,
+        entry_price=entry_price,
+        stop_price=stop_price,
+        target_rr=target_rr,
+        account_balance=account_balance,
+        risk_pct=account_risk_pct
+    )
+
+    log_file = tmp_path / "risk-management.jsonl"
+    risk_manager = RiskManager(log_dir=tmp_path)
+
+    # Act - Log position plan
+    risk_manager.log_position_plan(position_plan, pullback_source="detected")
+
+    # Assert - Verify correlation_id exists and is valid UUID
+    assert log_file.exists(), f"Expected log file at {log_file}"
+
+    with open(log_file, 'r', encoding='utf-8') as f:
+        log_lines = f.readlines()
+
+    assert len(log_lines) >= 1, "Expected at least one log entry"
+    log_entry = json.loads(log_lines[-1])
+
+    # Verify correlation_id field exists
+    assert "correlation_id" in log_entry, "Expected correlation_id field in log entry"
+
+    # Verify correlation_id is a valid UUID4
+    correlation_id = log_entry["correlation_id"]
+    import uuid
+    try:
+        uuid_obj = uuid.UUID(correlation_id, version=4)
+        assert str(uuid_obj) == correlation_id, "correlation_id should be valid UUID4 string"
+    except ValueError:
+        pytest.fail(f"correlation_id '{correlation_id}' is not a valid UUID4")
+
+
+def test_correlation_id_included_in_risk_management_envelope() -> None:
+    """
+    Test that RiskManagementEnvelope tracks correlation_id for position lifecycle.
+
+    T033 Enhancement: correlation_id should be included in RiskManagementEnvelope
+    for consistent tracking across entry/stop/target orders.
+
+    Given:
+        - PositionPlan with entry/stop/target prices
+        - Mocked OrderManager
+
+    When:
+        place_trade_with_risk_management() is called
+
+    Then:
+        - RiskManagementEnvelope contains correlation_id field
+        - correlation_id is a valid UUID4
+        - Same correlation_id used for all order placements
+
+    Rationale:
+        Envelope must carry correlation_id for downstream order tracking
+        and log correlation across order lifecycle events.
+
+    From: tasks.md T033
+    Phase: TDD RED - test MUST FAIL until RiskManagementEnvelope updated
+    """
+    # Arrange
+    from src.trading_bot.risk_management.manager import RiskManager
+    from src.trading_bot.order_management.models import OrderEnvelope
+
+    position_plan = PositionPlan(
+        symbol="TSLA",
+        entry_price=Decimal("250.30"),
+        stop_price=Decimal("248.00"),
+        target_price=Decimal("254.90"),
+        quantity=434,
+        risk_amount=Decimal("1000.00"),
+        reward_amount=Decimal("1996.40"),
+        reward_ratio=2.0,
+        pullback_source="detected",
+        pullback_price=Decimal("248.00"),
+        created_at=datetime.now(UTC)
+    )
+
+    # Mock OrderManager
+    mock_order_manager = Mock()
+
+    entry_envelope = OrderEnvelope(
+        order_id="ENTRY123",
+        symbol="TSLA",
+        side="BUY",
+        quantity=434,
+        limit_price=Decimal("250.30"),
+        execution_mode="LIVE",
+        submitted_at=datetime.now(UTC)
+    )
+
+    stop_envelope = OrderEnvelope(
+        order_id="STOP456",
+        symbol="TSLA",
+        side="SELL",
+        quantity=434,
+        limit_price=Decimal("248.00"),
+        execution_mode="LIVE",
+        submitted_at=datetime.now(UTC)
+    )
+
+    target_envelope = OrderEnvelope(
+        order_id="TARGET789",
+        symbol="TSLA",
+        side="SELL",
+        quantity=434,
+        limit_price=Decimal("254.90"),
+        execution_mode="LIVE",
+        submitted_at=datetime.now(UTC)
+    )
+
+    mock_order_manager.place_limit_order.side_effect = [
+        entry_envelope,
+        stop_envelope,
+        target_envelope
+    ]
+
+    risk_manager = RiskManager(order_manager=mock_order_manager)
+
+    # Act
+    envelope = risk_manager.place_trade_with_risk_management(
+        plan=position_plan,
+        symbol="TSLA"
+    )
+
+    # Assert - Verify correlation_id exists in envelope
+    assert hasattr(envelope, 'correlation_id'), \
+        "RiskManagementEnvelope should have correlation_id attribute"
+    assert envelope.correlation_id is not None, \
+        "correlation_id should not be None"
+
+    # Verify correlation_id is valid UUID4
+    import uuid
+    try:
+        uuid_obj = uuid.UUID(envelope.correlation_id, version=4)
+        assert str(uuid_obj) == envelope.correlation_id, \
+            "correlation_id should be valid UUID4 string"
+    except ValueError:
+        pytest.fail(f"correlation_id '{envelope.correlation_id}' is not a valid UUID4")
+
+
+def test_calculate_position_with_stop_orchestration(tmp_path: Path) -> None:
+    """
+    Test that calculate_position_with_stop() orchestrates pullback analysis and position planning.
+
+    T032 Implementation: High-level method should:
+    1. Call PullbackAnalyzer.analyze_pullback() with price_data
+    2. Call calculate_position_plan() with detected stop_price
+    3. Log position plan to JSONL
+    4. Return PositionPlan
+
+    Given:
+        - Symbol: TSLA
+        - Entry: $250.30
+        - Account balance: $100,000
+        - Risk: 1.0%
+        - Price data with swing low at $248.00
+        - RiskManager with custom log_dir
+
+    When:
+        calculate_position_with_stop() is called
+
+    Then:
+        - Returns PositionPlan with:
+          * stop_price=$248.00 (from pullback analysis)
+          * quantity=434 shares
+          * target_price=$254.90 (2:1 ratio)
+        - Logs position plan to risk-management.jsonl
+        - Log contains pullback_source="detected"
+
+    From: specs/stop-loss-automation/tasks.md T032
+    """
+    # Arrange
+    from src.trading_bot.risk_management.manager import RiskManager
+
+    symbol = "TSLA"
+    entry_price = Decimal("250.30")
+    account_balance = Decimal("100000.00")
+    account_risk_pct = 1.0
+
+    # Create price data with swing low at $248.00 (from test_pullback_analyzer.py pattern)
+    price_data = [
+        # Downtrend leading to swing low
+        {"timestamp": datetime(2025, 10, 15, 9, 30, tzinfo=UTC), "low": Decimal("252.00"), "close": Decimal("251.50")},
+        {"timestamp": datetime(2025, 10, 15, 9, 35, tzinfo=UTC), "low": Decimal("251.00"), "close": Decimal("250.50")},
+        {"timestamp": datetime(2025, 10, 15, 9, 40, tzinfo=UTC), "low": Decimal("250.00"), "close": Decimal("249.50")},
+        {"timestamp": datetime(2025, 10, 15, 9, 45, tzinfo=UTC), "low": Decimal("249.50"), "close": Decimal("249.00")},
+        {"timestamp": datetime(2025, 10, 15, 9, 50, tzinfo=UTC), "low": Decimal("249.00"), "close": Decimal("248.50")},
+        {"timestamp": datetime(2025, 10, 15, 9, 55, tzinfo=UTC), "low": Decimal("248.50"), "close": Decimal("248.20")},
+        {"timestamp": datetime(2025, 10, 15, 10, 0, tzinfo=UTC), "low": Decimal("248.20"), "close": Decimal("248.10")},
+        {"timestamp": datetime(2025, 10, 15, 10, 5, tzinfo=UTC), "low": Decimal("248.10"), "close": Decimal("248.00")},
+        {"timestamp": datetime(2025, 10, 15, 10, 10, tzinfo=UTC), "low": Decimal("248.05"), "close": Decimal("248.00")},
+        {"timestamp": datetime(2025, 10, 15, 10, 15, tzinfo=UTC), "low": Decimal("248.00"), "close": Decimal("248.00")},
+        # SWING LOW: Index 10
+        {"timestamp": datetime(2025, 10, 15, 10, 20, tzinfo=UTC), "low": Decimal("248.00"), "close": Decimal("248.10")},
+        # Confirmation candles (higher lows)
+        {"timestamp": datetime(2025, 10, 15, 10, 25, tzinfo=UTC), "low": Decimal("248.20"), "close": Decimal("248.50")},
+        {"timestamp": datetime(2025, 10, 15, 10, 30, tzinfo=UTC), "low": Decimal("248.50"), "close": Decimal("249.00")},
+        # Recovery
+        {"timestamp": datetime(2025, 10, 15, 10, 35, tzinfo=UTC), "low": Decimal("249.00"), "close": Decimal("249.50")},
+        {"timestamp": datetime(2025, 10, 15, 10, 40, tzinfo=UTC), "low": Decimal("249.50"), "close": Decimal("250.00")},
+        {"timestamp": datetime(2025, 10, 15, 10, 45, tzinfo=UTC), "low": Decimal("249.80"), "close": Decimal("250.20")},
+        {"timestamp": datetime(2025, 10, 15, 10, 50, tzinfo=UTC), "low": Decimal("250.00"), "close": Decimal("250.30")},
+        {"timestamp": datetime(2025, 10, 15, 10, 55, tzinfo=UTC), "low": Decimal("250.20"), "close": Decimal("250.50")},
+        {"timestamp": datetime(2025, 10, 15, 11, 0, tzinfo=UTC), "low": Decimal("250.30"), "close": Decimal("250.60")},
+        {"timestamp": datetime(2025, 10, 15, 11, 5, tzinfo=UTC), "low": Decimal("250.40"), "close": Decimal("250.30")},
+    ]
+
+    log_file = tmp_path / "risk-management.jsonl"
+    risk_manager = RiskManager(log_dir=tmp_path)
+
+    # Act - Call high-level orchestration method
+    position_plan = risk_manager.calculate_position_with_stop(
+        symbol=symbol,
+        entry_price=entry_price,
+        account_balance=account_balance,
+        account_risk_pct=account_risk_pct,
+        price_data=price_data,
+    )
+
+    # Assert - Verify PositionPlan structure
+    assert isinstance(position_plan, PositionPlan)
+    assert position_plan.symbol == "TSLA"
+    assert position_plan.entry_price == Decimal("250.30")
+    assert position_plan.stop_price == Decimal("248.00"), "Should detect swing low at $248.00"
+    assert position_plan.quantity == 434, "Should calculate correct quantity based on risk"
+    assert position_plan.target_price == Decimal("254.90"), "Should calculate 2:1 target"
+    assert position_plan.risk_amount == Decimal("1000.00"), "Should risk 1% of $100k"
+
+    # Assert - Verify JSONL logging
+    assert log_file.exists(), f"Expected log file at {log_file}"
+
+    with open(log_file, 'r', encoding='utf-8') as f:
+        log_lines = f.readlines()
+
+    assert len(log_lines) >= 1, "Expected at least one log entry"
+    log_entry = json.loads(log_lines[-1])
+
+    # Verify log structure
+    assert log_entry["action"] == "position_plan_created"
+    assert log_entry["symbol"] == "TSLA"
+    assert float(log_entry["entry_price"]) == 250.30
+    assert float(log_entry["stop_price"]) == 248.00
+    assert log_entry["quantity"] == 434
+    assert log_entry["pullback_source"] == "detected", "Should use detected pullback, not default"
+
+
 def test_cancel_entry_on_stop_placement_failure() -> None:
     """
     Test that RiskManager cancels entry order when stop placement fails.
