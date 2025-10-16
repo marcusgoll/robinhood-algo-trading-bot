@@ -1,8 +1,10 @@
 """Tests for Trade Management Rules.
 
 Tests cover:
-- Scale-in limit enforcement (max 3 scale-ins per position)
-- Break-even rule evaluation with 2xATR threshold
+- Break-even rule evaluation with 2xATR threshold (T006)
+- Break-even idempotency (prevents multiple activations) (T007)
+- Scale-in limit enforcement (max 3 scale-ins per position) (T009)
+- Catastrophic exit at 3xATR adverse move (T011)
 - Position state tracking
 - Rule activation logic
 
@@ -43,6 +45,145 @@ class RuleActivation:
     reason: str
     quantity: int | None = None  # Full position quantity for close_position
     new_stop_price: Decimal | None = None  # New stop price for move_stop action
+
+
+class TestBreakEvenRules:
+    """Test suite for break-even trade management rules."""
+
+    def test_break_even_rule_activates_at_2x_atr(self) -> None:
+        """Test break-even rule moves stop to entry at 2xATR favorable move.
+
+        Scenario (from T006 requirements):
+        - Given: Long position at $100, current price $106, ATR $3, stop at $98
+        - When: Position moves to 2xATR above entry ($106 = $100 + 2 * $3)
+        - Then: Returns RuleActivation with:
+            - action="move_stop"
+            - new_stop_price=$100 (break-even = entry price)
+            - reason explains 2xATR threshold reached
+
+        Test validates:
+        - Distance calculation: current_price - entry_price >= 2.0 * ATR
+        - New stop price equals entry price (break-even protection)
+        - Rule activation includes correct action and stop price
+        - Audit reason explains 2xATR break-even threshold
+
+        References:
+        - Task T006: Break-even rule evaluation with 2xATR threshold
+        - spec.md FR-001: Move stop to break-even at 2x ATR
+        - spec.md Acceptance Scenario 1
+        - Pattern: test_stop_adjuster.py test structure
+        """
+        # Arrange: Position at exactly 2xATR above entry
+        position = PositionState(
+            symbol="TSLA",
+            entry_price=Decimal("100.00"),
+            current_price=Decimal("106.00"),  # 2xATR above entry ($6 = 2 * $3)
+            current_atr=Decimal("3.00"),
+            scale_in_count=0,
+            quantity=100,
+            break_even_activated=False,  # Not yet activated
+            stop_price=Decimal("98.00"),  # Original stop below entry
+        )
+
+        # Act: Evaluate break-even rule (implementation doesn't exist yet)
+        # This will fail because evaluate_break_even_rule() doesn't exist
+        from src.trading_bot.risk_management.trade_rules import (
+            evaluate_break_even_rule,
+        )
+
+        result = evaluate_break_even_rule(position)
+
+        # Assert: Should return activation to move stop to break-even
+        assert result is not None, (
+            "Should return RuleActivation at 2xATR threshold, not None"
+        )
+
+        assert result.action == "move_stop", (
+            "Should return 'move_stop' action at 2xATR threshold"
+        )
+
+        # Verify new stop price equals entry (break-even)
+        assert result.new_stop_price is not None, (
+            "RuleActivation should include new_stop_price for move_stop action"
+        )
+        assert result.new_stop_price == Decimal("100.00"), (
+            "New stop should be at entry price ($100) for break-even protection"
+        )
+
+        # Verify the math: current_price - entry_price = 2.0 * ATR
+        distance_above_entry = position.current_price - position.entry_price
+        expected_distance = Decimal("2.0") * position.current_atr
+        assert distance_above_entry == expected_distance, (
+            f"Position should be exactly 2xATR above entry: "
+            f"{distance_above_entry} == {expected_distance}"
+        )
+
+        # Verify reason explains break-even threshold
+        assert "break" in result.reason.lower() or "2x" in result.reason.lower(), (
+            "Reason should explain 2xATR break-even threshold"
+        )
+        assert "atr" in result.reason.lower(), (
+            "Reason should reference ATR as threshold metric"
+        )
+
+    def test_break_even_rule_prevents_multiple_activations(self) -> None:
+        """Test that break-even rule prevents multiple activations (idempotency).
+
+        Scenario (from T007 requirements):
+        - Given: Position with break_even_activated=True, price 2xATR above entry
+        - When: evaluate_break_even_rule() called again
+        - Then: Returns RuleActivation with action="hold" (no stop adjustment)
+
+        Test validates:
+        - Break-even rule is idempotent (only triggers once)
+        - Position with break_even_activated=True should NOT trigger again
+        - Rule returns "hold" action when already activated
+        - Audit reason explains rule was already executed
+
+        References:
+        - Task T007: Break-even idempotency test
+        - spec.md FR-008: Execute break-even stop move only once per position
+        - spec.md Edge Cases: Break-even triggered multiple times
+        - Pattern: test_stop_adjuster.py test structure
+        """
+        # Arrange: Position where break-even was already activated
+        position = PositionState(
+            symbol="TSLA",
+            entry_price=Decimal("100.00"),
+            current_price=Decimal("110.00"),  # Well above 2xATR threshold
+            scale_in_count=0,
+            quantity=100,
+            current_atr=Decimal("3.00"),
+            break_even_activated=True,  # Already activated!
+            stop_price=Decimal("100.00"),  # Stop already at break-even
+        )
+
+        # Act: Evaluate break-even rule when already activated
+        # This will fail because evaluate_break_even_rule() doesn't exist
+        from src.trading_bot.risk_management.trade_rules import (
+            evaluate_break_even_rule,
+        )
+
+        result = evaluate_break_even_rule(position)
+
+        # Assert: Should return "hold" action (no adjustment)
+        assert result is not None, "Should return RuleActivation, not None"
+
+        assert result.action == "hold", (
+            "Should return 'hold' action when break_even_activated=True"
+        )
+
+        # Verify reason explains idempotency
+        assert (
+            "already" in result.reason.lower()
+            or "activated" in result.reason.lower()
+            or "once" in result.reason.lower()
+        ), "Reason should explain that break-even was already activated"
+
+        # Verify no new stop price is provided (hold means no change)
+        assert result.new_stop_price is None, (
+            "new_stop_price should be None for 'hold' action"
+        )
 
 
 class TestScaleInRules:
