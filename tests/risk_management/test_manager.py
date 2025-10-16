@@ -8,14 +8,165 @@ From: specs/stop-loss-automation/tasks.md T014-T015, T020
 """
 
 import json
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 from src.trading_bot.risk_management.calculator import calculate_position_plan
 from src.trading_bot.risk_management.exceptions import StopPlacementError
+from src.trading_bot.risk_management.models import PositionPlan, RiskManagementEnvelope
+
+
+def test_place_trade_with_risk_management() -> None:
+    """
+    Test that RiskManager places entry, stop, and target orders via OrderManager.
+
+    Given:
+        - PositionPlan with:
+          * symbol="TSLA"
+          * entry_price=$250.30
+          * stop_price=$248.00
+          * target_price=$254.90
+          * quantity=434 shares
+          * risk_amount=$1,000
+          * reward_ratio=2.0
+        - Mocked OrderManager dependency
+
+    When:
+        place_trade_with_risk_management(plan, symbol="TSLA") is called
+
+    Then:
+        - Calls OrderManager.place_limit_order() for entry BUY at $250.30, qty=434
+        - Calls OrderManager.place_limit_order() for stop SELL at $248.00, qty=434
+        - Calls OrderManager.place_limit_order() for target SELL at $254.90, qty=434
+        - Returns RiskManagementEnvelope with:
+          * entry_order_id="ENTRY123"
+          * stop_order_id="STOP456"
+          * target_order_id="TARGET789"
+          * status="pending"
+          * position_plan=plan
+
+    Rationale:
+        Core orchestration test ensures RiskManager correctly delegates to OrderManager
+        for each order type (entry/stop/target) and constructs proper audit envelope.
+        This validates FR-004: automated stop/target placement with OrderManager reuse.
+
+    Pattern: tests/order_management/test_manager.py test structure
+    Reuse: OrderManager.place_limit_order() for all three order types
+    From: spec.md FR-004, tasks.md T014
+    Phase: TDD RED - test MUST FAIL until RiskManager.place_trade_with_risk_management() implemented
+    """
+    # Arrange
+    # Create a realistic PositionPlan matching the spec scenario
+    position_plan = PositionPlan(
+        symbol="TSLA",
+        entry_price=Decimal("250.30"),
+        stop_price=Decimal("248.00"),
+        target_price=Decimal("254.90"),
+        quantity=434,
+        risk_amount=Decimal("1000.00"),
+        reward_amount=Decimal("1996.40"),
+        reward_ratio=2.0,
+        pullback_source="detected",
+        pullback_price=Decimal("248.00"),
+        created_at=datetime.now(UTC)
+    )
+
+    # Mock OrderManager
+    mock_order_manager = Mock()
+
+    # Configure mock to return different OrderEnvelopes for each call
+    # We need to import OrderEnvelope to construct realistic return values
+    from src.trading_bot.order_management.models import OrderEnvelope
+
+    entry_envelope = OrderEnvelope(
+        order_id="ENTRY123",
+        symbol="TSLA",
+        side="BUY",
+        quantity=434,
+        limit_price=Decimal("250.30"),
+        execution_mode="LIVE",
+        submitted_at=datetime.now(UTC)
+    )
+
+    stop_envelope = OrderEnvelope(
+        order_id="STOP456",
+        symbol="TSLA",
+        side="SELL",
+        quantity=434,
+        limit_price=Decimal("248.00"),
+        execution_mode="LIVE",
+        submitted_at=datetime.now(UTC)
+    )
+
+    target_envelope = OrderEnvelope(
+        order_id="TARGET789",
+        symbol="TSLA",
+        side="SELL",
+        quantity=434,
+        limit_price=Decimal("254.90"),
+        execution_mode="LIVE",
+        submitted_at=datetime.now(UTC)
+    )
+
+    # Configure place_limit_order to return different envelopes based on call order
+    mock_order_manager.place_limit_order.side_effect = [
+        entry_envelope,   # First call: entry order
+        stop_envelope,    # Second call: stop order
+        target_envelope   # Third call: target order
+    ]
+
+    # Import RiskManager (this will FAIL - not fully implemented yet)
+    from src.trading_bot.risk_management.manager import RiskManager
+
+    # Create RiskManager with mocked OrderManager
+    risk_manager = RiskManager(order_manager=mock_order_manager)
+
+    # Act
+    envelope = risk_manager.place_trade_with_risk_management(
+        plan=position_plan,
+        symbol="TSLA"
+    )
+
+    # Assert - Verify OrderManager was called correctly for all three orders
+    assert mock_order_manager.place_limit_order.call_count == 3, \
+        f"Expected 3 calls to place_limit_order, got {mock_order_manager.place_limit_order.call_count}"
+
+    # Verify entry order call (first call)
+    entry_call = mock_order_manager.place_limit_order.call_args_list[0]
+    entry_order_request = entry_call[0][0]  # First positional argument
+    assert entry_order_request.symbol == "TSLA"
+    assert entry_order_request.side == "BUY"
+    assert entry_order_request.quantity == 434
+    assert entry_order_request.reference_price == Decimal("250.30")
+
+    # Verify stop order call (second call)
+    stop_call = mock_order_manager.place_limit_order.call_args_list[1]
+    stop_order_request = stop_call[0][0]
+    assert stop_order_request.symbol == "TSLA"
+    assert stop_order_request.side == "SELL"
+    assert stop_order_request.quantity == 434
+    assert stop_order_request.reference_price == Decimal("248.00")
+
+    # Verify target order call (third call)
+    target_call = mock_order_manager.place_limit_order.call_args_list[2]
+    target_order_request = target_call[0][0]
+    assert target_order_request.symbol == "TSLA"
+    assert target_order_request.side == "SELL"
+    assert target_order_request.quantity == 434
+    assert target_order_request.reference_price == Decimal("254.90")
+
+    # Verify returned RiskManagementEnvelope structure
+    assert isinstance(envelope, RiskManagementEnvelope), \
+        f"Expected RiskManagementEnvelope, got {type(envelope)}"
+    assert envelope.entry_order_id == "ENTRY123"
+    assert envelope.stop_order_id == "STOP456"
+    assert envelope.target_order_id == "TARGET789"
+    assert envelope.status == "pending"
+    assert envelope.position_plan == position_plan
 
 
 def test_log_position_plan_to_jsonl(tmp_path: Path) -> None:
