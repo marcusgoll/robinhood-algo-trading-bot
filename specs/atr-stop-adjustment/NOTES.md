@@ -107,7 +107,9 @@ Enhancement to existing stop-loss automation that adds ATR (Average True Range) 
 ## Task Completion Log
 
 ### Phase 3.1 Setup (Parallel Batch 1)
+✅ T001 [P]: Add PriceBar dataclass to src/trading_bot/market_data/data_models.py
 ✅ T002 [P]: Add ATRStopData dataclass to src/trading_bot/risk_management/models.py
+✅ T003 [P]: Add ATR exception classes to src/trading_bot/risk_management/exceptions.py
 
 ## Last Updated
 2025-10-16T09:30:00
