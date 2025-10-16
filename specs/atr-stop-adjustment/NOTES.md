@@ -116,6 +116,10 @@ Enhancement to existing stop-loss automation that adds ATR (Average True Range) 
 ✅ T005 [RED]: Write test: ATR calculation with valid 14-period data
 ✅ T006 [RED]: Write test: ATR calculation fails with insufficient data
 ✅ T007 [RED]: Write test: ATR calculation validates price bar integrity
+✅ T008 [RED]: Write test: ATRCalculator.calculate_atr_stop() for long positions
+✅ T009 [RED]: Write test: ATRCalculator.validate_atr_stop() checks distance bounds
+✅ T010 [RED]: Write test: ATRCalculator.validate_atr_stop() rejects >10% stops
+✅ T011 [RED]: Write test: Calculator.calculate_position_plan() with ATR data
 
 ## Last Updated
-2025-10-16T10:15:00
+2025-10-16T10:30:00
