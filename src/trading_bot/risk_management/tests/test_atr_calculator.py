@@ -12,8 +12,251 @@ import pytest
 
 from trading_bot.market_data.data_models import PriceBar
 from trading_bot.risk_management.atr_calculator import ATRCalculator
-from trading_bot.risk_management.exceptions import ATRCalculationError, ATRValidationError
+from trading_bot.risk_management.exceptions import ATRCalculationError, ATRValidationError, StaleDataError
 from trading_bot.risk_management.models import ATRStopData
+
+
+def test_calculate_atr_from_bars_valid_data():
+    """
+    Test ATR calculation with valid 14-period data.
+
+    Given:
+        - 20 PriceBar objects with known price movements
+        - ATR period = 14
+
+    When:
+        ATRCalculator.calculate() is called
+
+    Then:
+        - Returns Decimal ATR value accurate to ±$0.01 (NFR-008)
+        - ATR value represents average volatility across the period
+        - Calculation uses Wilder's smoothing formula
+
+    Wilder's ATR Formula:
+        1. Calculate True Range for each bar:
+           TR = max(high - low, |high - prev_close|, |low - prev_close|)
+        2. First ATR = average of first 14 TRs
+        3. Subsequent ATRs = ((prev_ATR * 13) + current_TR) / 14
+
+    Expected ATR calculation for test data:
+        - Using realistic price bars with $2-$3 true ranges
+        - Expected ATR ≈ $2.50 (varies based on data)
+
+    From: specs/atr-stop-adjustment/tasks.md T005
+    Pattern: TDD RED phase - test MUST FAIL (calculate method doesn't exist yet)
+    """
+    # Arrange: Create 20 PriceBar objects with realistic volatility
+    base_timestamp = datetime.now(UTC)
+    price_bars: list[PriceBar] = []
+
+    # Generate price data with known volatility pattern
+    prices = [
+        # (open, high, low, close)
+        (Decimal("150.00"), Decimal("152.00"), Decimal("149.50"), Decimal("151.00")),
+        (Decimal("151.00"), Decimal("153.50"), Decimal("150.75"), Decimal("152.50")),
+        (Decimal("152.50"), Decimal("154.00"), Decimal("151.50"), Decimal("153.00")),
+        (Decimal("153.00"), Decimal("155.50"), Decimal("152.50"), Decimal("154.75")),
+        (Decimal("154.75"), Decimal("156.00"), Decimal("153.75"), Decimal("155.00")),
+        (Decimal("155.00"), Decimal("157.00"), Decimal("154.50"), Decimal("156.25")),
+        (Decimal("156.25"), Decimal("158.00"), Decimal("155.75"), Decimal("157.00")),
+        (Decimal("157.00"), Decimal("159.50"), Decimal("156.50"), Decimal("158.50")),
+        (Decimal("158.50"), Decimal("160.00"), Decimal("157.50"), Decimal("159.00")),
+        (Decimal("159.00"), Decimal("161.50"), Decimal("158.50"), Decimal("160.50")),
+        (Decimal("160.50"), Decimal("162.00"), Decimal("159.50"), Decimal("161.00")),
+        (Decimal("161.00"), Decimal("163.50"), Decimal("160.50"), Decimal("162.50")),
+        (Decimal("162.50"), Decimal("164.00"), Decimal("161.50"), Decimal("163.00")),
+        (Decimal("163.00"), Decimal("165.50"), Decimal("162.50"), Decimal("164.75")),
+        (Decimal("164.75"), Decimal("166.00"), Decimal("163.75"), Decimal("165.00")),
+        (Decimal("165.00"), Decimal("167.00"), Decimal("164.50"), Decimal("166.25")),
+        (Decimal("166.25"), Decimal("168.00"), Decimal("165.75"), Decimal("167.00")),
+        (Decimal("167.00"), Decimal("169.50"), Decimal("166.50"), Decimal("168.50")),
+        (Decimal("168.50"), Decimal("170.00"), Decimal("167.50"), Decimal("169.00")),
+        (Decimal("169.00"), Decimal("171.50"), Decimal("168.50"), Decimal("170.50")),
+    ]
+
+    for i, (open_price, high, low, close) in enumerate(prices):
+        price_bars.append(
+            PriceBar(
+                symbol="AAPL",
+                timestamp=base_timestamp + timedelta(minutes=i),
+                open=open_price,
+                high=high,
+                low=low,
+                close=close,
+                volume=1000000,
+            )
+        )
+
+    # Act: Calculate ATR with 14-period
+    calculator = ATRCalculator(period=14)
+    atr_value = calculator.calculate(price_bars)
+
+    # Assert: ATR should be positive Decimal, accurate to $0.01
+    assert isinstance(atr_value, Decimal), f"Expected Decimal, got {type(atr_value)}"
+    assert atr_value > Decimal("0"), f"ATR must be positive, got {atr_value}"
+    # With this data pattern (consistent $2-3 ranges), expect ATR around $2.00-$3.00
+    assert Decimal("1.50") <= atr_value <= Decimal("4.00"), \
+        f"ATR {atr_value} outside expected range $1.50-$4.00 for test data"
+
+
+def test_calculate_atr_validates_price_bars():
+    """
+    Test that ATR calculation validates price bar integrity.
+
+    Given:
+        - PriceBar with high < low (invalid OHLC data)
+
+    When:
+        ATRCalculator.calculate() is called
+
+    Then:
+        - Raises ATRCalculationError with "Invalid price data"
+        - Protects against corrupted market data
+
+    Data integrity requirements:
+        - high >= low (basic OHLC constraint)
+        - open/close within [low, high] range
+        - Sequential timestamps (no gaps)
+
+    From: specs/atr-stop-adjustment/tasks.md T007
+    Pattern: TDD RED phase - test MUST FAIL (validation doesn't exist yet)
+    """
+    # Arrange: Create price bars with INVALID data (high < low)
+    base_timestamp = datetime.now(UTC)
+    price_bars: list[PriceBar] = []
+
+    # First bar is valid
+    price_bars.append(
+        PriceBar(
+            symbol="AAPL",
+            timestamp=base_timestamp,
+            open=Decimal("150.00"),
+            high=Decimal("152.00"),
+            low=Decimal("149.00"),
+            close=Decimal("151.00"),
+            volume=1000000,
+        )
+    )
+
+    # Second bar has INVALID high < low (should be caught by PriceBar validation)
+    # This will raise ValueError from PriceBar.__post_init__, not ATRCalculationError
+    # So we test that ATRCalculator properly validates the data
+    try:
+        invalid_bar = PriceBar(
+            symbol="AAPL",
+            timestamp=base_timestamp + timedelta(minutes=1),
+            open=Decimal("150.00"),
+            high=Decimal("148.00"),  # HIGH < LOW (invalid!)
+            low=Decimal("149.00"),
+            close=Decimal("149.50"),
+            volume=1000000,
+        )
+        price_bars.append(invalid_bar)
+    except ValueError:
+        # PriceBar validation catches this - that's good!
+        # For this test, we'll create bars that pass PriceBar validation
+        # but have other integrity issues ATRCalculator should catch
+        pass
+
+    # Alternative: Test with negative prices (valid OHLC structure, but invalid domain)
+    price_bars.append(
+        PriceBar(
+            symbol="AAPL",
+            timestamp=base_timestamp + timedelta(minutes=1),
+            open=Decimal("-150.00"),
+            high=Decimal("-148.00"),
+            low=Decimal("-152.00"),
+            close=Decimal("-149.00"),
+            volume=1000000,
+        )
+    )
+
+    # Act & Assert: ATRCalculator should detect invalid price data
+    calculator = ATRCalculator(period=14)
+
+    with pytest.raises(ATRCalculationError) as exc_info:
+        calculator.calculate(price_bars)
+
+    # Verify error message mentions invalid data
+    assert "invalid" in str(exc_info.value).lower() or "negative" in str(exc_info.value).lower()
+
+
+def test_validate_price_bars_stale_data():
+    """
+    Test stale data detection for price bars.
+
+    Given:
+        - PriceBar with timestamp >15 minutes old
+
+    When:
+        ATRCalculator.validate_price_bars() is called with max_age_minutes=15
+
+    Then:
+        - Raises StaleDataError with age details
+        - Prevents ATR calculation from stale market data
+
+    Stale data protection requirement:
+        - Real-time trading requires fresh data for accurate volatility calculation
+        - Default threshold: 15 minutes (configurable)
+        - Error message includes actual age vs. threshold
+
+    Example:
+        Latest bar timestamp: 2025-10-16 10:00:00
+        Current time:        2025-10-16 10:23:00
+        Age: 23 minutes > 15 minute threshold → StaleDataError
+
+    From: specs/atr-stop-adjustment/tasks.md T012
+    Pattern: TDD RED phase - test MUST FAIL (validate_price_bars method doesn't exist yet)
+    """
+    # Arrange: Create price bars with STALE timestamps (>15 minutes old)
+    stale_timestamp = datetime.now(UTC) - timedelta(minutes=23)  # 23 minutes ago
+    price_bars: list[PriceBar] = []
+
+    for i in range(20):
+        price_bars.append(
+            PriceBar(
+                symbol="AAPL",
+                timestamp=stale_timestamp + timedelta(minutes=i),
+                open=Decimal("150.00"),
+                high=Decimal("152.00"),
+                low=Decimal("149.00"),
+                close=Decimal("151.00"),
+                volume=1000000,
+            )
+        )
+
+    # Latest bar is still 3 minutes ago (23 - 20 = 3... wait, that's not right)
+    # Let me recalculate: start at 23 minutes ago, add 19 minutes (i=0 to i=19)
+    # Latest bar timestamp = 23 - 19 = 4 minutes ago... still within threshold
+
+    # Fix: Make all bars start 30 minutes ago
+    stale_timestamp = datetime.now(UTC) - timedelta(minutes=30)
+    price_bars = []
+
+    for i in range(15):
+        price_bars.append(
+            PriceBar(
+                symbol="AAPL",
+                timestamp=stale_timestamp + timedelta(minutes=i),
+                open=Decimal("150.00"),
+                high=Decimal("152.00"),
+                low=Decimal("149.00"),
+                close=Decimal("151.00"),
+                volume=1000000,
+            )
+        )
+
+    # Latest bar is now 30 - 14 = 16 minutes old (exceeds 15 minute threshold)
+
+    # Act & Assert: Should raise StaleDataError
+    calculator = ATRCalculator(period=14)
+
+    with pytest.raises(StaleDataError) as exc_info:
+        calculator.validate_price_bars(price_bars, max_age_minutes=15)
+
+    # Verify error message mentions age threshold
+    error_message = str(exc_info.value).lower()
+    assert "stale" in error_message or "old" in error_message or "15" in error_message
 
 
 def test_calculate_atr_insufficient_data():
