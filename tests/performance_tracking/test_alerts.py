@@ -52,7 +52,6 @@ class TestAlertEvaluatorWinRateBreach:
         assert alerts[0].metric == "win_rate"
         assert alerts[0].severity == "WARN"
         assert "WARN" in caplog.text or "warn" in caplog.text.lower()
-        pytest.fail("T008: RED phase - test should fail until GREEN implementation")
 
 
 class TestAlertEvaluatorNoAlertAboveTarget:
@@ -91,4 +90,3 @@ class TestAlertEvaluatorNoAlertAboveTarget:
         alerts = evaluator.evaluate(summary)
 
         assert len(alerts) == 0
-        pytest.fail("T009: RED phase - test should fail until GREEN implementation")
