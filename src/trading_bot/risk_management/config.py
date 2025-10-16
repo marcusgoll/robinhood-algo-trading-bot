@@ -9,7 +9,8 @@ Enforces Constitution v1.0.0:
 - §Data_Integrity: Validate all inputs
 """
 
-from typing import Dict, Any, Optional, Mapping
+from typing import Dict, Any, Optional
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 
@@ -27,7 +28,7 @@ class RiskManagementConfig:
     trailing_enabled: bool
     pullback_lookback_candles: int
     trailing_breakeven_threshold: float
-    strategy_overrides: Dict[str, Any] = field(default_factory=dict)
+    strategy_overrides: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def default(cls) -> "RiskManagementConfig":
@@ -43,7 +44,7 @@ class RiskManagementConfig:
         )
 
     @classmethod
-    def from_dict(cls, data: Optional[Mapping[str, Any]]) -> "RiskManagementConfig":
+    def from_dict(cls, data: Mapping[str, Any] | None) -> "RiskManagementConfig":
         """Create configuration from JSON payload."""
         data = data or {}
 
@@ -79,7 +80,7 @@ class RiskManagementConfig:
             )
 
         # Parse strategy overrides
-        overrides: Dict[str, Dict[str, Any]] = {}
+        overrides: dict[str, dict[str, Any]] = {}
         overrides_raw = data.get("strategy_overrides") or {}
         if not isinstance(overrides_raw, Mapping):
             raise ValueError(
@@ -91,7 +92,7 @@ class RiskManagementConfig:
                 raise ValueError(
                     f"risk_management.strategy_overrides.{strategy} must be an object"
                 )
-            override_dict: Dict[str, Any] = {}
+            override_dict: dict[str, Any] = {}
 
             # Validate override fields
             for key in (

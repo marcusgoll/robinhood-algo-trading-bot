@@ -62,6 +62,6 @@ class RiskManagementEnvelope:
     target_order_id: str
     status: str  # "pending" | "active" | "stopped" | "target_hit" | "cancelled"
     correlation_id: str  # UUID4 for tracing position lifecycle across logs
-    adjustments: List[Dict[str, Any]] = field(default_factory=list)
+    adjustments: list[dict[str, Any]] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))

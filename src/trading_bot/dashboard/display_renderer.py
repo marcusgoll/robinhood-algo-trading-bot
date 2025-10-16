@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Iterable
+from collections.abc import Iterable
 
 from rich.layout import Layout
 from rich.panel import Panel

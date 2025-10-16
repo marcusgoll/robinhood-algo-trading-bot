@@ -76,7 +76,7 @@ class StopAdjuster:
         current_price: Decimal,
         position_plan: PositionPlan,
         config: RiskManagementConfig,
-    ) -> Optional[Tuple[Decimal, str]]:
+    ) -> tuple[Decimal, str] | None:
         """Calculate stop-loss adjustment based on current price and position progress.
 
         Args:
