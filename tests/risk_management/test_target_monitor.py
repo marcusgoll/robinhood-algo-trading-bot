@@ -73,6 +73,7 @@ class TestTargetMonitor:
             stop_order_id="STOP456",
             target_order_id="ORDER123",
             status="active",
+            correlation_id="test-correlation-id-123",
         )
 
         # Create TargetMonitor instance with mocked dependencies
@@ -163,6 +164,7 @@ class TestTargetMonitor:
             stop_order_id="ORDER456",
             target_order_id="TARGET123",
             status="active",
+            correlation_id="test-correlation-id-456",
         )
 
         # Create TargetMonitor instance
