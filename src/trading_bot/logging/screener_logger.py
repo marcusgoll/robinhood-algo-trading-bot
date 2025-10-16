@@ -17,7 +17,7 @@ import json
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 
 class ScreenerLogger:
@@ -97,7 +97,7 @@ class ScreenerLogger:
     def log_query(
         self,
         query_id: str,
-        query_params: dict,
+        query_params: dict[str, Any],
         result_count: int,
         total_count: int,
         execution_time_ms: float,
@@ -248,7 +248,7 @@ class ScreenerLogger:
         }
         self._write_jsonl(event)
 
-    def _write_jsonl(self, event: dict) -> None:
+    def _write_jsonl(self, event: dict[str, Any]) -> None:
         """Write event to JSONL file with thread-safe coordination.
 
         Internal method that handles the actual file I/O with proper locking

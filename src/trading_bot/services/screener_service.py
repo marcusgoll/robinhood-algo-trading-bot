@@ -21,8 +21,9 @@ import time
 from dataclasses import asdict
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
-import robin_stocks.robinhood as r
+import robin_stocks.robinhood as r  # type: ignore[import-untyped]
 
 from trading_bot.error_handling.policies import DEFAULT_POLICY
 from trading_bot.error_handling.retry import with_retry
@@ -196,7 +197,7 @@ class ScreenerService:
                 )
 
         # Apply filters sequentially (AND logic)
-        matched_filters_map = {}  # Track which filters each stock passed
+        matched_filters_map: dict[str, list[str]] = {}  # Track which filters each stock passed
 
         # Initialize matched filters for all stocks
         for stock in stocks:
@@ -303,10 +304,10 @@ class ScreenerService:
 
     def _apply_price_filter(
         self,
-        stocks: list[dict],
+        stocks: list[dict[str, Any]],
         min_price: Decimal | None,
         max_price: Decimal | None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """
         Filter stocks by price range.
 
@@ -338,8 +339,8 @@ class ScreenerService:
         return filtered
 
     def _apply_volume_filter(
-        self, stocks: list[dict], relative_volume: float
-    ) -> list[dict]:
+        self, stocks: list[dict[str, Any]], relative_volume: float
+    ) -> list[dict[str, Any]]:
         """
         Filter stocks by relative volume (vs 100-day average).
 
@@ -371,8 +372,8 @@ class ScreenerService:
         return filtered
 
     def _apply_float_filter(
-        self, stocks: list[dict], float_max: int
-    ) -> list[dict]:
+        self, stocks: list[dict[str, Any]], float_max: int
+    ) -> list[dict[str, Any]]:
         """
         Filter stocks by maximum float size.
 
@@ -406,8 +407,8 @@ class ScreenerService:
         return filtered
 
     def _apply_daily_change_filter(
-        self, stocks: list[dict], min_daily_change: float
-    ) -> list[dict]:
+        self, stocks: list[dict[str, Any]], min_daily_change: float
+    ) -> list[dict[str, Any]]:
         """
         Filter stocks by minimum daily percentage change.
 
@@ -429,8 +430,8 @@ class ScreenerService:
         return filtered
 
     def _paginate_results(
-        self, stocks: list[dict], offset: int, limit: int
-    ) -> tuple[list[dict], PageInfo]:
+        self, stocks: list[dict[str, Any]], offset: int, limit: int
+    ) -> tuple[list[dict[str, Any]], PageInfo]:
         """
         Paginate stock results.
 
