@@ -1,16 +1,24 @@
-"""
-Session health monitoring module exports.
+"""Session health monitoring for Robinhood trading bot.
 
-Provides the public interface for the health-check feature, exposing the
-monitor service and the associated data models so other parts of the
-codebase (and tests) can depend on a stable API.
+This module provides proactive session health checking to maintain active
+API connections and detect authentication issues before they impact trading.
+
+Exports:
+    SessionHealthMonitor: Main health check service
+    SessionHealthStatus: Health status dataclass
+    HealthCheckResult: Individual health check result
 """
 
-from .session_health import HealthCheckResult, SessionHealthMonitor, SessionHealthStatus
+from __future__ import annotations
+
+from trading_bot.health.session_health import (
+    HealthCheckResult,
+    SessionHealthMonitor,
+    SessionHealthStatus,
+)
 
 __all__ = [
     "SessionHealthMonitor",
     "SessionHealthStatus",
     "HealthCheckResult",
 ]
-

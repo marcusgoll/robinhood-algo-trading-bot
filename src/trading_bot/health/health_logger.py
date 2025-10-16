@@ -1,126 +1,137 @@
-"""Structured logging utilities for session health monitoring."""
+"""Structured logging for session health events.
+
+Provides JSONL-formatted logging for health check events, reauth activity,
+and session metrics snapshots.
+"""
 
 from __future__ import annotations
 
 import json
-import threading
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:  # pragma: no cover - type checking only
-    from .session_health import HealthCheckResult, SessionHealthStatus
+if TYPE_CHECKING:
+    from trading_bot.health.session_health import HealthCheckResult, SessionHealthStatus
+
+__all__ = ["HealthCheckLogger"]
 
 
 class HealthCheckLogger:
+    """Structured JSONL logger for health check events.
+
+    Writes health check events to logs/health_check.log in JSONL format
+    for analysis and monitoring.
+
+    Attributes:
+        log_file_path: Path to the health check log file
     """
-    Append-only JSONL logger for health check events.
 
-    Events are written to ``logs/health/health-checks.jsonl`` so operators can
-    audit session activity, re-authentication attempts, and performance
-    characteristics over time.
-    """
+    def __init__(self, log_file_path: str = "logs/health_check.log") -> None:
+        """Initialize health check logger.
 
-    def __init__(self, log_dir: Path | None = None) -> None:
-        self._log_dir = log_dir or Path("logs/health")
-        self._log_path = self._log_dir / "health-checks.jsonl"
-        self._lock = threading.Lock()
+        Args:
+            log_file_path: Path to log file (default: logs/health_check.log)
+        """
+        self.log_file_path = Path(log_file_path)
+        self.log_file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # ------------------------------------------------------------------ #
-    # Public logging helpers
-    # ------------------------------------------------------------------ #
+    def _write_event(self, event_data: dict) -> None:
+        """Write a single event to the log file.
 
-    def log_health_check_executed(self, *, result: HealthCheckResult, context: str = "periodic") -> None:
-        """Record that a health check ran (with final result)."""
-        self._write_event(
-            "health_check.executed",
-            {
-                "context": context,
-                "success": result.success,
-                "latency_ms": result.latency_ms,
-                "reauth_triggered": result.reauth_triggered,
-                "error": result.error_message,
-            },
-        )
+        Args:
+            event_data: Dictionary containing event data
+        """
+        event_data["timestamp"] = datetime.now(UTC).isoformat()
+        with self.log_file_path.open("a") as f:
+            f.write(json.dumps(event_data) + "\n")
 
-    def log_health_check_passed(self, *, status: SessionHealthStatus) -> None:
-        """Record a successful health check outcome."""
-        self._write_event(
-            "health_check.passed",
-            {
-                "health_check_count": status.health_check_count,
-                "reauth_count": status.reauth_count,
-                "consecutive_failures": status.consecutive_failures,
-            },
-        )
+    def log_health_check_executed(
+        self, result: HealthCheckResult, context: str = "periodic"
+    ) -> None:
+        """Log that a health check was executed.
 
-    def log_health_check_failed(self, *, result: HealthCheckResult) -> None:
-        """Record a failed health check outcome."""
-        self._write_event(
-            "health_check.failed",
-            {
-                "latency_ms": result.latency_ms,
-                "reauth_triggered": result.reauth_triggered,
-                "error": result.error_message,
-            },
-        )
+        Args:
+            result: Health check result
+            context: Context of the health check (e.g., "periodic", "pre_trade")
+        """
+        self._write_event({
+            "event": "health_check.executed",
+            "success": result.success,
+            "latency_ms": result.latency_ms,
+            "context": context,
+            "reauth_triggered": result.reauth_triggered,
+        })
 
-    def log_reauth_triggered(self, *, session_identifier: str) -> None:
-        """Record that a re-authentication attempt started."""
-        self._write_event(
-            "health_check.reauth_triggered",
-            {
-                "session": session_identifier,
-            },
-        )
+    def log_health_check_passed(self, status: SessionHealthStatus) -> None:
+        """Log that a health check passed.
 
-    def log_reauth_success(self, *, duration_ms: int) -> None:
-        """Record a successful re-authentication."""
-        self._write_event(
-            "health_check.reauth_success",
-            {
-                "duration_ms": duration_ms,
-            },
-        )
+        Args:
+            status: Current session health status
+        """
+        self._write_event({
+            "event": "health_check.passed",
+            "session_uptime": status.session_uptime_seconds,
+            "is_healthy": status.is_healthy,
+            "health_check_count": status.health_check_count,
+        })
 
-    def log_reauth_failed(self, *, error: str) -> None:
-        """Record a failed re-authentication."""
-        self._write_event(
-            "health_check.reauth_failed",
-            {
-                "error": error,
-            },
-        )
+    def log_health_check_failed(self, result: HealthCheckResult) -> None:
+        """Log that a health check failed.
 
-    def log_session_metrics_snapshot(self, *, status: SessionHealthStatus) -> None:
-        """Persist a snapshot of session metrics for trend analysis."""
-        self._write_event(
-            "session.metrics_snapshot",
-            {
-                "health_check_count": status.health_check_count,
-                "reauth_count": status.reauth_count,
-                "consecutive_failures": status.consecutive_failures,
-                "session_start_time": status.session_start_time.isoformat(),
-                "last_health_check": status.last_health_check.isoformat() if status.last_health_check else None,
-                "session_uptime_seconds": status.session_uptime_seconds,
-                "is_healthy": status.is_healthy,
-            },
-        )
+        Args:
+            result: Health check result with error details
+        """
+        self._write_event({
+            "event": "health_check.failed",
+            "error_message": result.error_message,
+            "latency_ms": result.latency_ms,
+        })
 
-    # ------------------------------------------------------------------ #
-    # Internal helpers
-    # ------------------------------------------------------------------ #
+    def log_reauth_triggered(self, session_id: str) -> None:
+        """Log that automatic reauth was triggered.
 
-    def _write_event(self, event: str, payload: dict[str, Any]) -> None:
-        """Append a structured log record to the JSONL file."""
-        record = {
-            "timestamp": datetime.now(UTC).isoformat(),
-            "event": event,
-            **payload,
-        }
+        Args:
+            session_id: Current session identifier
+        """
+        self._write_event({
+            "event": "health_check.reauth_triggered",
+            "session_id": session_id,
+        })
 
-        with self._lock:
-            self._log_dir.mkdir(parents=True, exist_ok=True)
-            with self._log_path.open("a", encoding="utf-8") as handle:
-                json.dump(record, handle)
-                handle.write("\n")
+    def log_reauth_success(self, duration_ms: int) -> None:
+        """Log that reauth completed successfully.
+
+        Args:
+            duration_ms: Time taken for reauth in milliseconds
+        """
+        self._write_event({
+            "event": "health_check.reauth_success",
+            "duration_ms": duration_ms,
+        })
+
+    def log_reauth_failed(self, error: str) -> None:
+        """Log that reauth failed.
+
+        Args:
+            error: Error message describing the failure
+        """
+        self._write_event({
+            "event": "health_check.reauth_failed",
+            "error": error,
+        })
+
+    def log_session_metrics_snapshot(self, status: SessionHealthStatus) -> None:
+        """Log a complete snapshot of session metrics.
+
+        Args:
+            status: Current session health status
+        """
+        self._write_event({
+            "event": "session.metrics_snapshot",
+            "is_healthy": status.is_healthy,
+            "session_uptime_seconds": status.session_uptime_seconds,
+            "health_check_count": status.health_check_count,
+            "reauth_count": status.reauth_count,
+            "consecutive_failures": status.consecutive_failures,
+        })
