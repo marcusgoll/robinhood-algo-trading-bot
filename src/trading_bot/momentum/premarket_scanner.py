@@ -253,26 +253,26 @@ class PreMarketScanner:
 
         Strength formula:
         - Price component (60%): Scale |price_change_pct| to 0-100 (5% = 0, 20% = 100)
-        - Volume component (40%): Scale volume_ratio to 0-100 (200% = 0, 500% = 100)
+        - Volume component (40%): Scale volume_ratio to 0-100 (2.0 = 0, 5.0 = 100)
         - Weighted average: 0.6 * price_score + 0.4 * volume_score
 
         Args:
-            price_change_pct: Percentage price change from previous close
-            volume_ratio: Current volume / 10-day average volume
+            price_change_pct: Percentage price change from previous close (e.g., 5.2 for 5.2%)
+            volume_ratio: Current volume / 10-day average volume (e.g., 2.5 for 250%)
 
         Returns:
             float: Strength score (0-100)
 
         Example:
             >>> scanner = PreMarketScanner(config, market_data)
-            >>> scanner._calculate_premarket_strength(10.0, 300.0)
+            >>> scanner._calculate_premarket_strength(10.0, 3.0)
             66.7  # 10% change, 300% volume
         """
         # Price score: Linear scale from 5% to 20% change
-        price_score = min(100.0, (abs(price_change_pct) - 5.0) / 15.0 * 100.0)
+        price_score = min(100.0, max(0.0, (abs(price_change_pct) - 5.0) / 15.0 * 100.0))
 
-        # Volume score: Linear scale from 200% to 500% ratio
-        volume_score = min(100.0, (volume_ratio - 200.0) / 300.0 * 100.0)
+        # Volume score: Linear scale from 2.0 (200%) to 5.0 (500%) ratio
+        volume_score = min(100.0, max(0.0, (volume_ratio - 2.0) / 3.0 * 100.0))
 
         # Weighted average (price 60%, volume 40%)
         strength = 0.6 * price_score + 0.4 * volume_score
