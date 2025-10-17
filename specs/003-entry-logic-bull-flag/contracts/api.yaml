@@ -1,0 +1,292 @@
+openapi: 3.0.0
+info:
+  title: Bull Flag Pattern Detection API
+  version: 1.0.0
+  description: Internal API contracts for bull flag pattern detection module
+
+paths:
+  # Internal module interface (not REST endpoints)
+  /internal/detect:
+    post:
+      summary: Detect bull flag pattern in OHLCV data
+      description: Analyzes historical bars to identify bull flag pattern and generate entry signals
+      operationId: detectBullFlag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbol
+                - bars
+              properties:
+                symbol:
+                  type: string
+                  description: Stock ticker symbol
+                  example: "AAPL"
+                bars:
+                  type: array
+                  description: OHLCV bars (minimum 30 required)
+                  minItems: 30
+                  items:
+                    type: object
+                    required:
+                      - open
+                      - high
+                      - low
+                      - close
+                      - volume
+                    properties:
+                      open:
+                        type: string
+                        description: Opening price (Decimal string)
+                        example: "180.50"
+                      high:
+                        type: string
+                        description: High price (Decimal string)
+                        example: "182.00"
+                      low:
+                        type: string
+                        description: Low price (Decimal string)
+                        example: "180.00"
+                      close:
+                        type: string
+                        description: Closing price (Decimal string)
+                        example: "181.75"
+                      volume:
+                        type: string
+                        description: Trading volume (Decimal string)
+                        example: "1500000"
+                      timestamp:
+                        type: string
+                        format: date-time
+                        description: Bar timestamp (optional)
+                        example: "2025-10-17T09:30:00Z"
+                config:
+                  type: object
+                  description: Optional configuration overrides
+                  properties:
+                    flagpole_min_gain_pct:
+                      type: number
+                      format: decimal
+                      minimum: 0
+                      example: 5.0
+                    quality_score_threshold:
+                      type: number
+                      format: decimal
+                      minimum: 0
+                      maximum: 100
+                      example: 60.0
+                    min_risk_reward_ratio:
+                      type: number
+                      format: decimal
+                      minimum: 1.0
+                      example: 2.0
+
+      responses:
+        '200':
+          description: Pattern detection completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BullFlagResult'
+        '400':
+          description: Invalid request (insufficient data, invalid configuration)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal calculation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    BullFlagResult:
+      type: object
+      required:
+        - symbol
+        - timestamp
+        - pattern_detected
+        - quality_score
+      properties:
+        symbol:
+          type: string
+          description: Stock ticker symbol
+          example: "AAPL"
+        timestamp:
+          type: string
+          format: date-time
+          description: Detection timestamp
+          example: "2025-10-17T14:30:00Z"
+        pattern_detected:
+          type: boolean
+          description: Whether valid bull flag pattern found
+          example: true
+        quality_score:
+          type: number
+          format: decimal
+          description: Pattern quality score (0-100)
+          minimum: 0
+          maximum: 100
+          example: 85.5
+        flagpole:
+          $ref: '#/components/schemas/FlagpoleData'
+        consolidation:
+          $ref: '#/components/schemas/ConsolidationData'
+        breakout_price:
+          type: string
+          nullable: true
+          description: Breakout confirmation price (null if no breakout)
+          example: "188.00"
+        entry_price:
+          type: string
+          nullable: true
+          description: Recommended entry price
+          example: "188.00"
+        stop_loss:
+          type: string
+          nullable: true
+          description: Calculated stop-loss price
+          example: "182.33"
+        target_price:
+          type: string
+          nullable: true
+          description: Calculated target price
+          example: "202.88"
+        risk_reward_ratio:
+          type: string
+          nullable: true
+          description: Risk/reward ratio (null if < minimum threshold)
+          example: "2.6"
+        indicators:
+          type: object
+          description: Technical indicator values at breakout
+          properties:
+            vwap:
+              type: string
+              example: "185.50"
+            macd:
+              type: string
+              example: "0.45"
+            ema_9:
+              type: string
+              example: "186.20"
+
+    FlagpoleData:
+      type: object
+      required:
+        - start_bar
+        - end_bar
+        - duration_bars
+        - gain_percent
+        - avg_volume
+        - start_price
+        - end_price
+      properties:
+        start_bar:
+          type: integer
+          description: Starting bar index
+          example: 0
+        end_bar:
+          type: integer
+          description: Ending bar index
+          example: 8
+        duration_bars:
+          type: integer
+          description: Number of bars in flagpole
+          minimum: 3
+          maximum: 15
+          example: 8
+        gain_percent:
+          type: string
+          description: Percentage gain (Decimal string)
+          example: "8.5"
+        avg_volume:
+          type: string
+          description: Average volume during flagpole (Decimal string)
+          example: "2000000"
+        start_price:
+          type: string
+          description: Price at flagpole start (Decimal string)
+          example: "175.00"
+        end_price:
+          type: string
+          description: Price at flagpole end (Decimal string)
+          example: "189.88"
+
+    ConsolidationData:
+      type: object
+      required:
+        - start_bar
+        - end_bar
+        - duration_bars
+        - retracement_percent
+        - upper_boundary
+        - lower_boundary
+        - avg_volume
+        - volume_decrease_percent
+      properties:
+        start_bar:
+          type: integer
+          description: Starting bar index
+          example: 9
+        end_bar:
+          type: integer
+          description: Ending bar index
+          example: 15
+        duration_bars:
+          type: integer
+          description: Number of bars in consolidation
+          minimum: 3
+          maximum: 10
+          example: 7
+        retracement_percent:
+          type: string
+          description: Retracement of flagpole gain (Decimal string)
+          example: "35.0"
+        upper_boundary:
+          type: string
+          description: Resistance level (Decimal string)
+          example: "187.50"
+        lower_boundary:
+          type: string
+          description: Support level (Decimal string)
+          example: "183.25"
+        avg_volume:
+          type: string
+          description: Average volume during consolidation (Decimal string)
+          example: "1200000"
+        volume_decrease_percent:
+          type: string
+          description: Volume decrease vs flagpole (Decimal string)
+          example: "40.0"
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: "InsufficientDataError"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Insufficient data for AAPL: 20 bars available, 30 required"
+        details:
+          type: object
+          description: Additional error context
+          properties:
+            symbol:
+              type: string
+            required_bars:
+              type: integer
+            available_bars:
+              type: integer
