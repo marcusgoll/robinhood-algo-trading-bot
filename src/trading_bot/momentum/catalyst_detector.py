@@ -236,10 +236,17 @@ class CatalystDetector:
                     if symbol not in symbols:
                         continue
 
+                    # Calculate strength
+                    strength = self._calculate_catalyst_strength(catalyst_type, published_at)
+
+                    # Filter by min_catalyst_strength threshold
+                    if strength < self.config.min_catalyst_strength:
+                        continue
+
                     signal = MomentumSignal(
                         symbol=symbol,
                         signal_type=SignalType.CATALYST,
-                        strength=self._calculate_catalyst_strength(catalyst_type, published_at),
+                        strength=strength,
                         detected_at=now,
                         details={
                             "headline": headline,

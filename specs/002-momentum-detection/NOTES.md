@@ -164,9 +164,10 @@ The system is designed for manual review and paper trading validation before any
 - ✅ T007: Create MomentumLogger wrapper (2025-10-16)
 - ✅ T015: Create CatalystDetector service with scan() and categorize() methods (2025-10-16)
 - ✅ T016: Add error handling for missing NEWS_API_KEY (2025-10-16)
+- ✅ T011: Write test for CatalystDetector.categorize() - 100% coverage achieved (2025-10-16)
 
 ## Last Updated
-2025-10-16T21:15:00-00:00
+2025-10-16T21:30:00-00:00
 
 ## Phase 2: Tasks (2025-10-16)
 
