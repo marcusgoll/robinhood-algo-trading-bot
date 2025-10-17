@@ -174,9 +174,15 @@ The system is designed for manual review and paper trading validation before any
   - Integration with MomentumLogger for signal logging
   - _calculate_volume_baseline() implemented (T026 completed inline)
   - Graceful error handling for API failures
+- ✅ T027: Add timestamp validation for pre-market window (2025-10-17)
+  - _validate_premarket_timestamp() method with UTC→EST conversion via zoneinfo
+  - Validates 4:00-9:30 AM EST range, Monday-Friday only
+  - Integrated into scan() workflow - skips quotes with invalid timestamps
+  - _format_timestamp_log() helper for dual UTC/EST logging
+  - 12 tests passing: boundary conditions, weekends, DST edge cases
 
 ## Last Updated
-2025-10-17T02:35:00-00:00
+2025-10-17T02:50:00-00:00
 
 ## Phase 2: Tasks (2025-10-16)
 
