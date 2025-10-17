@@ -171,12 +171,14 @@
 
 ## Core Services
 
-- [ ] **T010** [P] Create OrderValidator service in api/src/services/order_validator.py
+- [x] **T010** [P] Create OrderValidator service in api/app/services/order_validator.py (COMPLETED 2025-10-17)
   - Methods: validate_order(), validate_balance(), validate_risk_limits()
   - Returns: ValidationResult (valid: bool, error_code, message)
   - Validation rules: From spec.md FR-001, FR-002, FR-003
-  - Pattern: api/src/services/payment_validator.py
+  - Pattern: Protocol-based dependency injection
   - From: plan.md [VALIDATION LAYERING]
+  - Evidence: 24/24 tests passing, 96% coverage. Commit: fad9cbe. Error messages clear and actionable.
+  - Note: Created in api/app/ structure with Protocol pattern for loose coupling
 
 - [ ] **T011** [P] Create OrderExecutor service in api/src/services/order_executor.py
   - Methods: execute_order(), retry_order(), check_duplicate()
