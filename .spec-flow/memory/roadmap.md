@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-17 (momentum-detection v1.0.0 shipped to production)
+**Last updated**: 2025-10-17 (technical-indicators v1.0.0 shipped, momentum-detection v1.0.0 shipped)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -479,6 +479,49 @@
   - Auto-exit on target hit (§Risk_Management)
   - Depends on: order-management (shipped)
 
+### technical-indicators
+- **Title**: Technical indicators module
+- **Area**: api
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-17
+- **Release**: v1.0.0 - Technical indicators with VWAP, EMA, MACD
+- **Spec**: specs/technical-indicators/
+- **Commits**: d0d728d, 081dcb1, eb2ca20
+- **Delivered**:
+  - **VWAP Calculator**: Volume Weighted Average Price calculation
+    - Typical price computation from high/low/close
+    - Entry validation (price vs VWAP comparison)
+    - Error handling for empty/zero-volume bars
+  - **EMA Calculator**: Exponential Moving Average (9 and 20 period)
+    - SMA initialization for first calculation
+    - Exponential smoothing with proper multipliers
+    - Price proximity detection (within 1%)
+    - Bullish/Bearish crossover signal detection
+  - **MACD Calculator**: Moving Average Convergence Divergence
+    - 12-period fast EMA
+    - 26-period slow EMA
+    - 9-period signal line (proper EMA implementation)
+    - Histogram calculation (MACD - Signal)
+    - Divergence detection
+    - Cross detection (MACD crossing signal line)
+  - **Service Facade**: Unified interface for all indicators
+    - Conservative AND-gate entry validation (price > VWAP AND MACD > 0)
+    - Exit signal detection (MACD crossing negative)
+    - State tracking for sequential calculations
+  - **Configuration System**: IndicatorConfig with comprehensive validation
+    - Minimum bar requirements
+    - Period constraints
+    - Refresh interval settings
+  - 56 tests (100% pass rate)
+  - Code coverage: 90.85% (exceeds 90% target)
+  - Type safety: 100% type hints, MyPy strict compliant
+  - Security: 0 vulnerabilities (Bandit scan clean)
+  - Critical issues fixed: 2 (CR-1: missing symbol field, CR-2: MACD signal line)
+  - Full Constitution v1.0.0 compliance (§Code_Quality, §Testing_Requirements, §Data_Integrity, §Safety_First)
+  - Production-ready, local-only feature
+  - Documentation: spec, plan, tasks, analysis-report, local-build-report, staging-ship-report
+
 ## In Progress
 
 <!-- Currently implementing -->
@@ -496,29 +539,6 @@
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
 
-### technical-indicators
-- **Title**: Technical indicators module
-- **Area**: api
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 3 | **Confidence**: 0.9 | **Score**: 1.50
-- **Requirements**:
-  - **VWAP monitor**: Fetch current VWAP for symbol
-  - Verify price is above VWAP for longs
-  - Reject entries below VWAP
-  - Use VWAP as dynamic support level
-  - Update VWAP intraday
-  - **EMA calculator**: Calculate 9-period and 20-period EMAs
-  - Detect EMA crossovers
-  - Identify when price near 9 EMA (optimal entry)
-  - Visualize trend angle from EMAs
-  - **MACD indicator**: Calculate MACD line and signal line
-  - Verify MACD is positive for longs
-  - Detect divergence (lines moving apart)
-  - Trigger exit when MACD crosses negative
-  - [BLOCKED: market-data-module]
-  - [MERGED: vwap-monitor, ema-calculator, macd-indicator]
-
 ### entry-logic-bull-flag
 - **Title**: Bull flag entry logic
 - **Area**: strategy
@@ -534,7 +554,8 @@
   - Detect new high above pullback range
   - Verify volume confirmation
   - Auto-place limit order at breakout level
-  - [BLOCKED: technical-indicators, momentum-detection]
+  - [BLOCKED: momentum-detection]
+  - [DEPENDS ON: technical-indicators (shipped)]
   - [MERGED: bull-flag-detector, breakout-entry-trigger]
 
 ### order-execution-enhanced
@@ -587,7 +608,7 @@
 - **Requirements**:
   - Identify daily/4H support and resistance levels
   - Track rejection and breakout patterns
-  - [BLOCKED: technical-indicators]
+  - [DEPENDS ON: technical-indicators (shipped)]
 
 ### level2-integration
 - **Title**: Level 2 order flow integration
@@ -612,7 +633,7 @@
   - Replay historical data against strategy rules
   - Calculate win rate and R:R over 20+ trades
   - Performance analytics and reporting
-  - [BLOCKED: market-data-module, technical-indicators]
+  - [DEPENDS ON: market-data-module (shipped), technical-indicators (shipped)]
   - [PIGGYBACK: extends backtest/ structure]
 
 ### position-scaling-logic
