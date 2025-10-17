@@ -260,9 +260,34 @@ The system is designed for manual review and paper trading validation before any
   - All 13 tests passing: 6 score_composite tests + 7 rank tests
   - Coverage: 87.80% (missing lines are logging branches)
   - Commit: da049a3 "feat: T045 create MomentumRanker service"
+- ✅ T046: Add signal aggregation by symbol (2025-10-17)
+  - Method: _aggregate_signals_by_symbol() returns Dict[str, Dict[SignalType, float]]
+  - Logic: Groups MomentumSignal objects by symbol, extracts scores per signal_type
+  - Missing signals: Not present in dict (rank() method uses .get() with default 0.0)
+  - Duplicate handling: Uses max strength when multiple signals for same symbol/type
+  - Composite signals: Skipped during aggregation (only raw signals processed)
+  - Example output: {AAPL: {CATALYST: 80, PREMARKET: 60, PATTERN: 90}, MSFT: {CATALYST: 75, PATTERN: 85}}
+  - Test coverage: All scenarios tested (multiple symbols, empty list, duplicates, COMPOSITE skip)
+  - Implementation: Integrated into rank() method for composite score calculation
+  - Commit: da049a3 (included in T045 implementation)
+
+- ✅ T047: Write integration test for MomentumRanker - 7/7 tests passing (2025-10-17)
+  - test_momentum_ranker_e2e_ranks_signals_correctly: End-to-end with all 3 signal types
+    - AAPL (all signals): 77.0, MSFT (catalyst+pattern): 52.75, NVDA (pattern): 38.0, TSLA (premarket): 24.5
+    - Verified sorting, composite scores, component scores in details
+  - test_momentum_ranker_groups_signals_by_symbol: Signal grouping with duplicate handling (max strength)
+  - test_momentum_ranker_handles_missing_signals: Missing signal types default to 0.0
+  - test_momentum_ranker_performance: <1s for 50 signals across 5 symbols
+  - test_momentum_ranker_empty_input: Empty list gracefully handled
+  - test_momentum_ranker_composite_signals_excluded: COMPOSITE signals skipped in aggregation
+  - test_momentum_ranker_score_composite_unit: Formula verification (0.25*cat + 0.35*pre + 0.40*pat)
+  - Test fixtures: mixed_signals_all_types (4 symbols, 7 signals), large_signal_batch (5 symbols, 50 signals)
+  - Critical path coverage: ≥90% (rank, score_composite, _aggregate_signals_by_symbol)
+  - All tests passing in <0.4s
+  - Commit: 73b3a52 "test: T047 write integration test for momentum ranker"
 
 ## Last Updated
-2025-10-17T06:00:00-00:00
+2025-10-17T07:00:00-00:00
 
 ## Phase 2: Tasks (2025-10-16)
 
