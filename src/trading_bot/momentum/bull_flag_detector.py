@@ -15,11 +15,9 @@ Task: T035 - BullFlagDetector service implementation
 
 import logging
 from datetime import UTC, datetime
-from typing import List, Optional, Tuple
 
 import pandas as pd
 
-from ..error_handling.retry import with_retry
 from ..market_data.market_data_service import MarketDataService
 from .config import MomentumConfig
 from .logging.momentum_logger import MomentumLogger
@@ -72,7 +70,7 @@ class BullFlagDetector:
         self.market_data = market_data_service
         self.logger = momentum_logger or MomentumLogger()
 
-    async def scan(self, symbols: List[str]) -> List[MomentumSignal]:
+    async def scan(self, symbols: list[str]) -> list[MomentumSignal]:
         """Scan for bull flag patterns in historical price data.
 
         Fetches 100 days of OHLCV data via MarketDataService, detects bull flag
@@ -237,7 +235,7 @@ class BullFlagDetector:
 
         return signals
 
-    def _detect_pattern(self, ohlcv: pd.DataFrame) -> Optional[BullFlagPattern]:
+    def _detect_pattern(self, ohlcv: pd.DataFrame) -> BullFlagPattern | None:
         """Detect bull flag pattern from OHLCV data.
 
         Scans historical data for pole (>8% gain in 1-3 days) followed by
@@ -289,7 +287,7 @@ class BullFlagDetector:
             logger.warning(f"Unexpected error in pattern detection: {e}")
             return None
 
-    def _detect_pole(self, ohlcv: pd.DataFrame) -> Optional[Tuple[datetime, datetime, float, float, float]]:
+    def _detect_pole(self, ohlcv: pd.DataFrame) -> tuple[datetime, datetime, float, float, float] | None:
         """Detect pole: >8% gain in 1-3 consecutive days.
 
         Scans last 100 days for consecutive 1-3 day periods with >8% gain
@@ -346,7 +344,7 @@ class BullFlagDetector:
 
     def _detect_flag(
         self, ohlcv: pd.DataFrame, pole_end: datetime
-    ) -> Optional[Tuple[datetime, datetime, float, float, float, float]]:
+    ) -> tuple[datetime, datetime, float, float, float, float] | None:
         """Detect flag: 3-5% consolidation for 2-5 days after pole.
 
         Scans 2-5 days after pole_end for consolidation with:
@@ -451,7 +449,7 @@ class BullFlagDetector:
 
     def _calculate_targets(
         self, pole_high: float, pole_low: float, flag_high: float
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Calculate breakout price and price target.
 
         Logic:

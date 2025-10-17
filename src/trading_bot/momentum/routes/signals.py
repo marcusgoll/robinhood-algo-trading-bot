@@ -15,12 +15,9 @@ Task: T051 - Create FastAPI routes for GET /api/v1/momentum/signals
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
-
-from ..schemas.momentum_signal import SignalType
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +38,7 @@ class MomentumSignalResponse(BaseModel):
 class SignalsQueryResponse(BaseModel):
     """Response model for signals query endpoint."""
 
-    signals: List[MomentumSignalResponse] = Field(..., description="List of momentum signals")
+    signals: list[MomentumSignalResponse] = Field(..., description="List of momentum signals")
     total: int = Field(..., description="Total count before pagination")
     count: int = Field(..., description="Number of signals in this response")
     has_more: bool = Field(..., description="Whether more results exist")
@@ -49,25 +46,25 @@ class SignalsQueryResponse(BaseModel):
 
 @router.get("/signals", response_model=SignalsQueryResponse)
 async def get_signals(
-    symbols: Optional[str] = Query(
+    symbols: str | None = Query(
         None,
         description="Comma-separated list of symbols to filter (e.g., 'AAPL,GOOGL')"
     ),
-    signal_type: Optional[str] = Query(
+    signal_type: str | None = Query(
         None,
         description="Filter by signal type (catalyst, premarket, pattern, composite)"
     ),
-    min_strength: Optional[float] = Query(
+    min_strength: float | None = Query(
         0.0,
         ge=0.0,
         le=100.0,
         description="Minimum signal strength (0-100)"
     ),
-    start_time: Optional[str] = Query(
+    start_time: str | None = Query(
         None,
         description="Start time filter (ISO 8601 UTC, e.g., '2025-10-16T00:00:00Z')"
     ),
-    end_time: Optional[str] = Query(
+    end_time: str | None = Query(
         None,
         description="End time filter (ISO 8601 UTC)"
     ),
@@ -179,12 +176,12 @@ async def get_signals(
 
 
 async def _query_signals_from_logs(
-    symbol_list: List[str],
-    signal_type: Optional[str],
+    symbol_list: list[str],
+    signal_type: str | None,
     min_strength: float,
-    start_time: Optional[datetime],
-    end_time: Optional[datetime]
-) -> List[dict]:
+    start_time: datetime | None,
+    end_time: datetime | None
+) -> list[dict]:
     """Query signals from JSONL log files with filtering.
 
     Reads all JSONL files in logs/momentum/ directory and applies filters.
@@ -212,7 +209,7 @@ async def _query_signals_from_logs(
     # Read all JSONL files in logs/momentum/
     for log_file in sorted(log_dir.glob("*.jsonl")):
         try:
-            with open(log_file, "r") as f:
+            with open(log_file) as f:
                 for line in f:
                     try:
                         entry = json.loads(line)
@@ -261,7 +258,7 @@ async def _query_signals_from_logs(
     return signals
 
 
-def _sort_signals(signals: List[dict], sort_by: str) -> List[dict]:
+def _sort_signals(signals: list[dict], sort_by: str) -> list[dict]:
     """Sort signals by specified field.
 
     Args:

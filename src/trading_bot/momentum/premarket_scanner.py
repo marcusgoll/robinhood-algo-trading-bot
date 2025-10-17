@@ -15,14 +15,12 @@ Tasks: T025 [GREEN], T027 [GREEN] - PreMarketScanner with timestamp validation
 
 import logging
 from datetime import UTC, datetime
-from typing import List
 from zoneinfo import ZoneInfo
 
-from ..error_handling.retry import with_retry
 from ..market_data.market_data_service import MarketDataService
 from .config import MomentumConfig
 from .logging.momentum_logger import MomentumLogger
-from .schemas.momentum_signal import MomentumSignal, PreMarketMover, SignalType
+from .schemas.momentum_signal import MomentumSignal, SignalType
 from .validation import validate_symbols
 
 # Module logger
@@ -72,7 +70,7 @@ class PreMarketScanner:
         self.market_data = market_data_service
         self.logger = momentum_logger or MomentumLogger()
 
-    async def scan(self, symbols: List[str]) -> List[MomentumSignal]:
+    async def scan(self, symbols: list[str]) -> list[MomentumSignal]:
         """Scan for pre-market movers with >5% change and >200% volume.
 
         Validates pre-market window before processing. All timestamps stored in UTC,
@@ -156,12 +154,6 @@ class PreMarketScanner:
                 current_price = float(quote.current_price)
                 # TODO: Get actual previous close from historical data
                 previous_close = current_price  # STUB
-
-                # Create PreMarketMover details
-                mover = PreMarketMover(
-                    change_pct=price_change_pct,
-                    volume_ratio=volume_ratio,
-                )
 
                 # Calculate signal strength
                 strength = self._calculate_premarket_strength(price_change_pct, volume_ratio)

@@ -7,16 +7,15 @@ Ranks stocks based on multi-signal confluence (catalyst + pre-market + pattern).
 Follows patterns from src/trading_bot/momentum/catalyst_detector.py
 """
 
-from typing import Dict, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from .config import MomentumConfig
 from .logging.momentum_logger import MomentumLogger
 from .schemas.momentum_signal import MomentumSignal, SignalType
 
 if TYPE_CHECKING:
+    from .bull_flag_detector import BullFlagDetector
     from .catalyst_detector import CatalystDetector
     from .premarket_scanner import PreMarketScanner
-    from .bull_flag_detector import BullFlagDetector
 
 
 class MomentumRanker:
@@ -64,7 +63,7 @@ class MomentumRanker:
             SignalType.PATTERN: 0.40,
         }
 
-    async def scan_and_rank(self, symbols: List[str]) -> List[MomentumSignal]:
+    async def scan_and_rank(self, symbols: list[str]) -> list[MomentumSignal]:
         """
         Scan for momentum signals using all detectors and rank by composite score.
 
@@ -85,7 +84,7 @@ class MomentumRanker:
             >>> ranked_signals[0].symbol  # Top-ranked symbol
             'AAPL'
         """
-        all_signals: List[MomentumSignal] = []
+        all_signals: list[MomentumSignal] = []
 
         # Run all detectors in parallel
         if self.catalyst_detector:
@@ -105,7 +104,7 @@ class MomentumRanker:
 
         return ranked_signals
 
-    def rank(self, signals: List[MomentumSignal]) -> List[MomentumSignal]:
+    def rank(self, signals: list[MomentumSignal]) -> list[MomentumSignal]:
         """
         Rank momentum signals by composite score.
 
@@ -139,7 +138,7 @@ class MomentumRanker:
         aggregated = self._aggregate_signals_by_symbol(signals)
 
         # Step 2: Calculate composite scores and create COMPOSITE signals
-        composite_signals: List[MomentumSignal] = []
+        composite_signals: list[MomentumSignal] = []
         for symbol, scores in aggregated.items():
             composite_score = self.score_composite(
                 catalyst_score=scores.get(SignalType.CATALYST, 0.0),
@@ -152,7 +151,7 @@ class MomentumRanker:
             latest_timestamp = max(s.detected_at for s in symbol_signals)
 
             # Collect details from each signal type
-            details_dict = {
+            details_dict: dict[str, Any] = {
                 "composite_score": composite_score,
                 "signal_count": len(symbol_signals),
             }
@@ -231,8 +230,8 @@ class MomentumRanker:
         return composite
 
     def _aggregate_signals_by_symbol(
-        self, signals: List[MomentumSignal]
-    ) -> Dict[str, Dict[SignalType, float]]:
+        self, signals: list[MomentumSignal]
+    ) -> dict[str, dict[SignalType, float]]:
         """
         Group signals by symbol and extract scores per signal_type.
 
@@ -263,7 +262,7 @@ class MomentumRanker:
             >>> aggregated["MSFT"]
             {SignalType.CATALYST: 75.0, SignalType.PREMARKET: 0.0, SignalType.PATTERN: 85.0}
         """
-        aggregated: Dict[str, Dict[SignalType, float]] = {}
+        aggregated: dict[str, dict[SignalType, float]] = {}
 
         for signal in signals:
             # Skip COMPOSITE signals (only aggregate raw signals)

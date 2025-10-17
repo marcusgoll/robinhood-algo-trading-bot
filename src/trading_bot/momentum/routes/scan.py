@@ -17,15 +17,12 @@ import asyncio
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from ...market_data.market_data_service import MarketDataService
-from ..config import MomentumConfig
-from ..schemas.momentum_signal import SignalType
 from ... import MomentumEngine
+from ..config import MomentumConfig
 
 logger = logging.getLogger(__name__)
 
@@ -33,19 +30,19 @@ router = APIRouter(prefix="/api/v1/momentum", tags=["momentum"])
 
 # In-memory storage for scan results (MVP implementation)
 # TODO Phase 2: Replace with Redis or database for production
-_scan_results: Dict[str, dict] = {}
+_scan_results: dict[str, dict] = {}
 
 
 class ScanRequest(BaseModel):
     """Request model for momentum scan."""
 
-    symbols: List[str] = Field(
+    symbols: list[str] = Field(
         ...,
         min_items=1,
         max_items=100,
         description="List of stock ticker symbols to scan (1-100 symbols)"
     )
-    scan_types: Optional[List[str]] = Field(
+    scan_types: list[str] | None = Field(
         None,
         description="Scan types to execute (catalyst, premarket, pattern). Default: all"
     )
@@ -65,11 +62,11 @@ class ScanStatusResponse(BaseModel):
     scan_id: str = Field(..., description="Unique scan identifier")
     status: str = Field(..., description="Scan status (queued, running, completed, failed)")
     created_at: str = Field(..., description="When scan was initiated (ISO 8601 UTC)")
-    completed_at: Optional[str] = Field(None, description="When scan completed (ISO 8601 UTC)")
-    symbols: List[str] = Field(..., description="Symbols being scanned")
+    completed_at: str | None = Field(None, description="When scan completed (ISO 8601 UTC)")
+    symbols: list[str] = Field(..., description="Symbols being scanned")
     signal_count: int = Field(..., description="Number of signals detected (0 if incomplete)")
-    signals: List[dict] = Field(..., description="Detected signals (empty if incomplete)")
-    error: Optional[str] = Field(None, description="Error message if scan failed")
+    signals: list[dict] = Field(..., description="Detected signals (empty if incomplete)")
+    error: str | None = Field(None, description="Error message if scan failed")
 
 
 @router.post("/scan", response_model=ScanResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -157,7 +154,7 @@ async def trigger_scan(request: ScanRequest) -> ScanResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to initiate scan: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/scans/{scan_id}", response_model=ScanStatusResponse)
@@ -208,7 +205,7 @@ async def get_scan_status(scan_id: str) -> ScanStatusResponse:
     )
 
 
-async def _execute_scan(scan_id: str, symbols: List[str], scan_types: List[str]) -> None:
+async def _execute_scan(scan_id: str, symbols: list[str], scan_types: list[str]) -> None:
     """Execute momentum scan in background task.
 
     Updates _scan_results with status and results.

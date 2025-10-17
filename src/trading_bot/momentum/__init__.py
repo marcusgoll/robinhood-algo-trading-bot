@@ -13,9 +13,7 @@ Main components:
 - MomentumRanker: Signal aggregation and ranking
 """
 
-import asyncio
 import logging as stdlib_logging
-from typing import List
 
 from ..market_data.market_data_service import MarketDataService
 from .bull_flag_detector import BullFlagDetector
@@ -84,7 +82,7 @@ class MomentumEngine:
 
         stdlib_logging.info("MomentumEngine initialized with all detectors")
 
-    async def scan(self, symbols: List[str]) -> List[MomentumSignal]:
+    async def scan(self, symbols: list[str]) -> list[MomentumSignal]:
         """Execute all detection methods and rank results.
 
         Runs catalyst, premarket, and pattern detectors in parallel using

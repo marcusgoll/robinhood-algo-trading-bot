@@ -14,7 +14,6 @@ Task: T056 - Input validation for all scan() methods
 
 import logging
 import re
-from typing import List
 
 # Module logger
 logger = logging.getLogger(__name__)
@@ -25,7 +24,7 @@ logger = logging.getLogger(__name__)
 SYMBOL_PATTERN = re.compile(r"^[A-Z]{1,5}$")
 
 
-def validate_symbols(symbols: List[str]) -> None:
+def validate_symbols(symbols: list[str]) -> None:
     """
     Validate list of stock ticker symbols.
 

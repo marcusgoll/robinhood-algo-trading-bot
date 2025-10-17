@@ -287,7 +287,90 @@ The system is designed for manual review and paper trading validation before any
   - Commit: 73b3a52 "test: T047 write integration test for momentum ranker"
 
 ## Last Updated
-2025-10-17T07:00:00-00:00
+2025-10-17T03:15:00Z
+
+## Phase 5: Optimization (2025-10-17)
+
+**Summary**:
+- Status: ⚠️ **BLOCKED** - Critical quality gaps identified
+- Test Suite: 168/196 passed (28 failures, 85.7% pass rate)
+- Coverage: 55.70% (target: ≥90%, gap: -34.3%)
+- Security: ✅ Zero vulnerabilities (Bandit scan passed)
+- Code Quality: 82 linting errors (auto-fixable), 3 type errors
+
+**Performance Validation**:
+- Test suite execution: 3.73s ✅ (target: <6min)
+- Unit tests: <1s ✅ (target: <2s)
+- Integration tests: <1s ✅ (target: <10s)
+- 500-stock benchmark: ⏸️ Not measured (target: <90s)
+
+**Security Validation**:
+- Bandit scan: 2,485 lines, 0 vulnerabilities ✅
+- API keys: All from environment variables ✅
+- Hardcoded secrets: None detected ✅
+- Input validation: Regex, Pydantic models ✅
+- Rate limiting: ⚠️ Not implemented (planned: 10 req/min)
+
+**Code Quality Validation**:
+- Linting (ruff): 82 errors (68 auto-fixable)
+  - UP006: 38 (List[X] → list[X])
+  - UP035: 12 (typing.List deprecated)
+  - UP045: 24 (Optional[X] → X | None)
+  - F401: 6 (unused imports)
+- Type coverage (mypy): 3 errors in momentum_ranker.py
+- Coverage gaps:
+  - API routes: 0% (170 lines untested)
+  - MomentumEngine: 48.61% (37 lines uncovered)
+  - Error paths: Scattered gaps
+
+**Critical Blockers**:
+1. CR-001: 28 test failures (constructor signature mismatch)
+   - Root cause: MomentumRanker refactored after tests written
+   - Fix: Update test fixtures to match new signature
+   - Effort: 2-4 hours
+
+2. CR-002: 55.70% coverage vs 90% target
+   - Gap: API routes (0%), MomentumEngine (48.61%)
+   - Fix: Add integration tests for FastAPI endpoints
+   - Effort: 6-8 hours
+
+**High Priority Issues**:
+3. CR-003: 3 type safety errors (incompatible assignments)
+   - Location: momentum_ranker.py lines 163-167
+   - Fix: Change Dict[str, float] → Dict[str, Any]
+   - Effort: 30 minutes
+
+4. CR-004: 82 linting violations
+   - Type: Deprecated type annotations (Python 3.8 → 3.11+)
+   - Fix: Run ruff check --fix
+   - Effort: 15 minutes
+
+**Architectural Assessment**:
+- ✅ Composition root pattern (MomentumEngine)
+- ✅ Reuse of MarketDataService, TradingLogger, @with_retry
+- ✅ Clean separation: catalyst, premarket, pattern detectors
+- ✅ Contract alignment: MomentumSignal, API schemas
+- ⚠️ Missing @with_retry decorators on detector methods
+- ⚠️ Test-implementation sync issue (continuous testing needed)
+
+**Artifacts Generated**:
+- specs/002-momentum-detection/code-review.md (detailed findings)
+- specs/002-momentum-detection/optimization-report.md (summary)
+
+**Checkpoint**:
+- ❌ Phase 5 (Optimization): **BLOCKED**
+- 📋 Next action: Fix CR-001 and CR-002 (test failures + coverage)
+- 📋 Estimated time to production-ready: 8-12 hours
+- 📋 Ready for: Fix blockers → Re-run /optimize → /preview
+
+**Recommendations**:
+1. Immediate: Fix MomentumRanker test fixtures (CR-001)
+2. Immediate: Add API route integration tests (CR-002)
+3. Quick: Run ruff auto-fix (CR-004)
+4. Quick: Fix type annotations (CR-003)
+5. Follow-up: Add @with_retry decorators (CR-006)
+6. Follow-up: Implement rate limiting (security)
+7. Validation: Run 500-stock performance benchmark
 
 ## Phase 2: Tasks (2025-10-16)
 

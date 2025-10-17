@@ -15,7 +15,6 @@ Tasks: T015 [GREEN], T016 [GREEN] - CatalystDetector service with error handling
 
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import List
 
 from ..error_handling.retry import with_retry
 from .config import MomentumConfig
@@ -69,7 +68,7 @@ class CatalystDetector:
         self.config = config
         self.logger = momentum_logger or MomentumLogger()
 
-    async def scan(self, symbols: List[str]) -> List[MomentumSignal]:
+    async def scan(self, symbols: list[str]) -> list[MomentumSignal]:
         """Scan for catalyst events in last 24 hours.
 
         Implements graceful degradation per spec Dependencies and Blockers:
@@ -216,7 +215,7 @@ class CatalystDetector:
             return []  # Graceful degradation: don't crash entire momentum scan
 
     @with_retry()  # Uses DEFAULT_POLICY: 3 retries, exponential backoff
-    async def _fetch_news_with_retry(self, symbols: List[str]) -> List[CatalystEvent]:
+    async def _fetch_news_with_retry(self, symbols: list[str]) -> list[CatalystEvent]:
         """Fetch news from data provider with retry logic.
 
         Internal method wrapped with @with_retry decorator for exponential backoff.
@@ -233,7 +232,7 @@ class CatalystDetector:
         """
         return await self._fetch_news(symbols)
 
-    async def _fetch_news(self, symbols: List[str]) -> List[CatalystEvent]:
+    async def _fetch_news(self, symbols: list[str]) -> list[CatalystEvent]:
         """Fetch news from Alpaca API (or configured provider).
 
         TODO: Replace stub with actual Alpaca API integration when market-data-module available.
@@ -250,7 +249,7 @@ class CatalystDetector:
         logger.info(f"CatalystDetector stub: Would fetch news for {len(symbols)} symbols")
         return []
 
-    async def _fetch_news_from_alpaca(self, symbols: List[str]) -> dict:
+    async def _fetch_news_from_alpaca(self, symbols: list[str]) -> dict:
         """Fetch news from Alpaca API with retry logic.
 
         This method is used for mocking in tests. In production, it will make
@@ -280,7 +279,7 @@ class CatalystDetector:
         # For now, this is a stub that will be mocked in tests
         raise NotImplementedError("Alpaca API integration pending")
 
-    def _process_news_data(self, news_data: dict, symbols: List[str]) -> List[MomentumSignal]:
+    def _process_news_data(self, news_data: dict, symbols: list[str]) -> list[MomentumSignal]:
         """Process raw news data and build MomentumSignal objects.
 
         Filters news to last 24 hours, categorizes catalyst types, and builds signals.
@@ -422,7 +421,7 @@ class CatalystDetector:
         # Default: PRODUCT (most generic category)
         return CatalystType.PRODUCT
 
-    def _convert_events_to_signals(self, events: List[CatalystEvent]) -> List[MomentumSignal]:
+    def _convert_events_to_signals(self, events: list[CatalystEvent]) -> list[MomentumSignal]:
         """Convert CatalystEvent objects to MomentumSignal objects.
 
         Calculates signal strength based on catalyst type and recency.
