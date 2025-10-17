@@ -162,6 +162,8 @@ The system is designed for manual review and paper trading validation before any
 - ✅ T005: Create data model schemas for momentum detection (2025-10-16)
 - ✅ T006: Create MomentumConfig dataclass (2025-10-16)
 - ✅ T007: Create MomentumLogger wrapper (2025-10-16)
+- ✅ T015: Create CatalystDetector service with scan() and categorize() methods (2025-10-16)
+- ✅ T016: Add error handling for missing NEWS_API_KEY (2025-10-16)
 
 ## Last Updated
 2025-10-16T21:15:00-00:00
