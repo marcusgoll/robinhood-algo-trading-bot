@@ -138,13 +138,15 @@
   - From: plan.md [DATA MODEL]
   - Evidence: Migration created with 3 tables (orders 15 cols, fills 8 cols, execution_logs 10 cols), 3 enums, 8 check constraints, 2 FKs, 8 indexes, 5 RLS policies. Syntax validated. Commit: 3d03620
 
-- [ ] **T006** [P] Create Order model in api/src/models/order.py
-  - Fields: id, trader_id, symbol, quantity, order_type, price, status, filled_quantity, created_at, updated_at
-  - Validation: quantity > 0, price > 0 (if not market), status enum
-  - Methods: get_by_id, create, update_status
-  - REUSE: BaseModel (api/src/models/base.py)
-  - Pattern: api/src/models/notification.py
-  - From: data-model.md Order entity
+- [x] **T006** [P] Create Order model in api/app/models/order.py (COMPLETED 2025-10-17)
+  - Fields: id, trader_id, symbol, quantity, order_type, price, stop_loss, take_profit, status, filled_quantity, average_fill_price, created_at, updated_at, expires_at
+  - Validation: quantity > 0, price > 0 (if set), order_type/status enum validation, state transition validation
+  - Methods: __repr__, is_pending(), get_unfilled_quantity(), update_status() with state machine
+  - REUSE: BaseModel (api/app/models/base.py) - created with GUID cross-database type
+  - Enums: OrderType (MARKET/LIMIT/STOP), OrderStatus (PENDING/FILLED/PARTIAL/REJECTED/CANCELLED)
+  - Tests: 16/16 passing (test_order.py with 100% method coverage)
+  - Evidence: Commit 39d47e3. pytest: 16 passing. mypy: acceptable (SQLAlchemy dynamic types)
+  - Note: Created in api/app/ structure (not api/src/ as originally planned)
 
 - [ ] **T007** [P] Create Fill model in api/src/models/fill.py
   - Fields: id, order_id, timestamp, quantity_filled, price_at_fill, venue, commission
