@@ -325,33 +325,32 @@ class BullFlagDetector:
         max_duration = self.config.max_consolidation_bars
 
         # Pre-check 1: Does consolidation extend beyond max_duration?
-        # Try max_duration + 1 to see if it would still be valid
-        if start_idx + max_duration < len(bars):
-            extended_end_idx = start_idx + max_duration  # This is max_duration + 1 bars (0-indexed)
-            extended_bars = bars[start_idx:extended_end_idx + 1]
+        # Check if a pattern with max_duration + 1 bars would still be valid
+        check_beyond_max_end_idx = start_idx + max_duration
+        if check_beyond_max_end_idx < len(bars):
+            extended_bars = bars[start_idx:check_beyond_max_end_idx + 1]
 
-            if len(extended_bars) > max_duration:
-                # Calculate metrics for this extended pattern
-                extended_closes = [Decimal(str(bar["close"])) for bar in extended_bars]
-                extended_lows = [Decimal(str(bar["low"])) for bar in extended_bars]
-                extended_lower = min(extended_closes)
-                extended_lowest_low = min(extended_lows)
+            # Calculate metrics for this extended pattern
+            extended_closes = [Decimal(str(bar["close"])) for bar in extended_bars]
+            extended_lows = [Decimal(str(bar["low"])) for bar in extended_bars]
+            extended_lowest_low = min(extended_lows)
 
-                # Calculate retracement using lowest low
-                extended_retracement = flagpole.high_price - extended_lowest_low
-                extended_retracement_pct = (extended_retracement / gain_absolute) * Decimal("100")
+            # Calculate retracement using lowest low
+            extended_retracement = flagpole.high_price - extended_lowest_low
+            extended_retracement_pct = (extended_retracement / gain_absolute) * Decimal("100")
 
-                # Calculate volume
-                total_vol_ext = sum(Decimal(str(bar["volume"])) for bar in extended_bars)
-                avg_vol_ext = total_vol_ext / Decimal(str(len(extended_bars)))
-                decay_threshold = self.config.volume_decay_threshold
-                max_allowed_vol_ext = flagpole.avg_volume * decay_threshold
+            # Calculate volume
+            total_vol_ext = sum(Decimal(str(bar["volume"])) for bar in extended_bars)
+            avg_vol_ext = total_vol_ext / Decimal(str(len(extended_bars)))
+            decay_threshold = self.config.volume_decay_threshold
+            max_allowed_vol_ext = flagpole.avg_volume * decay_threshold
 
-                # If this extended pattern meets criteria, consolidation is too long
-                if (extended_retracement_pct >= self.config.min_retracement_pct and
-                    extended_retracement_pct <= self.config.max_retracement_pct and
-                    avg_vol_ext < max_allowed_vol_ext):
-                    return None  # Consolidation extends beyond max, reject entire pattern
+            # If this extended pattern (> max_duration bars) meets criteria, consolidation is too long
+            if (len(extended_bars) > max_duration and
+                extended_retracement_pct >= self.config.min_retracement_pct and
+                extended_retracement_pct <= self.config.max_retracement_pct and
+                avg_vol_ext < max_allowed_vol_ext):
+                return None  # Consolidation extends beyond max, reject entire pattern
 
         # Pre-check 2: Check all durations from min to max for excessive retracement
         # If ANY valid duration exceeds max retracement, reject the entire pattern
