@@ -1,0 +1,442 @@
+openapi: 3.0.0
+info:
+  title: Order Execution API
+  description: Robust order execution with real-time status updates and audit trail
+  version: 1.0.0
+  contact:
+    name: Trading API
+    url: https://github.com/cfipros/trading-api
+
+servers:
+  - url: https://api.example.com
+    description: Production
+  - url: https://api-staging.example.com
+    description: Staging
+  - url: http://localhost:8000
+    description: Local development
+
+paths:
+  /api/v1/orders:
+    post:
+      summary: Submit new order
+      description: Create and validate a new order. Returns 201 if successful, 400 if validation fails.
+      tags:
+        - Orders
+      security:
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderSubmitRequest'
+            examples:
+              market:
+                summary: Market order
+                value:
+                  symbol: AAPL
+                  quantity: 100
+                  order_type: MARKET
+              limit:
+                summary: Limit order
+                value:
+                  symbol: MSFT
+                  quantity: 50
+                  order_type: LIMIT
+                  price: 450.00
+      responses:
+        201:
+          description: Order successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        400:
+          description: Validation error (invalid parameters, insufficient funds, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        401:
+          description: Unauthorized (invalid or expired token)
+        500:
+          description: Server error (exchange API down, database error)
+
+    get:
+      summary: List trader's orders
+      description: Get all orders for the authenticated trader, paginated and sortable
+      tags:
+        - Orders
+      security:
+        - Bearer: []
+      parameters:
+        - name: status
+          in: query
+          description: Filter by order status
+          schema:
+            type: string
+            enum: [PENDING, FILLED, PARTIAL, REJECTED, CANCELLED]
+        - name: symbol
+          in: query
+          description: Filter by stock symbol
+          schema:
+            type: string
+            example: AAPL
+        - name: limit
+          in: query
+          description: Max results (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          description: Pagination offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        200:
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrderResponse'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        401:
+          description: Unauthorized
+        500:
+          description: Server error
+
+  /api/v1/orders/{order_id}:
+    get:
+      summary: Get order details
+      description: Retrieve full order details including fills and audit trail
+      tags:
+        - Orders
+      security:
+        - Bearer: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          description: Order ID (UUID)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailResponse'
+        404:
+          description: Order not found (or not owned by trader)
+        401:
+          description: Unauthorized
+        500:
+          description: Server error
+
+  /api/v1/orders/{order_id}/cancel:
+    post:
+      summary: Cancel pending order
+      description: Cancel an order if status is PENDING. Returns 200 if successful.
+      tags:
+        - Orders
+      security:
+        - Bearer: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Order cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        400:
+          description: Cannot cancel (not in PENDING status)
+        404:
+          description: Order not found
+        401:
+          description: Unauthorized
+        500:
+          description: Server error
+
+  /api/v1/orders/{order_id}/audit:
+    get:
+      summary: Get order audit trail
+      description: Retrieve immutable execution log for compliance (SEC Rule 4530)
+      tags:
+        - Orders
+        - Compliance
+      security:
+        - Bearer: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Execution log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExecutionLogEntry'
+                  total:
+                    type: integer
+        404:
+          description: Order not found
+        401:
+          description: Unauthorized
+        500:
+          description: Server error
+
+  /api/v1/health:
+    get:
+      summary: Health check
+      description: Verify order execution service is operational
+      tags:
+        - Health
+      responses:
+        200:
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /ws/orders/events:
+    get:
+      summary: WebSocket subscription to order events
+      description: Real-time updates for order status changes. Connect via WebSocket upgrade.
+      tags:
+        - WebSocket
+      security:
+        - Bearer: []
+      responses:
+        101:
+          description: Switching Protocols (WebSocket upgrade)
+        401:
+          description: Unauthorized
+
+components:
+  schemas:
+    OrderSubmitRequest:
+      type: object
+      required:
+        - symbol
+        - quantity
+        - order_type
+      properties:
+        symbol:
+          type: string
+          description: Stock symbol (e.g., AAPL, MSFT)
+          example: AAPL
+          minLength: 1
+          maxLength: 10
+        quantity:
+          type: integer
+          description: Number of shares (must be > 0)
+          example: 100
+          minimum: 1
+        order_type:
+          type: string
+          description: Type of order
+          enum: [MARKET, LIMIT, STOP]
+          example: MARKET
+        price:
+          type: number
+          description: Limit price (required for LIMIT/STOP orders)
+          example: 150.50
+          nullable: true
+          minimum: 0.01
+        stop_loss:
+          type: number
+          description: Stop loss price (optional)
+          example: 145.00
+          nullable: true
+          minimum: 0.01
+        take_profit:
+          type: number
+          description: Take profit price (optional)
+          example: 160.00
+          nullable: true
+          minimum: 0.01
+
+    OrderResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Order ID
+        trader_id:
+          type: string
+          format: uuid
+          description: Trader ID
+        symbol:
+          type: string
+          example: AAPL
+        quantity:
+          type: integer
+          example: 100
+        order_type:
+          type: string
+          enum: [MARKET, LIMIT, STOP]
+        price:
+          type: number
+          nullable: true
+        stop_loss:
+          type: number
+          nullable: true
+        take_profit:
+          type: number
+          nullable: true
+        status:
+          type: string
+          enum: [PENDING, FILLED, PARTIAL, REJECTED, CANCELLED]
+        filled_quantity:
+          type: integer
+          description: Quantity filled so far
+        average_fill_price:
+          type: number
+          nullable: true
+          description: Average price of fills
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    OrderDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/OrderResponse'
+        - type: object
+          properties:
+            fills:
+              type: array
+              items:
+                $ref: '#/components/schemas/FillEntry'
+              description: All fills for this order
+
+    FillEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        quantity_filled:
+          type: integer
+        price_at_fill:
+          type: number
+        venue:
+          type: string
+          description: Exchange name (NYSE, NASDAQ, etc.)
+        commission:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+
+    ExecutionLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+          format: uuid
+        trader_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [SUBMITTED, APPROVED, EXECUTED, FILLED, REJECTED, CANCELLED, RECOVERED]
+          description: Action taken
+        status:
+          type: string
+          description: Order status at time of action
+        timestamp:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          nullable: true
+          description: Reason for action (e.g., error message if rejected)
+        retry_attempt:
+          type: integer
+          nullable: true
+          description: Retry number (0=initial, 1=first retry)
+        error_code:
+          type: string
+          nullable: true
+          description: Exchange error code if applicable
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error code (e.g., INSUFFICIENT_FUNDS)
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Insufficient funds for $5,000 order; available: $3,200"
+        details:
+          type: object
+          nullable: true
+          description: Additional error details
+          example:
+            required_balance: 5000
+            available_balance: 3200
+
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from Clerk authentication
+
+tags:
+  - name: Orders
+    description: Order submission, retrieval, cancellation
+  - name: Compliance
+    description: Audit trail and regulatory endpoints
+  - name: Health
+    description: Service health checks
+  - name: WebSocket
+    description: Real-time connections for status updates
+
