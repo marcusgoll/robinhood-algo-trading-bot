@@ -1,17 +1,14 @@
 """
-Shared pytest fixtures for momentum detection integration tests.
+Shared test fixtures for momentum detection integration tests.
 
-Provides integration-level mocks and test infrastructure:
-- Mock Alpaca API client
-- Test database fixtures
-- Integration test configuration
-- End-to-end test data
+Provides integration test fixtures with mocked external APIs
+(Alpaca, news providers) for end-to-end testing of momentum engine.
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock
-from typing import List, Dict, Any
 
 
-# Fixtures will be added as needed during integration testing
-# Following TDD approach: implement after unit tests pass
+@pytest.fixture
+def mock_market_data():
+    """Mock MarketDataService for integration testing."""
+    pass  # To be implemented with actual tests
