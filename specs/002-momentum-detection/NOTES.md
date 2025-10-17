@@ -241,8 +241,28 @@ The system is designed for manual review and paper trading validation before any
   - Pattern placement: Positioned at end of data to match detector's backward scanning logic
   - Critical path coverage: ≥90% (scan, _detect_pattern, _detect_pole, _detect_flag, _calculate_targets)
 
+- ✅ T041: Write test for MomentumRanker.score_composite() - 6/6 tests passing (2025-10-16)
+  - Test cases: All signals (catalyst=80, premarket=60, pattern=90 → 77.0), single signals, all zeros, boundary values
+  - Weighted average formula verified: 0.25*catalyst + 0.35*premarket + 0.40*pattern
+  - Edge cases tested: All zeros (0.0), all 100s (100.0), catalyst only (20.0), premarket only (24.5), pattern only (34.0)
+  - Parametrized tests for multiple scoring scenarios
+  - Implementation verified: MomentumRanker.score_composite() correctly calculates weighted composite scores
+  - Test suite includes 13 total tests (6 for score_composite + 7 for rank method)
+  - All tests passing with no coverage failures for momentum_ranker module
+  - Scoring weights confirmed: Catalyst 25%, Pre-market 35%, Pattern 40%
+  - Formula accuracy: pytest.approx() validates calculations to 9 decimal places
+- ✅ T045: Create MomentumRanker service implementation (2025-10-17)
+  - Class: MomentumRanker(config, logger) with rank() and score_composite() methods
+  - score_composite(): Weighted average formula (0.25*catalyst + 0.35*premarket + 0.40*pattern)
+  - rank(): Groups signals by symbol, extracts scores, calculates composite, sorts descending
+  - Graceful handling: Missing signal types default to 0.0 (no crashes)
+  - Logging: Aggregation events logged via MomentumLogger with component scores
+  - All 13 tests passing: 6 score_composite tests + 7 rank tests
+  - Coverage: 87.80% (missing lines are logging branches)
+  - Commit: da049a3 "feat: T045 create MomentumRanker service"
+
 ## Last Updated
-2025-10-17T05:30:00-00:00
+2025-10-17T06:00:00-00:00
 
 ## Phase 2: Tasks (2025-10-16)
 
