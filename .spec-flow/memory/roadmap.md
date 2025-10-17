@@ -383,6 +383,36 @@
   - Production-ready, local-only feature (no staging/production deployment needed)
   - Documentation: spec, plan, tasks, analysis, optimization-report, PRODUCTION-READY.md
 
+### stock-screener
+- **Title**: Stock screener and filtering
+- **Area**: api
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-16
+- **Release**: v1.0.0 - Stock screener MVP with 4 filters and pagination
+- **Spec**: specs/001-stock-screener/
+- **Commits**: f92332e, 1282144, d5e877e, 87d3c5c, a90db5b, d20c615, 4b05774, 74c3da8
+- **Delivered**:
+  - ScreenerService class with 4 filter types: price, volume, float, daily_change
+  - AND logic combining all filters
+  - Pagination support (offset/limit/has_more/next_offset)
+  - Results sorted by volume descending
+  - ScreenerQuery/StockScreenerMatch/ScreenerResult dataclasses with validation
+  - ScreenerLogger with thread-safe JSONL audit trail (daily rotation)
+  - ScreenerConfig with environment variable overrides
+  - Graceful degradation on missing market data (skip filter, log gap, continue)
+  - @with_retry decorator integration with exponential backoff + circuit breaker
+  - Input validation with actionable error messages
+  - 78 tests (68 unit + 10 integration, 100% pass rate)
+  - Code coverage: 90%+ target met
+  - Type safety: 100% (MyPy strict mode, 0 errors after auto-fixes)
+  - Security: 0 vulnerabilities (Bandit scan)
+  - Performance: P95 ~110ms (target <500ms, 78% margin)
+  - All 8 Constitution principles verified (§Safety_First, §Code_Quality, §Risk_Management, §Testing_Requirements, §Audit_Everything, §Error_Handling, §Security, §Data_Integrity)
+  - 15+ artifacts: spec, plan, data-model, tasks, analysis, code-review, optimization-report, preview-checklist, finalization-summary, contracts/api.yaml, etc.
+  - Production-ready, local-only feature (no staging/production deployment needed)
+  - Simple 2-command rollback (git revert + restart)
+
 ## In Progress
 
 <!-- Currently implementing -->
@@ -418,19 +448,6 @@
   - Compare against targets
   - [UNBLOCKED: account-data-module shipped, performance-tracking ready (trade-logging provides data)]
   - [MERGED: performance-metrics-dashboard]
-
-### stock-screener
-- **Title**: Stock screener and filtering
-- **Area**: api
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 3 | **Confidence**: 0.8 | **Score**: 1.33
-- **Requirements**:
-  - Filter by price range ($2-$20)
-  - Relative volume filter (5x+ average)
-  - Float size filter (under 20M shares)
-  - Daily performance filter (10%+ movers)
-  - [BLOCKED: market-data-module]
 
 ### momentum-detection
 - **Title**: Momentum and catalyst detection
