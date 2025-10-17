@@ -21,7 +21,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from ... import MomentumEngine
+from .. import MomentumEngine
 from ..config import MomentumConfig
 
 logger = logging.getLogger(__name__)
