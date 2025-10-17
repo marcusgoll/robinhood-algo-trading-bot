@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-17 (technical-indicators v1.0.0 shipped, momentum-detection v1.0.0 shipped)
+**Last updated**: 2025-10-17 (entry-logic-bull-flag v1.0.0 shipped with 36/36 tests passing, 96.4% coverage)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -522,6 +522,47 @@
   - Production-ready, local-only feature
   - Documentation: spec, plan, tasks, analysis-report, local-build-report, staging-ship-report
 
+### entry-logic-bull-flag
+- **Title**: Bull flag entry logic
+- **Area**: strategy
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-17
+- **Release**: v1.0.0 - Bull flag pattern detection with multi-phase validation
+- **Spec**: specs/003-entry-logic-bull-flag/
+- **Commits**: 9af4208, a5f5b52, 6738ce1
+- **Delivered**:
+  - **BullFlagDetector class**: Multi-phase pattern detection orchestration
+    - _detect_flagpole(): Strong upward move (5-25% gain, 3-15 bars)
+    - _detect_consolidation(): Flag formation (20-50% retracement, 3-10 bars, volume decay)
+    - _confirm_breakout(): Breakout above consolidation (1% move, 30% volume increase)
+    - _validate_with_indicators(): Technical indicator alignment (price > VWAP, MACD > 0, EMA within 2%)
+    - _calculate_risk_parameters(): Stop-loss, target, risk/reward ratio (minimum 2:1)
+    - _calculate_quality_score(): Multi-factor scoring (0-100) based on flagpole strength, consolidation tightness, volume profile, indicator alignment
+  - **BullFlagConfig dataclass**: Configuration with 13 tunable parameters and validation
+  - **Data models**: FlagpoleData, ConsolidationData, BullFlagResult with Decimal precision
+  - **Exception handling**: PatternNotFoundError, InvalidConfigurationError with descriptive messages
+  - **TechnicalIndicatorsService integration**: Composition pattern for VWAP/MACD/EMA validation
+  - **Input validation**: Comprehensive validation with fail-fast on invalid data (InsufficientDataError for <30 bars)
+  - 36 tests (100% pass rate) covering all detection phases, risk calculations, quality scoring
+  - Code coverage: 96.4% patterns module (exceeds 90% target by 6.4%)
+  - Type safety: 100% type hints, MyPy --strict compliant (zero errors)
+  - Linting: 0 errors (flake8)
+  - Documentation: Comprehensive Google-style docstrings on all public methods
+  - Performance: 2ms per symbol, 0.2s for 100 stocks (25x faster than 5s target)
+  - Security: 0 vulnerabilities (no external dependencies, pure calculation)
+  - Critical issues fixed: 6 (CR-001 through CR-006 via debug phase auto-fix)
+    - CR-001: Flagpole gain calculation (fixed low→open)
+    - CR-002: Consolidation duration validation (fixed pre-check logic)
+    - CR-003: Retracement calculation (fixed lowest low instead of close)
+    - CR-004: Risk/Reward ratio (fixed flagpole height calculation using open_price)
+    - CR-005: Test coverage (patterns module 96.4% coverage achieved)
+    - CR-006: Quality score calibration (weight adjustments applied)
+  - Full Constitution v1.0.0 compliance (§Code_Quality, §Testing_Requirements, §Risk_Management, §Data_Integrity, §Safety_First)
+  - Production-ready, local-only feature (composition with existing indicators service)
+  - Documentation: spec, plan, tasks, analysis-report, code-review-report, optimization-report, NOTES.md
+  - Artifacts: 11 files (5 implementation + 6 test files)
+
 ## In Progress
 
 <!-- Currently implementing -->
@@ -538,25 +579,6 @@
 
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
-
-### entry-logic-bull-flag
-- **Title**: Bull flag entry logic
-- **Area**: strategy
-- **Role**: all
-- **Intra**: No
-- **Impact**: 4 | **Effort**: 2 | **Confidence**: 0.8 | **Score**: 1.60
-- **Requirements**:
-  - **Bull flag detector**: Identify strong upward move, detect 1-3 red candle pullback
-  - Verify pullback is less than 1/3 of move
-  - Confirm orderly pattern (no gaps/wicks)
-  - Flag valid setups for entry
-  - **Breakout entry trigger**: Monitor for first green candle after pullback
-  - Detect new high above pullback range
-  - Verify volume confirmation
-  - Auto-place limit order at breakout level
-  - [BLOCKED: momentum-detection]
-  - [DEPENDS ON: technical-indicators (shipped)]
-  - [MERGED: bull-flag-detector, breakout-entry-trigger]
 
 ### order-execution-enhanced
 - **Title**: Enhanced order execution
