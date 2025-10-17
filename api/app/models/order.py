@@ -197,8 +197,8 @@ class Order(BaseModel):
         Index("idx_orders_trader_status", "trader_id", "status"),
     )
 
-    # Relationships (commented out until Fill and ExecutionLog models are created)
-    # fills = relationship("Fill", back_populates="order", cascade="all, delete-orphan")
+    # Relationships
+    fills = relationship("Fill", back_populates="order", cascade="all, delete-orphan")
     # execution_logs = relationship("ExecutionLog", back_populates="order", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
