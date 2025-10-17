@@ -131,6 +131,39 @@ Implication: Add numpy dependency for efficient array math
 - Stateless design: No database persistence, calculations on-demand
 - Reuse pattern: MarketDataService for data, TradingLogger for audit trail
 
+## Phase 2: Tasks (2025-10-17T05:30:00Z)
+
+**Summary**:
+- Total tasks: 38
+- User story tasks: 14 (organized by US1-US12)
+- Parallel opportunities: 31 (marked with [P])
+- Setup tasks: 3 (Phase 1)
+- VWAP tasks: 5 (Phase 2)
+- EMA tasks: 5 (Phase 3)
+- MACD tasks: 6 (Phase 4)
+- Service facade tasks: 6 (Phase 5)
+- Testing/validation tasks: 13 (Phase 6)
+- Task file: specs/technical-indicators/tasks.md
+
+**Checkpoint**:
+- ✅ Tasks generated: 38
+- ✅ User story organization: Complete (14 US-labeled tasks)
+- ✅ Dependency graph: Created (6 phases with clear ordering)
+- ✅ Parallel opportunities: 31 tasks can run in parallel
+- ✅ REUSE analysis: 5 existing components identified
+- ✅ NEW components: 4 calculators + service facade
+- ✅ TDD approach: Tests written before implementation
+- ✅ Performance targets: Benchmarked (VWAP <500ms, EMA <500ms, MACD <1s, batch <2s)
+- 📋 Ready for: /analyze
+
+**Task Breakdown by Phase**:
+- Phase 1 (Setup): 3 tasks - Module structure, config, exceptions
+- Phase 2 (VWAP): 5 tasks - Tests + implementation for US1, US2, US3, US11
+- Phase 3 (EMA): 5 tasks - Tests + implementation for US4, US5, US6
+- Phase 4 (MACD): 6 tasks - Tests + implementation for US7, US8, US9, US10
+- Phase 5 (Service): 6 tasks - Integration tests + facade for US11, US12
+- Phase 6 (Validation): 13 tasks - Coverage, manual validation, type safety, performance
+
 ## Checkpoints
 
 - Phase 0 (Spec-flow): 2025-10-17
@@ -139,7 +172,13 @@ Implication: Add numpy dependency for efficient array math
   - Research decisions: 7
   - Migration required: No
   - Agent context: Updated (if applicable)
+- Phase 2 (Tasks): 2025-10-17
+  - Artifacts: tasks.md
+  - Total tasks: 38
+  - User story tasks: 14
+  - Parallel opportunities: 31
+  - TDD approach: Yes
 
 ## Last Updated
 
-2025-10-17T05:00:00Z
+2025-10-17T05:30:00Z
