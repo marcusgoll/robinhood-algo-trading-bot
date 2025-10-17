@@ -129,13 +129,14 @@
 
 ## Database Setup
 
-- [ ] **T005** [P] Create Alembic migration for order tables
+- [x] **T005** [P] Create Alembic migration for order tables (COMPLETED 2025-10-17)
   - Files: api/alembic/versions/001_create_order_tables.py
   - Tables: orders, fills, execution_logs (see data-model.md for schema)
   - Enums: order_type, order_status, action
   - Constraints: PK, FK, check constraints, RLS policies
   - Pattern: api/alembic/versions/existing_migration.py
   - From: plan.md [DATA MODEL]
+  - Evidence: Migration created with 3 tables (orders 15 cols, fills 8 cols, execution_logs 10 cols), 3 enums, 8 check constraints, 2 FKs, 8 indexes, 5 RLS policies. Syntax validated. Commit: 3d03620
 
 - [ ] **T006** [P] Create Order model in api/src/models/order.py
   - Fields: id, trader_id, symbol, quantity, order_type, price, status, filled_quantity, created_at, updated_at
