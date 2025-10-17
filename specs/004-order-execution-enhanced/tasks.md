@@ -148,12 +148,15 @@
   - Evidence: Commit 39d47e3. pytest: 16 passing. mypy: acceptable (SQLAlchemy dynamic types)
   - Note: Created in api/app/ structure (not api/src/ as originally planned)
 
-- [ ] **T007** [P] Create Fill model in api/src/models/fill.py
-  - Fields: id, order_id, timestamp, quantity_filled, price_at_fill, venue, commission
-  - Validation: quantity_filled > 0, price > 0
-  - REUSE: BaseModel (api/src/models/base.py)
-  - Pattern: api/src/models/order_history.py
-  - From: data-model.md Fill entity
+- [x] **T007** [P] Create Fill model in api/app/models/fill.py (COMPLETED 2025-10-17)
+  - Fields: id, order_id, timestamp, quantity_filled, price_at_fill, venue, commission (all 6 fields)
+  - Validation: quantity_filled > 0, price_at_fill > 0, commission >= 0 (SQLAlchemy validators)
+  - Helper methods: total_value(), get_net_value(), __repr__()
+  - Relationships: order (back_populates with Order model)
+  - REUSE: BaseModel (api/app/models/base.py)
+  - Tests: 15/15 passing (test_fill.py with 100% coverage)
+  - Evidence: Commit 28ac542. pytest: 15 passing, coverage: 100%
+  - Note: Created in api/app/ structure (not api/src/ as originally planned)
 
 - [ ] **T008** [P] Create ExecutionLog model in api/src/models/execution_log.py
   - Fields: id, order_id, trader_id, action, status, timestamp, reason, retry_attempt
