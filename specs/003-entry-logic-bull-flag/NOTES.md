@@ -81,6 +81,41 @@ Bull flag pattern detection for automated entry signal generation in momentum tr
 
 ## Checkpoints
 - Phase 0 (Spec-flow): 2025-10-17
+- Phase 2 (Tasks): 2025-10-17
+
+## Phase 2: Tasks (2025-10-17)
+
+**Summary**:
+- Total tasks: 34
+- Parallel opportunities: 14 tasks marked [P]
+- Setup tasks: 2
+- Foundation tasks: 6 (exceptions, models, config, test fixtures)
+- Core detection: 8 (tests + implementation for flagpole, consolidation, breakout)
+- Risk & scoring: 4 (risk parameters, quality scoring)
+- Integration: 3 (TechnicalIndicatorsService integration)
+- Testing: 5 (E2E tests, performance benchmarks, coverage validation)
+- Documentation: 6 (docstrings, type hints, linting, manual validation)
+
+**Task Distribution by Category**:
+- Backend implementation: 13 tasks (exceptions, models, config, detector logic)
+- Unit tests: 9 tasks (config, models, detection phases, risk/scoring)
+- Integration tests: 3 tasks (TechnicalIndicatorsService integration, regression)
+- Performance & validation: 5 tasks (benchmarks, coverage, E2E tests)
+- Documentation & polish: 6 tasks (docstrings, type checking, linting, manual validation)
+
+**Complexity Breakdown**:
+- Simple (< 50 lines): 8 tasks (setup, exceptions, exports, error-log)
+- Medium (50-150 lines): 15 tasks (models, config, tests, docstrings)
+- Complex (150+ lines): 11 tasks (detector implementation, comprehensive tests, integration)
+
+**Checkpoint**:
+- ✅ Tasks generated: 34 concrete tasks with file paths
+- ✅ User story organization: N/A (technical feature, no user stories)
+- ✅ Dependency graph: 7-phase sequential with parallel opportunities
+- ✅ MVP strategy: Complete pattern detection (all phases required for valid signals)
+- ✅ REUSE analysis: 4 existing components identified
+- ✅ Quality gates defined: >90% coverage, <5s for 100 stocks, zero breaking changes
+- 📋 Ready for: /analyze
 
 ## Last Updated
-2025-10-17T09:30:00-07:00
+2025-10-17
