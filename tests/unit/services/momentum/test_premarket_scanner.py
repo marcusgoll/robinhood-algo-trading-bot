@@ -617,11 +617,11 @@ class TestPreMarketScannerIdentifiesMovers:
             ),
         }
 
-        # Mock get_quote to return different quotes based on symbol
-        async def mock_get_quote(symbol):
+        # Mock get_quote to return different quotes based on symbol (synchronous)
+        def mock_get_quote(symbol):
             return quotes[symbol]
 
-        mock_market_data_service.get_quote = mock_get_quote
+        mock_market_data_service.get_quote = Mock(side_effect=mock_get_quote)
 
         # Mock data for each symbol:
         # AAPL: 5.2% change, 250% volume -> INCLUDE
