@@ -84,7 +84,7 @@ class TestMomentumSignal:
 
     def test_validates_strength_range_min(self):
         """Given strength < 0, when creating MomentumSignal, then raises ValueError."""
-        with pytest.raises(ValueError, match="strength must be between 0 and 100"):
+        with pytest.raises(ValueError, match=r"strength \(-1\.0\) must be between 0 and 100"):
             MomentumSignal(
                 symbol="AAPL",
                 signal_type=SignalType.CATALYST,
@@ -95,7 +95,7 @@ class TestMomentumSignal:
 
     def test_validates_strength_range_max(self):
         """Given strength > 100, when creating MomentumSignal, then raises ValueError."""
-        with pytest.raises(ValueError, match="strength must be between 0 and 100"):
+        with pytest.raises(ValueError, match=r"strength \(101\.0\) must be between 0 and 100"):
             MomentumSignal(
                 symbol="AAPL",
                 signal_type=SignalType.CATALYST,
@@ -106,7 +106,7 @@ class TestMomentumSignal:
 
     def test_validates_symbol_uppercase(self):
         """Given lowercase symbol, when creating MomentumSignal, then raises ValueError."""
-        with pytest.raises(ValueError, match="symbol must be uppercase"):
+        with pytest.raises(ValueError, match=r"symbol \(aapl\) must be 1-5 uppercase characters"):
             MomentumSignal(
                 symbol="aapl",
                 signal_type=SignalType.CATALYST,
@@ -117,7 +117,7 @@ class TestMomentumSignal:
 
     def test_validates_symbol_length_min(self):
         """Given empty symbol, when creating MomentumSignal, then raises ValueError."""
-        with pytest.raises(ValueError, match="symbol must be 1-5 uppercase characters"):
+        with pytest.raises(ValueError, match=r"symbol \(\) must be 1-5 uppercase characters"):
             MomentumSignal(
                 symbol="",
                 signal_type=SignalType.CATALYST,
@@ -128,7 +128,7 @@ class TestMomentumSignal:
 
     def test_validates_symbol_length_max(self):
         """Given symbol > 5 chars, when creating MomentumSignal, then raises ValueError."""
-        with pytest.raises(ValueError, match="symbol must be 1-5 uppercase characters"):
+        with pytest.raises(ValueError, match=r"symbol \(TOOLONG\) must be 1-5 uppercase characters"):
             MomentumSignal(
                 symbol="TOOLONG",
                 signal_type=SignalType.CATALYST,
@@ -139,7 +139,7 @@ class TestMomentumSignal:
 
     def test_validates_symbol_format(self):
         """Given symbol with numbers, when creating MomentumSignal, then raises ValueError."""
-        with pytest.raises(ValueError, match="symbol must be 1-5 uppercase characters"):
+        with pytest.raises(ValueError, match=r"symbol \(APL1\) must be 1-5 uppercase characters"):
             MomentumSignal(
                 symbol="APL1",
                 signal_type=SignalType.CATALYST,
@@ -198,7 +198,7 @@ class TestPreMarketMover:
 
     def test_validates_volume_ratio_positive(self):
         """Given negative volume_ratio, when creating PreMarketMover, then raises ValueError."""
-        with pytest.raises(ValueError, match="volume_ratio must be positive"):
+        with pytest.raises(ValueError, match=r"volume_ratio \(-1\.0\) must be positive"):
             PreMarketMover(
                 change_pct=5.0,
                 volume_ratio=-1.0,
@@ -206,7 +206,7 @@ class TestPreMarketMover:
 
     def test_validates_volume_ratio_zero_not_allowed(self):
         """Given zero volume_ratio, when creating PreMarketMover, then raises ValueError."""
-        with pytest.raises(ValueError, match="volume_ratio must be positive"):
+        with pytest.raises(ValueError, match=r"volume_ratio \(0\.0\) must be positive"):
             PreMarketMover(
                 change_pct=5.0,
                 volume_ratio=0.0,
@@ -233,7 +233,7 @@ class TestBullFlagPattern:
 
     def test_validates_pole_gain_pct_minimum(self):
         """Given pole_gain_pct < 8%, when creating BullFlagPattern, then raises ValueError."""
-        with pytest.raises(ValueError, match="pole_gain_pct must be >= 8"):
+        with pytest.raises(ValueError, match=r"pole_gain_pct \(7\.0\) must be >= 8\.0"):
             BullFlagPattern(
                 pole_gain_pct=7.0,
                 flag_range_pct=4.0,
@@ -244,7 +244,7 @@ class TestBullFlagPattern:
 
     def test_validates_flag_range_pct_minimum(self):
         """Given flag_range_pct < 3%, when creating BullFlagPattern, then raises ValueError."""
-        with pytest.raises(ValueError, match="flag_range_pct must be between 3 and 5"):
+        with pytest.raises(ValueError, match=r"flag_range_pct \(2\.0\) must be between 3\.0 and 5\.0"):
             BullFlagPattern(
                 pole_gain_pct=12.0,
                 flag_range_pct=2.0,
@@ -255,7 +255,7 @@ class TestBullFlagPattern:
 
     def test_validates_flag_range_pct_maximum(self):
         """Given flag_range_pct > 5%, when creating BullFlagPattern, then raises ValueError."""
-        with pytest.raises(ValueError, match="flag_range_pct must be between 3 and 5"):
+        with pytest.raises(ValueError, match=r"flag_range_pct \(6\.0\) must be between 3\.0 and 5\.0"):
             BullFlagPattern(
                 pole_gain_pct=12.0,
                 flag_range_pct=6.0,
@@ -266,7 +266,7 @@ class TestBullFlagPattern:
 
     def test_validates_breakout_price_positive(self):
         """Given negative breakout_price, when creating BullFlagPattern, then raises ValueError."""
-        with pytest.raises(ValueError, match="breakout_price must be positive"):
+        with pytest.raises(ValueError, match=r"breakout_price \(-195\.5\) must be positive"):
             BullFlagPattern(
                 pole_gain_pct=12.0,
                 flag_range_pct=4.0,
@@ -277,7 +277,7 @@ class TestBullFlagPattern:
 
     def test_validates_price_target_positive(self):
         """Given negative price_target, when creating BullFlagPattern, then raises ValueError."""
-        with pytest.raises(ValueError, match="price_target must be positive"):
+        with pytest.raises(ValueError, match=r"price_target \(-210\.0\) must be positive"):
             BullFlagPattern(
                 pole_gain_pct=12.0,
                 flag_range_pct=4.0,
@@ -288,7 +288,7 @@ class TestBullFlagPattern:
 
     def test_validates_price_target_greater_than_breakout(self):
         """Given price_target < breakout_price, when creating BullFlagPattern, then raises ValueError."""
-        with pytest.raises(ValueError, match="price_target must be >= breakout_price"):
+        with pytest.raises(ValueError, match=r"price_target \(190\.0\) must be >= breakout_price \(195\.5\)"):
             BullFlagPattern(
                 pole_gain_pct=12.0,
                 flag_range_pct=4.0,
