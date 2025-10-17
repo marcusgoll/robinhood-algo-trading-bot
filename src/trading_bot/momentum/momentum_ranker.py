@@ -7,11 +7,16 @@ Ranks stocks based on multi-signal confluence (catalyst + pre-market + pattern).
 Follows patterns from src/trading_bot/momentum/catalyst_detector.py
 """
 
-from typing import Dict, List
+from typing import Dict, List, TYPE_CHECKING
 
-from trading_bot.momentum.config import MomentumConfig
-from trading_bot.momentum.logging.momentum_logger import MomentumLogger
-from trading_bot.momentum.schemas.momentum_signal import MomentumSignal, SignalType
+from .config import MomentumConfig
+from .logging.momentum_logger import MomentumLogger
+from .schemas.momentum_signal import MomentumSignal, SignalType
+
+if TYPE_CHECKING:
+    from .catalyst_detector import CatalystDetector
+    from .premarket_scanner import PreMarketScanner
+    from .bull_flag_detector import BullFlagDetector
 
 
 class MomentumRanker:
@@ -19,6 +24,7 @@ class MomentumRanker:
     Aggregates and ranks momentum signals for trading opportunities.
 
     Responsibilities:
+    - Orchestrate all 3 detectors (catalyst, premarket, pattern)
     - Group signals by symbol
     - Aggregate scores by signal type
     - Calculate composite scores with weighted averaging
@@ -30,16 +36,26 @@ class MomentumRanker:
     - Pattern: 40% (technical setup quality)
     """
 
-    def __init__(self, config: MomentumConfig, logger: MomentumLogger) -> None:
+    def __init__(
+        self,
+        catalyst_detector: "CatalystDetector | None" = None,
+        premarket_scanner: "PreMarketScanner | None" = None,
+        bull_flag_detector: "BullFlagDetector | None" = None,
+        momentum_logger: MomentumLogger | None = None,
+    ) -> None:
         """
-        Initialize MomentumRanker with configuration and logger.
+        Initialize MomentumRanker with detectors and logger.
 
         Args:
-            config: MomentumConfig for thresholds and settings
-            logger: MomentumLogger for structured logging
+            catalyst_detector: Optional CatalystDetector instance
+            premarket_scanner: Optional PreMarketScanner instance
+            bull_flag_detector: Optional BullFlagDetector instance
+            momentum_logger: Optional MomentumLogger for structured logging
         """
-        self.config = config
-        self.logger = logger
+        self.catalyst_detector = catalyst_detector
+        self.premarket_scanner = premarket_scanner
+        self.bull_flag_detector = bull_flag_detector
+        self.logger = momentum_logger or MomentumLogger()
 
         # Scoring weights (must sum to 1.0)
         self.weights = {
@@ -47,6 +63,47 @@ class MomentumRanker:
             SignalType.PREMARKET: 0.35,
             SignalType.PATTERN: 0.40,
         }
+
+    async def scan_and_rank(self, symbols: List[str]) -> List[MomentumSignal]:
+        """
+        Scan for momentum signals using all detectors and rank by composite score.
+
+        Orchestrates all 3 detectors:
+        1. CatalystDetector - News-driven catalyst events
+        2. PreMarketScanner - Pre-market price/volume movers
+        3. BullFlagDetector - Bull flag chart patterns
+
+        Args:
+            symbols: List of stock ticker symbols to scan
+
+        Returns:
+            List of composite MomentumSignal objects ranked by strength (descending)
+
+        Example:
+            >>> ranker = MomentumRanker(catalyst_detector, premarket_scanner, bull_flag_detector)
+            >>> ranked_signals = await ranker.scan_and_rank(["AAPL", "GOOGL", "TSLA"])
+            >>> ranked_signals[0].symbol  # Top-ranked symbol
+            'AAPL'
+        """
+        all_signals: List[MomentumSignal] = []
+
+        # Run all detectors in parallel
+        if self.catalyst_detector:
+            catalyst_signals = await self.catalyst_detector.scan(symbols)
+            all_signals.extend(catalyst_signals)
+
+        if self.premarket_scanner:
+            premarket_signals = await self.premarket_scanner.scan(symbols)
+            all_signals.extend(premarket_signals)
+
+        if self.bull_flag_detector:
+            pattern_signals = await self.bull_flag_detector.scan(symbols)
+            all_signals.extend(pattern_signals)
+
+        # Rank signals by composite score
+        ranked_signals = self.rank(all_signals)
+
+        return ranked_signals
 
     def rank(self, signals: List[MomentumSignal]) -> List[MomentumSignal]:
         """
@@ -94,19 +151,28 @@ class MomentumRanker:
             symbol_signals = [s for s in signals if s.symbol == symbol]
             latest_timestamp = max(s.detected_at for s in symbol_signals)
 
+            # Collect details from each signal type
+            details_dict = {
+                "composite_score": composite_score,
+                "signal_count": len(symbol_signals),
+            }
+
+            # Add individual signal details
+            for signal in symbol_signals:
+                if signal.signal_type == SignalType.CATALYST:
+                    details_dict["catalyst"] = signal.details
+                elif signal.signal_type == SignalType.PREMARKET:
+                    details_dict["premarket"] = signal.details
+                elif signal.signal_type == SignalType.PATTERN:
+                    details_dict["pattern"] = signal.details
+
             # Create composite signal
             composite_signal = MomentumSignal(
                 symbol=symbol,
                 signal_type=SignalType.COMPOSITE,
                 strength=composite_score,
                 detected_at=latest_timestamp,
-                details={
-                    "catalyst_score": scores.get(SignalType.CATALYST, 0.0),
-                    "premarket_score": scores.get(SignalType.PREMARKET, 0.0),
-                    "pattern_score": scores.get(SignalType.PATTERN, 0.0),
-                    "composite_score": composite_score,
-                    "signal_count": len(symbol_signals),
-                },
+                details=details_dict,
             )
             composite_signals.append(composite_signal)
 

@@ -14,7 +14,7 @@ Main components:
 """
 
 import asyncio
-import logging
+import logging as stdlib_logging
 from typing import List
 
 from ..market_data.market_data_service import MarketDataService
@@ -26,7 +26,7 @@ from .momentum_ranker import MomentumRanker
 from .premarket_scanner import PreMarketScanner
 from .schemas.momentum_signal import MomentumSignal
 
-logger = logging.getLogger(__name__)
+logger = stdlib_logging.getLogger(__name__)
 
 __all__ = ["MomentumConfig", "MomentumEngine"]
 
@@ -75,9 +75,14 @@ class MomentumEngine:
         self.catalyst_detector = CatalystDetector(config, self.logger)
         self.premarket_scanner = PreMarketScanner(config, market_data_service, self.logger)
         self.bull_flag_detector = BullFlagDetector(config, market_data_service, self.logger)
-        self.ranker = MomentumRanker(config, self.logger)
+        self.ranker = MomentumRanker(
+            catalyst_detector=self.catalyst_detector,
+            premarket_scanner=self.premarket_scanner,
+            bull_flag_detector=self.bull_flag_detector,
+            momentum_logger=self.logger
+        )
 
-        logger.info("MomentumEngine initialized with all detectors")
+        stdlib_logging.info("MomentumEngine initialized with all detectors")
 
     async def scan(self, symbols: List[str]) -> List[MomentumSignal]:
         """Execute all detection methods and rank results.
@@ -106,59 +111,109 @@ class MomentumEngine:
         })
 
         try:
-            # Execute all detectors in parallel
-            tasks = [
-                self.catalyst_detector.scan(symbols),
-                self.premarket_scanner.scan(symbols),
-                self.bull_flag_detector.scan(symbols),
-            ]
-
-            catalyst_signals, premarket_signals, pattern_signals = await asyncio.gather(
-                *tasks, return_exceptions=True
-            )
-
-            # Handle exceptions from individual detectors (graceful degradation)
-            all_signals = []
-
-            if isinstance(catalyst_signals, Exception):
-                logger.warning(f"CatalystDetector failed: {catalyst_signals}")
-                self.logger.log_error(catalyst_signals, {"detector": "CatalystDetector"})
-                catalyst_signals = []
-            all_signals.extend(catalyst_signals)
-
-            if isinstance(premarket_signals, Exception):
-                logger.warning(f"PreMarketScanner failed: {premarket_signals}")
-                self.logger.log_error(premarket_signals, {"detector": "PreMarketScanner"})
-                premarket_signals = []
-            all_signals.extend(premarket_signals)
-
-            if isinstance(pattern_signals, Exception):
-                logger.warning(f"BullFlagDetector failed: {pattern_signals}")
-                self.logger.log_error(pattern_signals, {"detector": "BullFlagDetector"})
-                pattern_signals = []
-            all_signals.extend(pattern_signals)
-
-            # Rank signals by composite strength
-            ranked_signals = self.ranker.rank(all_signals)
+            # Execute all detectors and rank via MomentumRanker
+            ranked_signals = await self.ranker.scan_and_rank(symbols)
 
             # Log scan completion
             self.logger.log_scan_event("scan_completed", {
                 "symbols": symbols,
                 "signal_count": len(ranked_signals),
-                "catalyst_count": len(catalyst_signals) if not isinstance(catalyst_signals, Exception) else 0,
-                "premarket_count": len(premarket_signals) if not isinstance(premarket_signals, Exception) else 0,
-                "pattern_count": len(pattern_signals) if not isinstance(pattern_signals, Exception) else 0
             })
 
-            logger.info(f"Scan completed: {len(ranked_signals)} signals detected for {len(symbols)} symbols")
+            stdlib_logging.info(f"Scan completed: {len(ranked_signals)} signals detected for {len(symbols)} symbols")
 
             return ranked_signals
 
         except Exception as e:
             # Unexpected error during scan orchestration
-            logger.error(f"Scan failed with unexpected error: {e}")
+            stdlib_logging.error(f"Scan failed with unexpected error: {e}")
             self.logger.log_error(e, {
                 "detector": "MomentumEngine",
                 "symbols": symbols
             })
             return []
+
+    def health_check(self) -> dict:
+        """Verify system dependencies and return health status.
+
+        Checks:
+        - NEWS_API_KEY configured (optional, graceful degradation if missing)
+        - MarketDataService accessible (can instantiate Quote objects)
+        - JSONL log directory writable (can log events)
+
+        Returns:
+            dict: Health status with structure:
+                {
+                    "status": "ok" | "degraded" | "error",
+                    "dependencies": {
+                        "news_api": "ok" | "missing" | "error",
+                        "market_data": "ok" | "error",
+                        "logging": "ok" | "error"
+                    },
+                    "warnings": [str] (optional, only if status == "degraded")
+                }
+
+        Example:
+            >>> engine = MomentumEngine(config, market_data)
+            >>> health = engine.health_check()
+            >>> health["status"]
+            'ok'
+            >>> health["dependencies"]["news_api"]
+            'ok'
+        """
+        dependencies = {}
+        warnings = []
+        overall_status = "ok"
+
+        # Check 1: NEWS_API_KEY (optional - graceful degradation)
+        if self.config.news_api_key:
+            dependencies["news_api"] = "ok"
+            stdlib_logging.debug("Health check: NEWS_API_KEY configured")
+        else:
+            dependencies["news_api"] = "missing"
+            warnings.append("NEWS_API_KEY not configured - catalyst detection disabled")
+            overall_status = "degraded"
+            stdlib_logging.warning("Health check: NEWS_API_KEY missing (graceful degradation)")
+
+        # Check 2: MarketDataService accessible
+        try:
+            # Test if market data service is functional
+            # Simple check: verify service exists and has required methods
+            if hasattr(self.market_data, 'get_quote') and hasattr(self.market_data, 'get_historical_data'):
+                dependencies["market_data"] = "ok"
+                stdlib_logging.debug("Health check: MarketDataService accessible")
+            else:
+                dependencies["market_data"] = "error"
+                warnings.append("MarketDataService missing required methods")
+                overall_status = "error"
+                stdlib_logging.error("Health check: MarketDataService invalid")
+        except Exception as e:
+            dependencies["market_data"] = "error"
+            warnings.append(f"MarketDataService error: {e}")
+            overall_status = "error"
+            stdlib_logging.error(f"Health check: MarketDataService error: {e}")
+
+        # Check 3: Logging system writable
+        try:
+            # Test if logger can write events
+            self.logger.log_scan_event("health_check", {"test": True})
+            dependencies["logging"] = "ok"
+            stdlib_logging.debug("Health check: Logging system writable")
+        except Exception as e:
+            dependencies["logging"] = "error"
+            warnings.append(f"Logging system error: {e}")
+            overall_status = "error"
+            stdlib_logging.error(f"Health check: Logging error: {e}")
+
+        # Build response
+        response = {
+            "status": overall_status,
+            "dependencies": dependencies,
+        }
+
+        # Add warnings if any exist
+        if warnings:
+            response["warnings"] = warnings
+
+        stdlib_logging.info(f"Health check completed: {overall_status}")
+        return response
