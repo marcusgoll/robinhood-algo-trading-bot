@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-17 (momentum-detection v1.0.0 shipped to production)
+**Last updated**: 2025-10-16 (health-check v1.4.0 shipped to master)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -413,72 +413,6 @@
   - Production-ready, local-only feature (no staging/production deployment needed)
   - Simple 2-command rollback (git revert + restart)
 
-### momentum-detection
-- **Title**: Momentum and catalyst detection
-- **Area**: api
-- **Role**: all
-- **Intra**: No
-- **Date**: 2025-10-17
-- **Release**: v1.0.0 - Momentum detection with catalyst news, pre-market movers, and bull flag patterns
-- **Spec**: specs/002-momentum-detection/
-- **Delivered**:
-  - MomentumEngine composition root orchestrating 3 parallel detectors via asyncio.gather()
-  - CatalystDetector: News-driven catalyst detection (earnings, FDA, merger, product, analyst)
-  - PreMarketScanner: Pre-market momentum tracking (>5% change, >200% volume ratio)
-  - BullFlagDetector: Technical pattern recognition (pole >8%, flag 3-5% range)
-  - MomentumRanker: Weighted composite scoring (25% catalyst + 35% premarket + 40% pattern)
-  - FastAPI endpoints: GET /signals (query/filter/paginate), POST /scan (async trigger), GET /scans/{id} (polling)
-  - MomentumLogger: Structured JSONL logging with UTC timestamps
-  - Configuration validation with environment variable support
-  - Graceful degradation on missing API keys or data
-  - 216 tests (208 passing, 96.3% pass rate)
-  - Code coverage: Improved to 90%+ target
-  - Type safety: mypy --strict clean (0 errors)
-  - Security: 0 vulnerabilities (Bandit scan of 2,485 lines)
-  - Performance: <1s unit tests, <1s integration tests, <500ms p95 for single symbol scans
-  - All 8 Constitution principles verified (§Safety_First, §Code_Quality, §Risk_Management, §Testing_Requirements, §Audit_Everything, §Error_Handling, §Security, §Data_Integrity)
-  - 20+ artifacts: spec, plan, data-model, tasks, analysis, code-review, optimization-report, contracts/api.yaml, etc.
-  - Production-ready, local-only feature
-  - Comprehensive documentation with API contracts and user guides
-
-### status-dashboard
-- **Title**: CLI status dashboard & performance metrics
-- **Area**: infra
-- **Role**: all
-- **Intra**: No
-- **Date**: 2025-10-17
-- **Release**: v1.0.0 - Status dashboard with performance metrics
-- **Delivered**:
-  - Display current positions
-  - Show today's P&L
-  - Track number of trades executed
-  - Show remaining buying power
-  - Display active orders
-  - **Performance metrics display**: All key stats (win rate, avg R:R, total P&L, current streak, trades today, session count)
-  - Real-time updates
-  - Export daily summary
-  - Compare against targets
-  - Depends on: account-data-module, performance-tracking, trade-logging
-
-### stop-loss-automation
-- **Title**: Automated stop loss and targets
-- **Area**: api
-- **Role**: all
-- **Intra**: No
-- **Date**: 2025-10-17
-- **Release**: v1.0.0 - Stop loss calculator and risk-reward target automation
-- **Delivered**:
-  - **Stop loss calculator**: Identify pullback low as invalidation point
-  - Auto-place stop at pullback low
-  - Calculate position size based on stop distance
-  - Adjust for account risk limit
-  - **Risk-reward target setter**: Calculate 2:1 target from entry and stop
-  - Set limit sell order at target price
-  - Track progress to target
-  - Auto-adjust if stop moves
-  - Auto-exit on target hit (§Risk_Management)
-  - Depends on: order-management (shipped)
-
 ## In Progress
 
 <!-- Currently implementing -->
@@ -495,6 +429,37 @@
 
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
+
+### status-dashboard
+- **Title**: CLI status dashboard & performance metrics
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Impact**: 4 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 1.80
+- **Requirements**:
+  - Display current positions
+  - Show today's P&L
+  - Track number of trades executed
+  - Show remaining buying power
+  - Display active orders
+  - **Performance metrics display**: All key stats (win rate, avg R:R, total P&L, current streak, trades today, session count)
+  - Update real-time
+  - Export daily summary
+  - Compare against targets
+  - [UNBLOCKED: account-data-module shipped, performance-tracking ready (trade-logging provides data)]
+  - [MERGED: performance-metrics-dashboard]
+
+### momentum-detection
+- **Title**: Momentum and catalyst detection
+- **Area**: api
+- **Role**: all
+- **Intra**: No
+- **Impact**: 5 | **Effort**: 3 | **Confidence**: 0.7 | **Score**: 1.17
+- **Requirements**:
+  - Identify stocks with breaking news catalysts
+  - Track pre-market movers
+  - Scan for bull flag patterns
+  - [BLOCKED: market-data-module, technical-indicators]
 
 ### technical-indicators
 - **Title**: Technical indicators module
@@ -536,6 +501,25 @@
   - Auto-place limit order at breakout level
   - [BLOCKED: technical-indicators, momentum-detection]
   - [MERGED: bull-flag-detector, breakout-entry-trigger]
+
+### stop-loss-automation
+- **Title**: Automated stop loss and targets
+- **Area**: api
+- **Role**: all
+- **Intra**: No
+- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
+- **Requirements**:
+  - **Stop loss calculator**: Identify pullback low as invalidation point
+  - Auto-place stop at pullback low
+  - Calculate position size based on stop distance
+  - Adjust for account risk limit
+  - **Risk-reward target setter**: Calculate 2:1 target from entry and stop
+  - Set limit sell order at target price
+  - Track progress to target
+  - Auto-adjust if stop moves
+  - Auto-exit on target hit (§Risk_Management)
+  - [BLOCKED: order-management]
+  - [MERGED: stop-loss-calculator, risk-reward-target-setter]
 
 ### order-execution-enhanced
 - **Title**: Enhanced order execution

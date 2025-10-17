@@ -1,0 +1,237 @@
+openapi: 3.0.0
+info:
+  title: Market Data Service API
+  description: |
+    Internal API wrapper for robin_stocks market data retrieval.
+    Provides real-time quotes, historical OHLCV data, and market hours status.
+  version: 1.0.0
+
+paths:
+  /quote/{symbol}:
+    get:
+      summary: Get real-time stock quote
+      description: |
+        Fetch current price quote for a stock symbol.
+        Validates data (price > 0, timestamp recent) before returning.
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "AAPL"
+      responses:
+        200:
+          description: Quote retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quote'
+        400:
+          description: Invalid symbol
+        429:
+          description: Rate limit exceeded (retry with backoff)
+        500:
+          description: Server error or data validation failed
+
+  /historical/{symbol}:
+    get:
+      summary: Get historical price data
+      description: |
+        Fetch historical OHLCV data for backtesting.
+        Validates completeness (no date gaps) and bounds (prices > 0).
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "AAPL"
+        - name: interval
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["5minute", "10minute", "day", "week"]
+            default: "day"
+        - name: span
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["day", "week", "month", "3month", "year", "5year"]
+            default: "3month"
+      responses:
+        200:
+          description: Historical data retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoricalData'
+        400:
+          description: Invalid parameters
+        429:
+          description: Rate limit exceeded (retry with backoff)
+        500:
+          description: Server error or data validation failed
+
+  /market/status:
+    get:
+      summary: Check if market is open
+      description: |
+        Get market open/close status with next open/close timestamps.
+        All timestamps in UTC.
+      responses:
+        200:
+          description: Market status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketStatus'
+        500:
+          description: Server error
+
+  /market/trading-hours:
+    get:
+      summary: Validate trading hours (7am-10am EST)
+      description: |
+        Check if current time is within 7am-10am EST trading window.
+        Raises TradingHoursError if outside window.
+      responses:
+        200:
+          description: Within trading hours
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  within_window:
+                    type: boolean
+                    example: true
+                  current_time_est:
+                    type: string
+                    format: date-time
+                    example: "2025-10-08T08:15:00-04:00"
+        403:
+          description: Outside trading hours (blocked)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Trading blocked outside 7am-10am EST peak volatility window"
+
+components:
+  schemas:
+    Quote:
+      type: object
+      required:
+        - symbol
+        - current_price
+        - timestamp_utc
+        - market_state
+      properties:
+        symbol:
+          type: string
+          description: Stock ticker symbol
+          example: "AAPL"
+        current_price:
+          type: number
+          format: decimal
+          description: Current price (validated > 0)
+          example: 150.25
+        timestamp_utc:
+          type: string
+          format: date-time
+          description: Quote timestamp in UTC (validated <5min stale)
+          example: "2025-10-08T18:30:00Z"
+        market_state:
+          type: string
+          enum: [regular, pre, post, closed]
+          description: Market state at quote time
+          example: "regular"
+
+    MarketStatus:
+      type: object
+      required:
+        - is_open
+        - next_open
+        - next_close
+      properties:
+        is_open:
+          type: boolean
+          description: True if market currently open
+          example: true
+        next_open:
+          type: string
+          format: date-time
+          description: Next market open time (UTC)
+          example: "2025-10-09T13:30:00Z"
+        next_close:
+          type: string
+          format: date-time
+          description: Next market close time (UTC)
+          example: "2025-10-08T20:00:00Z"
+
+    HistoricalData:
+      type: object
+      description: pandas DataFrame serialized as JSON
+      properties:
+        dates:
+          type: array
+          items:
+            type: string
+            format: date-time
+          description: Date column (UTC timestamps)
+          example: ["2025-07-01T00:00:00Z", "2025-07-02T00:00:00Z"]
+        open:
+          type: array
+          items:
+            type: number
+          description: Opening prices (validated > 0)
+          example: [150.0, 151.5]
+        high:
+          type: array
+          items:
+            type: number
+          description: High prices (validated > 0)
+          example: [152.0, 153.0]
+        low:
+          type: array
+          items:
+            type: number
+          description: Low prices (validated > 0)
+          example: [149.5, 150.0]
+        close:
+          type: array
+          items:
+            type: number
+          description: Closing prices (validated > 0)
+          example: [151.0, 152.5]
+        volume:
+          type: array
+          items:
+            type: integer
+          description: Volume (validated >= 0)
+          example: [1000000, 1200000]
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type
+          enum: [DataValidationError, TradingHoursError, RateLimitError, NonRetriableError]
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Price validation failed: price must be > 0"
+        retry_after:
+          type: integer
+          description: Seconds to wait before retry (RateLimitError only)
+          example: 60

@@ -1,0 +1,283 @@
+# Internal API Specification: Startup Sequence
+# This is a CLI application with no external HTTP API
+# This document specifies internal Python APIs for testing and integration
+
+internal_apis:
+  StartupOrchestrator:
+    description: "Orchestrates trading bot initialization sequence"
+    class: "src.trading_bot.startup.StartupOrchestrator"
+
+    methods:
+      - name: "__init__"
+        parameters:
+          - name: "config"
+            type: "Config"
+            required: true
+            description: "Configuration instance"
+          - name: "dry_run"
+            type: "bool"
+            required: false
+            default: false
+            description: "If True, validation only (no trading loop)"
+          - name: "json_output"
+            type: "bool"
+            required: false
+            default: false
+            description: "If True, output JSON instead of text"
+
+      - name: "run"
+        description: "Execute complete startup sequence"
+        returns:
+          type: "StartupResult"
+          description: "Startup result with status, errors, warnings"
+        raises:
+          - "SystemExit: Exit code 1 (config error), 2 (validation error), 3 (init failure)"
+        example: |
+          config = Config.from_env_and_json()
+          orchestrator = StartupOrchestrator(config, dry_run=False, json_output=False)
+          result = orchestrator.run()
+
+  StartupResult:
+    description: "Result of startup sequence execution"
+    class: "src.trading_bot.startup.StartupResult"
+    type: "dataclass"
+
+    fields:
+      - name: "status"
+        type: "Literal['ready', 'blocked']"
+        description: "Overall startup status"
+
+      - name: "mode"
+        type: "str"
+        description: "Trading mode: 'paper' or 'live'"
+
+      - name: "phase"
+        type: "str"
+        description: "Current phase: 'experience', 'proof', 'trial', 'scaling'"
+
+      - name: "steps"
+        type: "List[StartupStep]"
+        description: "All startup steps with their status"
+
+      - name: "errors"
+        type: "List[str]"
+        description: "Critical errors that blocked startup"
+
+      - name: "warnings"
+        type: "List[str]"
+        description: "Non-critical warnings"
+
+      - name: "component_states"
+        type: "Dict[str, Dict]"
+        description: "State of each component (config, logging, mode_switcher, etc.)"
+
+      - name: "startup_duration_seconds"
+        type: "float"
+        description: "Total startup time in seconds"
+
+      - name: "timestamp"
+        type: "str"
+        description: "ISO 8601 UTC timestamp of startup completion"
+
+  StartupStep:
+    description: "Individual startup step tracking"
+    class: "src.trading_bot.startup.StartupStep"
+    type: "dataclass"
+
+    fields:
+      - name: "name"
+        type: "str"
+        description: "Step name (e.g., 'Loading configuration')"
+
+      - name: "status"
+        type: "Literal['pending', 'running', 'success', 'failed']"
+        description: "Current step status"
+
+      - name: "error_message"
+        type: "Optional[str]"
+        description: "Error message if status=failed"
+
+      - name: "duration_seconds"
+        type: "float"
+        description: "Time taken for this step"
+
+command_line_interface:
+  entry_point: "python -m src.trading_bot.main"
+
+  arguments:
+    - name: "--dry-run"
+      type: "flag"
+      required: false
+      description: "Run validation only, do not start trading loop"
+
+    - name: "--json"
+      type: "flag"
+      required: false
+      description: "Output JSON format instead of human-readable text"
+
+  exit_codes:
+    0:
+      name: "SUCCESS"
+      description: "Startup completed successfully, ready to trade"
+
+    1:
+      name: "CONFIG_ERROR"
+      description: "Configuration error (missing .env, invalid config.json)"
+
+    2:
+      name: "VALIDATION_ERROR"
+      description: "Validation failed (phase-mode conflict, invalid parameters)"
+
+    3:
+      name: "INIT_ERROR"
+      description: "Component initialization failed (filesystem, permissions)"
+
+  examples:
+    - command: "python -m src.trading_bot.main"
+      description: "Normal startup in paper trading mode"
+      expected_output: "Text banner, progress indicators, 'Ready to trade' message"
+      exit_code: 0
+
+    - command: "python -m src.trading_bot.main --dry-run"
+      description: "Validation only, exit without trading"
+      expected_output: "Complete startup sequence, exit with 'DRY RUN' message"
+      exit_code: 0
+
+    - command: "python -m src.trading_bot.main --json"
+      description: "Machine-readable JSON output"
+      expected_output: "JSON object with status, components, errors, warnings"
+      exit_code: 0
+
+    - command: "python -m src.trading_bot.main --dry-run --json"
+      description: "Validation in JSON format"
+      expected_output: "JSON object with dry_run: true"
+      exit_code: 0
+
+logging_interface:
+  startup_log:
+    path: "logs/startup.log"
+    format: "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+    rotation:
+      max_bytes: 10485760  # 10 MB
+      backup_count: 5
+    content:
+      - "Startup sequence began"
+      - "Configuration loaded from .env and config.json"
+      - "Validation results (errors, warnings)"
+      - "Component initialization (logging, mode_switcher, circuit_breaker, bot)"
+      - "Health check results"
+      - "Startup completed or failed"
+      - "Exit code and duration"
+
+json_output_schema:
+  type: "object"
+  required: ["status", "mode", "phase", "startup_duration_seconds", "timestamp", "components", "errors", "warnings"]
+  properties:
+    status:
+      type: "string"
+      enum: ["ready", "blocked"]
+      description: "Overall startup status"
+
+    mode:
+      type: "string"
+      enum: ["paper", "live"]
+      description: "Trading mode"
+
+    phase:
+      type: "string"
+      enum: ["experience", "proof", "trial", "scaling"]
+      description: "Current phase"
+
+    startup_duration_seconds:
+      type: "number"
+      minimum: 0
+      description: "Startup time in seconds"
+
+    timestamp:
+      type: "string"
+      format: "date-time"
+      description: "ISO 8601 UTC timestamp"
+
+    components:
+      type: "object"
+      description: "Component states"
+      properties:
+        config:
+          type: "object"
+          properties:
+            status:
+              type: "string"
+              enum: ["ready", "failed"]
+            errors:
+              type: "array"
+              items:
+                type: "string"
+
+        logging:
+          type: "object"
+          properties:
+            status:
+              type: "string"
+              enum: ["ready", "failed"]
+            logs_dir:
+              type: "string"
+
+        validation:
+          type: "object"
+          properties:
+            status:
+              type: "string"
+              enum: ["ready", "failed"]
+            errors:
+              type: "array"
+              items:
+                type: "string"
+            warnings:
+              type: "array"
+              items:
+                type: "string"
+
+        mode_switcher:
+          type: "object"
+          properties:
+            status:
+              type: "string"
+              enum: ["ready", "failed"]
+            mode:
+              type: "string"
+              enum: ["paper", "live"]
+            phase:
+              type: "string"
+              enum: ["experience", "proof", "trial", "scaling"]
+
+        circuit_breaker:
+          type: "object"
+          properties:
+            status:
+              type: "string"
+              enum: ["ready", "failed"]
+            max_daily_loss_pct:
+              type: "number"
+            max_consecutive_losses:
+              type: "integer"
+
+        trading_bot:
+          type: "object"
+          properties:
+            status:
+              type: "string"
+              enum: ["ready", "failed"]
+            is_running:
+              type: "boolean"
+
+    errors:
+      type: "array"
+      items:
+        type: "string"
+      description: "Critical errors"
+
+    warnings:
+      type: "array"
+      items:
+        type: "string"
+      description: "Non-critical warnings"
