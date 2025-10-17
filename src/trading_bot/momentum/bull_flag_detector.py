@@ -24,6 +24,7 @@ from ..market_data.market_data_service import MarketDataService
 from .config import MomentumConfig
 from .logging.momentum_logger import MomentumLogger
 from .schemas.momentum_signal import BullFlagPattern, MomentumSignal, SignalType
+from .validation import validate_symbols
 
 # Module logger
 logger = logging.getLogger(__name__)
@@ -84,12 +85,31 @@ class BullFlagDetector:
             List of MomentumSignal objects with bull flag patterns
             (empty if no patterns detected or API failures)
 
+        Raises:
+            ValueError: If symbols list is empty or contains invalid symbols
+
         Example:
             >>> detector = BullFlagDetector(config, market_data)
             >>> signals = await detector.scan(["AAPL"])
             >>> len(signals) > 0
             True
         """
+        # T056: Input validation (fail fast)
+        try:
+            validate_symbols(symbols)
+        except ValueError as e:
+            logger.error(f"BullFlagDetector input validation failed: {e}")
+            self.logger.log_error(
+                e,
+                {
+                    "detector": "BullFlagDetector",
+                    "operation": "scan",
+                    "symbols": symbols,
+                    "validation_error": str(e),
+                }
+            )
+            raise  # Re-raise ValueError to fail fast
+
         signals = []
         current_time_utc = datetime.now(UTC)
 
@@ -146,13 +166,74 @@ class BullFlagDetector:
                 }
                 self.logger.log_signal(signal_dict, {"source": "bull_flag_detector"})
 
-            except Exception as e:
-                # Graceful degradation: log error and continue with next symbol
-                logger.warning(f"Failed to scan bull flag pattern for {symbol}: {e}")
-                self.logger.log_error(
-                    e, {"detector": "BullFlagDetector", "symbol": symbol}
+            except TimeoutError as e:
+                # T055: API timeout for this symbol - log warning, continue with next symbol
+                logger.warning(
+                    f"API timeout while fetching historical data for {symbol}: {e}. "
+                    f"Check market data provider availability. Continuing with next symbol."
                 )
-                continue
+                self.logger.log_error(
+                    e,
+                    {
+                        "detector": "BullFlagDetector",
+                        "operation": "scan_symbol",
+                        "symbol": symbol,
+                        "error_type": "timeout",
+                    }
+                )
+                continue  # Graceful degradation: process other symbols
+
+            except (ConnectionError, OSError) as e:
+                # T055: Network error for this symbol - log error, continue with next symbol
+                logger.error(
+                    f"Network error while fetching historical data for {symbol}: {e}. "
+                    f"Check network connectivity. Continuing with next symbol."
+                )
+                self.logger.log_error(
+                    e,
+                    {
+                        "detector": "BullFlagDetector",
+                        "operation": "scan_symbol",
+                        "symbol": symbol,
+                        "error_type": "network",
+                    }
+                )
+                continue  # Graceful degradation
+
+            except (KeyError, AttributeError, pd.errors.EmptyDataError) as e:
+                # T055: Malformed OHLCV data - log error, continue with next symbol
+                logger.error(
+                    f"Malformed OHLCV data for {symbol}: {e}. "
+                    f"Expected DataFrame with columns: date/timestamp, open, high, low, close, volume. "
+                    f"Check MarketDataService compatibility."
+                )
+                self.logger.log_error(
+                    e,
+                    {
+                        "detector": "BullFlagDetector",
+                        "operation": "scan_symbol",
+                        "symbol": symbol,
+                        "error_type": "malformed_data",
+                    }
+                )
+                continue  # Graceful degradation
+
+            except Exception as e:
+                # T055: Unexpected error for this symbol - log error, continue with next symbol
+                logger.error(
+                    f"Unexpected error while scanning bull flag pattern for {symbol}: {e}. "
+                    f"This should not happen - investigate immediately."
+                )
+                self.logger.log_error(
+                    e,
+                    {
+                        "detector": "BullFlagDetector",
+                        "operation": "scan_symbol",
+                        "symbol": symbol,
+                        "error_type": "unexpected",
+                    }
+                )
+                continue  # Graceful degradation: don't crash, process other symbols
 
         return signals
 

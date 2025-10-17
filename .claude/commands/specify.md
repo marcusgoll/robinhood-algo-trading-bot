@@ -54,42 +54,51 @@ COMPACT_THRESHOLD=50000  # Planning quality degrades above 50k tokens
 ```bash
 # Check arguments provided
 if [ -z "$ARGUMENTS" ]; then
-  echo "Error: Feature name required"
-  echo "Usage: /spec-flow [feature-name]"
+  echo "Error: Feature description required"
+  echo "Usage: /spec-flow [feature-description]"
   exit 1
 fi
 
-# Generate concise slug (max 50 chars, remove filler words)
-SLUG=$(echo "$ARGUMENTS" |
+# Generate concise short-name (2-4 words, action-noun format)
+# Analyze feature description and extract meaningful keywords
+SHORT_NAME=$(echo "$ARGUMENTS" |
   tr '[:upper:]' '[:lower:]' |
-  # Remove common filler words
-  sed 's/\bwe want to\b//g; s/\bget our\b//g; s/\bto a\b//g; s/\bwith\b//g' |
+  # Remove common filler words and phrases
+  sed 's/\bwe want to\b//g; s/\bI want to\b//g; s/\bget our\b//g' |
+  sed 's/\bto a\b//g; s/\bwith\b//g; s/\bfor the\b//g' |
   sed 's/\bbefore moving on to\b//g; s/\bother features\b//g' |
-  sed 's/\bsuccessful builds\b/builds/g; s/\bhealthy state\b/health/g' |
+  sed 's/\ba\b//g; s/\ban\b//g; s/\bthe\b//g' |
+  # Preserve technical terms (OAuth2, API, JWT, etc.) by keeping alphanumeric
+  # Extract key action words (add, create, fix, implement, etc.)
+  sed 's/\bimplement\b/add/g; s/\bcreate\b/add/g' |
   # Convert to hyphen-separated
   sed 's/[^a-z0-9-]/-/g' |
   sed 's/--*/-/g' |
   sed 's/^-//;s/-$//' |
-  # Truncate to 50 chars max
-  cut -c1-50 |
+  # Take first 2-4 meaningful words (approx 20 chars max for short-name)
+  cut -c1-20 |
   sed 's/-$//')
 
-# Validate slug is not empty after sanitization
-if [ -z "$SLUG" ]; then
-  echo "Error: Invalid feature name (results in empty slug)"
+# Validate short-name is not empty after sanitization
+if [ -z "$SHORT_NAME" ]; then
+  echo "Error: Invalid feature description (results in empty short-name)"
   echo "Provided: $ARGUMENTS"
   exit 1
 fi
 
 # Prevent path traversal
-if [[ "$SLUG" == *".."* ]] || [[ "$SLUG" == *"/"* ]]; then
+if [[ "$SHORT_NAME" == *".."* ]] || [[ "$SHORT_NAME" == *"/"* ]]; then
   echo "Error: Invalid characters in feature name"
   exit 1
 fi
 
-# Show generated slug
-echo "Generated slug: $SLUG"
+# Show generated short-name
+echo "Generated short-name: $SHORT_NAME"
 echo "From: $ARGUMENTS"
+echo ""
+
+# Use SHORT_NAME as SLUG for consistency with rest of workflow
+SLUG="$SHORT_NAME"
 ```
 
 ## GIT VALIDATION (before any changes)
@@ -250,62 +259,90 @@ echo "Analyzing: $ARGUMENTS"
 echo ""
 
 # Feature type (determines UI artifacts)
+# Requires UI-specific keywords to avoid false positives
 HAS_UI=false
-if [[ "$ARGUMENTS" =~ (screen|page|UI|component|dashboard|form|modal) ]]; then
+if [[ "$ARGUMENTS" =~ (screen|page|component|dashboard|form|modal|frontend|interface) ]] &&
+   [[ ! "$ARGUMENTS" =~ (API|endpoint|service|backend|database|migration|health.*check|cron|job|worker) ]]; then
   HAS_UI=true
 fi
 
 # Change type (determines hypothesis)
+# Only true if explicitly about improving/optimizing something
 IS_IMPROVEMENT=false
-if [[ "$ARGUMENTS" =~ (improve|optimize|reduce|increase|faster) ]]; then
+if [[ "$ARGUMENTS" =~ (improve|optimize|enhance|speed.*up|reduce.*time|increase.*performance) ]] &&
+   [[ "$ARGUMENTS" =~ (existing|current|slow|faster|better) ]]; then
   IS_IMPROVEMENT=true
 fi
 
 # Measurable outcomes (determines HEART metrics)
+# Only true if explicitly about user behavior/metrics tracking
 HAS_METRICS=false
-if [[ "$ARGUMENTS" =~ (user|engagement|retention|conversion|completion) ]]; then
+if [[ "$ARGUMENTS" =~ (track|measure|metric|analytic).*user ]] ||
+   [[ "$ARGUMENTS" =~ user.*(engagement|retention|conversion|behavior|journey|adoption) ]] ||
+   [[ "$ARGUMENTS" =~ (A/B.*test|experiment|funnel|cohort) ]]; then
   HAS_METRICS=true
 fi
 
 # Deployment complexity (determines deployment section)
+# Only for actual infrastructure/platform changes
 HAS_DEPLOYMENT_IMPACT=false
-if [[ "$ARGUMENTS" =~ (migration|env|breaking|platform|infrastructure) ]]; then
+if [[ "$ARGUMENTS" =~ (migration|alembic|schema.*change|env.*variable|environment.*var) ]] ||
+   [[ "$ARGUMENTS" =~ (breaking.*change|platform.*change|infrastructure|docker|deploy.*config) ]]; then
   HAS_DEPLOYMENT_IMPACT=true
 fi
 
-# Ask user to confirm classification
-echo "Detected classification:"
-echo "  UI screens: ${HAS_UI} (generates screens.yaml, copy.md, system check)"
-echo "  Improvement: ${IS_IMPROVEMENT} (generates hypothesis)"
-echo "  Measurable: ${HAS_METRICS} (generates HEART metrics)"
-echo "  Deployment impact: ${HAS_DEPLOYMENT_IMPACT} (prompts deployment questions)"
-echo ""
-echo "Is this correct? (Y/n/customize)"
-read -p "Choice: " classification_choice
+# Count flags to determine if classification is clear
+FLAG_COUNT=0
+[ "$HAS_UI" = true ] && FLAG_COUNT=$((FLAG_COUNT + 1))
+[ "$IS_IMPROVEMENT" = true ] && FLAG_COUNT=$((FLAG_COUNT + 1))
+[ "$HAS_METRICS" = true ] && FLAG_COUNT=$((FLAG_COUNT + 1))
+[ "$HAS_DEPLOYMENT_IMPACT" = true ] && FLAG_COUNT=$((FLAG_COUNT + 1))
 
-case $classification_choice in
-  n|N)
-    # Manual classification
-    read -p "Has UI screens? (y/n): " has_ui_input
-    [[ "$has_ui_input" =~ ^[Yy]$ ]] && HAS_UI=true || HAS_UI=false
+# Auto-skip prompt if classification is clear (0-1 flags)
+if [ "$FLAG_COUNT" -le 1 ]; then
+  # Clear case - auto-proceed without asking
+  echo "✓ Auto-classified: Simple feature"
+  [ "$HAS_UI" = true ] && echo "  → UI feature detected"
+  [ "$IS_IMPROVEMENT" = true ] && echo "  → Improvement feature detected"
+  [ "$HAS_METRICS" = true ] && echo "  → Metrics tracking detected"
+  [ "$HAS_DEPLOYMENT_IMPACT" = true ] && echo "  → Deployment impact detected"
+  [ "$FLAG_COUNT" -eq 0 ] && echo "  → Backend/API feature (no special artifacts)"
+  echo ""
+else
+  # Ambiguous case - ask for confirmation
+  echo "Detected classification (multiple signals):"
+  echo "  UI screens: ${HAS_UI} (generates screens.yaml, copy.md, system check)"
+  echo "  Improvement: ${IS_IMPROVEMENT} (generates hypothesis)"
+  echo "  Measurable: ${HAS_METRICS} (generates HEART metrics)"
+  echo "  Deployment impact: ${HAS_DEPLOYMENT_IMPACT} (prompts deployment questions)"
+  echo ""
+  echo "Is this correct? (Y/n/customize)"
+  read -p "Choice: " classification_choice
 
-    read -p "Improvement feature? (y/n): " is_improvement_input
-    [[ "$is_improvement_input" =~ ^[Yy]$ ]] && IS_IMPROVEMENT=true || IS_IMPROVEMENT=false
+  case $classification_choice in
+    n|N)
+      # Manual classification
+      read -p "Has UI screens? (y/n): " has_ui_input
+      [[ "$has_ui_input" =~ ^[Yy]$ ]] && HAS_UI=true || HAS_UI=false
 
-    read -p "Has measurable outcomes? (y/n): " has_metrics_input
-    [[ "$has_metrics_input" =~ ^[Yy]$ ]] && HAS_METRICS=true || HAS_METRICS=false
+      read -p "Improvement feature? (y/n): " is_improvement_input
+      [[ "$is_improvement_input" =~ ^[Yy]$ ]] && IS_IMPROVEMENT=true || IS_IMPROVEMENT=false
 
-    read -p "Deployment impact? (y/n): " has_deployment_input
-    [[ "$has_deployment_input" =~ ^[Yy]$ ]] && HAS_DEPLOYMENT_IMPACT=true || HAS_DEPLOYMENT_IMPACT=false
-    ;;
-  customize|c|C)
-    # Let user customize each
-    # (same as 'n' flow above)
-    ;;
-  *)
-    # Accept auto-detected classification
-    ;;
-esac
+      read -p "Has measurable outcomes? (y/n): " has_metrics_input
+      [[ "$has_metrics_input" =~ ^[Yy]$ ]] && HAS_METRICS=true || HAS_METRICS=false
+
+      read -p "Deployment impact? (y/n): " has_deployment_input
+      [[ "$has_deployment_input" =~ ^[Yy]$ ]] && HAS_DEPLOYMENT_IMPACT=true || HAS_DEPLOYMENT_IMPACT=false
+      ;;
+    customize|c|C)
+      # Let user customize each
+      # (same as 'n' flow above)
+      ;;
+    *)
+      # Accept auto-detected classification
+      ;;
+  esac
+fi
 
 # Store in NOTES.md for reference
 cat >> $NOTES_FILE <<EOF
@@ -320,21 +357,40 @@ EOF
 
 **Result**: Single decision tree evaluated once, determines which artifacts to generate.
 
-## RESEARCH (3-8 tool calls)
+## RESEARCH (Scaled: 1-8 tool calls)
 
-**Gather context before writing:**
+**Determine research depth based on feature complexity:**
 
-**Always read** (1-3 tools):
+```bash
+# Minimal research for simple backend features (1-2 tools)
+if [ "$FLAG_COUNT" -eq 0 ]; then
+  RESEARCH_MODE="minimal"
+  echo "Research mode: Minimal (backend/API feature)"
+# Standard research for single-aspect features (3-5 tools)
+elif [ "$FLAG_COUNT" -eq 1 ]; then
+  RESEARCH_MODE="standard"
+  echo "Research mode: Standard (single-aspect feature)"
+# Full research for complex features (5-8 tools)
+else
+  RESEARCH_MODE="full"
+  echo "Research mode: Full (multi-aspect feature)"
+fi
+echo ""
+```
+
+**Minimal research** (1-2 tools):
 1. `$CONSTITUTION_FILE` → Check compliance with mission/values
-2. `$UI_INVENTORY_FILE` → List reusable components (if `$HAS_UI = true`)
-3. `$BUDGETS_FILE` → Performance targets (if `$HAS_UI = true`)
+2. `Grep codebase` → If integrating with existing code (infer from $ARGUMENTS keywords)
 
-**Conditionally read** (0-3 tools):
-4. `Glob specs/**/spec.md` → If similar feature exists (search by keyword in $ARGUMENTS)
-5. `$INSPIRATIONS_FILE` → If UX pattern needed (`$HAS_UI = true`)
-6. `Grep codebase` → If integrating with existing code (infer from $ARGUMENTS keywords)
+**Standard research** (3-5 tools):
+1-2. Minimal research tools (above)
+3. `$UI_INVENTORY_FILE` → List reusable components (if `$HAS_UI = true`)
+4. `$BUDGETS_FILE` → Performance targets (if `$HAS_UI = true`)
+5. `Glob specs/**/spec.md` → If similar feature exists (search by keyword in $ARGUMENTS)
 
-**External research** (0-2 tools):
+**Full research** (5-8 tools):
+1-5. Standard research tools (above)
+6. `$INSPIRATIONS_FILE` → If UX pattern needed (`$HAS_UI = true`)
 7. `WebSearch "UX pattern [feature-type] 2025"` → If `$HAS_UI = true` and no internal pattern found
 8. `chrome-devtools [URL]` → If user provided reference site in $ARGUMENTS
 
@@ -562,7 +618,9 @@ Does this feature require deployment changes?
    - User scenarios (Given/When/Then)
    - Requirements (FR-001, FR-002..., NFR-001...)
    - Context Strategy & Signal Design
-   - Mark ambiguities: `[NEEDS CLARIFICATION: question]`
+   - **Success Criteria** (measurable, technology-agnostic, user-focused, verifiable)
+   - Mark ambiguities: `[NEEDS CLARIFICATION: question]` (max 3, prioritized by impact)
+   - Make informed guesses for non-critical decisions, document assumptions
 
 2. **NOTES.md** (`$NOTES_FILE`):
    - Already created in INITIALIZE
@@ -573,6 +631,151 @@ Does this feature require deployment changes?
    - Document UX patterns from chrome-devtools
    - Extract layout, colors, interactions, measurements
    - Include reference URLs
+
+**Success Criteria Guidelines:**
+- Must be **Measurable**: Include specific metrics (time, percentage, count, rate)
+- Must be **Technology-agnostic**: No frameworks, languages, databases, or tools
+- Must be **User-focused**: Outcomes from user/business perspective, not system internals
+- Must be **Verifiable**: Testable without knowing implementation details
+
+**Examples:**
+- ✅ Good: "Users can complete checkout in under 3 minutes"
+- ✅ Good: "System supports 10,000 concurrent users"
+- ✅ Good: "95% of searches return results in under 1 second"
+- ❌ Bad: "API response time is under 200ms" (too technical)
+- ❌ Bad: "React components render efficiently" (framework-specific)
+- ❌ Bad: "Redis cache hit rate above 80%" (technology-specific)
+
+**Informed Guesses Strategy:**
+- Make reasonable defaults based on industry standards
+- Document assumptions in Assumptions section
+- **Only mark [NEEDS CLARIFICATION] for critical decisions** that:
+  - Significantly impact feature scope or user experience
+  - Have multiple reasonable interpretations with different implications
+  - Lack any reasonable default
+- **Limit: Maximum 3 [NEEDS CLARIFICATION] markers total**
+- **Prioritize clarifications**: scope > security/privacy > user experience > technical details
+
+**Common Reasonable Defaults** (don't ask about these):
+- Data retention: Industry-standard practices for the domain
+- Performance targets: Standard web/mobile app expectations unless specified
+- Error handling: User-friendly messages with appropriate fallbacks
+- Authentication method: Standard session-based or OAuth2 for web apps
+- Integration patterns: RESTful APIs unless specified otherwise
+
+## SPECIFICATION QUALITY VALIDATION
+
+**After generating spec, validate quality before proceeding:**
+
+```bash
+# Create checklists directory if needed
+mkdir -p ${FEATURE_DIR}/checklists
+
+# Create requirements quality checklist
+REQUIREMENTS_CHECKLIST="${FEATURE_DIR}/checklists/requirements.md"
+
+cat > $REQUIREMENTS_CHECKLIST <<'CHECKLIST_EOF'
+# Specification Quality Checklist: ${ARGUMENTS}
+
+**Purpose**: Validate specification completeness and quality before proceeding to planning
+**Created**: $(date -I)
+**Feature**: specs/${SLUG}/spec.md
+
+## Content Quality
+
+- [ ] CHK001 - No implementation details (languages, frameworks, APIs)
+- [ ] CHK002 - Focused on user value and business needs
+- [ ] CHK003 - Written for non-technical stakeholders
+- [ ] CHK004 - All mandatory sections completed
+
+## Requirement Completeness
+
+- [ ] CHK005 - No [NEEDS CLARIFICATION] markers remain (or max 3)
+- [ ] CHK006 - Requirements are testable and unambiguous
+- [ ] CHK007 - Success criteria are measurable
+- [ ] CHK008 - Success criteria are technology-agnostic (no implementation details)
+- [ ] CHK009 - All acceptance scenarios are defined
+- [ ] CHK010 - Edge cases are identified
+- [ ] CHK011 - Scope is clearly bounded
+- [ ] CHK012 - Dependencies and assumptions identified
+
+## Feature Readiness
+
+- [ ] CHK013 - All functional requirements have clear acceptance criteria
+- [ ] CHK014 - User scenarios cover primary flows
+- [ ] CHK015 - Feature meets measurable outcomes defined in Success Criteria
+- [ ] CHK016 - No implementation details leak into specification
+
+## Notes
+
+- Items marked incomplete require spec updates before `/clarify` or `/plan`
+- Maximum 3 [NEEDS CLARIFICATION] markers allowed (prioritize by impact)
+CHECKLIST_EOF
+
+echo "✅ Created requirements quality checklist"
+```
+
+**Validation Process:**
+
+1. **Run validation check** against spec.md:
+   - Review each CHK item
+   - Identify failing items (excluding [NEEDS CLARIFICATION] count)
+
+2. **Handle validation failures** (non-clarification issues):
+   - List failing items with specific issues
+   - Update spec.md to address each issue
+   - Re-validate (max 3 iterations)
+   - If still failing after 3 iterations: document in checklist notes, warn user
+
+3. **Handle clarification markers**:
+   ```bash
+   # Count [NEEDS CLARIFICATION] markers
+   CLARIFICATIONS=$(grep -c "\[NEEDS CLARIFICATION" $SPEC_FILE || echo 0)
+
+   if [ "$CLARIFICATIONS" -gt 3 ]; then
+     echo "⚠️  Found $CLARIFICATIONS clarification markers (limit: 3)"
+     echo "Keeping 3 most critical (by scope > security > UX > technical)"
+     echo "Making informed guesses for remaining items"
+     # Claude Code: Reduce to 3 most critical markers
+   fi
+
+   if [ "$CLARIFICATIONS" -gt 0 ]; then
+     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+     echo "📋 CLARIFICATION NEEDED ($CLARIFICATIONS items)"
+     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+     echo ""
+
+     # Claude Code: Present structured questions with options table
+     # Format per question:
+     #
+     # ## Question [N]: [Topic]
+     #
+     # **Context**: [Quote relevant spec section]
+     #
+     # **What we need to know**: [Specific question from NEEDS CLARIFICATION]
+     #
+     # **Suggested Answers**:
+     #
+     # | Option | Answer | Implications |
+     # |--------|--------|--------------|
+     # | A      | [First answer] | [Impact] |
+     # | B      | [Second answer] | [Impact] |
+     # | C      | [Third answer] | [Impact] |
+     # | Custom | Provide your own | [How to provide] |
+     #
+     # **Your choice**: _[Wait for response]_
+     #
+     # Wait for user responses (e.g., "Q1: A, Q2: Custom - ..., Q3: B")
+     # Update spec with answers
+     # Re-validate after all clarifications resolved
+   fi
+   ```
+
+4. **Update checklist** with final pass/fail status:
+   ```bash
+   # Mark CHK items as [x] based on validation results
+   # Update Notes section with any remaining issues
+   ```
 
 ## UPDATE ROADMAP (if from roadmap)
 
@@ -757,6 +960,20 @@ In `/flow` mode, auto-compaction runs after specification:
 # Count clarification markers
 CLARIFICATIONS=$(grep -c "\\[NEEDS CLARIFICATION" $SPEC_FILE || echo 0)
 
+# Check requirements checklist status
+REQUIREMENTS_CHECKLIST="${FEATURE_DIR}/checklists/requirements.md"
+CHECKLIST_COMPLETE=false
+
+if [ -f "$REQUIREMENTS_CHECKLIST" ]; then
+  TOTAL_CHECKS=$(grep -c "^- \[" $REQUIREMENTS_CHECKLIST || echo 0)
+  COMPLETE_CHECKS=$(grep -c "^- \[x\]" $REQUIREMENTS_CHECKLIST || echo 0)
+
+  if [ "$TOTAL_CHECKS" -eq "$COMPLETE_CHECKS" ]; then
+    CHECKLIST_COMPLETE=true
+  fi
+fi
+
+# Auto-progression logic based on validation status
 if [ "$CLARIFICATIONS" -gt 0 ]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "⚠️  AUTO-PROGRESSION: Clarifications needed"
@@ -764,16 +981,30 @@ if [ "$CLARIFICATIONS" -gt 0 ]; then
   echo ""
   echo "Found $CLARIFICATIONS ambiguities marked [NEEDS CLARIFICATION]"
   echo ""
+  [ "$CHECKLIST_COMPLETE" = false ] && echo "⚠️  Requirements checklist incomplete"
+  echo ""
   echo "Recommended: /clarify"
   echo "Alternative: /plan (proceed with current spec, clarify later)"
   echo ""
   echo "To automate: /flow \"${SLUG}\" (runs full workflow)"
-else
+elif [ "$CHECKLIST_COMPLETE" = false ]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "✅ AUTO-PROGRESSION: Spec is clear"
+  echo "⚠️  AUTO-PROGRESSION: Quality checks incomplete"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo ""
-  echo "No ambiguities found - ready for planning"
+  echo "Requirements checklist has incomplete items ($COMPLETE_CHECKS/$TOTAL_CHECKS complete)"
+  echo ""
+  echo "Review: ${REQUIREMENTS_CHECKLIST}"
+  echo ""
+  echo "Action needed: Address failing checklist items before proceeding"
+  echo "After fixes: Re-run spec validation or proceed with /plan"
+else
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "✅ AUTO-PROGRESSION: Spec is clear and validated"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  echo "No ambiguities found - requirements checklist complete"
+  echo "Ready for planning phase"
   echo ""
   echo "Recommended: /plan"
   echo "Alternative: /flow continue (automates plan → tasks → implement → ship)"
@@ -816,6 +1047,20 @@ fi
 
 echo "- Ambiguities: ${CLARIFICATIONS}"
 echo "- Artifacts created: ${ARTIFACT_COUNT}"
+
+# Show checklist status
+REQUIREMENTS_CHECKLIST="${FEATURE_DIR}/checklists/requirements.md"
+if [ -f "$REQUIREMENTS_CHECKLIST" ]; then
+  TOTAL_CHECKS=$(grep -c "^- \[" $REQUIREMENTS_CHECKLIST || echo 0)
+  COMPLETE_CHECKS=$(grep -c "^- \[x\]" $REQUIREMENTS_CHECKLIST || echo 0)
+
+  if [ "$TOTAL_CHECKS" -eq "$COMPLETE_CHECKS" ]; then
+    echo "- Requirements checklist: ✅ Complete ($TOTAL_CHECKS/$TOTAL_CHECKS)"
+  else
+    echo "- Requirements checklist: ⚠️  Incomplete ($COMPLETE_CHECKS/$TOTAL_CHECKS)"
+  fi
+fi
+
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📋 NEXT STEPS"
@@ -828,6 +1073,13 @@ if [ "$CLARIFICATIONS" -gt 0 ]; then
   echo ""
   echo "Automated (full workflow):"
   echo "  → /flow continue"
+elif [ "$COMPLETE_CHECKS" -ne "$TOTAL_CHECKS" ] 2>/dev/null; then
+  echo "Manual (step-by-step):"
+  echo "  → Review and complete requirements checklist"
+  echo "  → Then: /plan"
+  echo ""
+  echo "Automated (full workflow):"
+  echo "  → /flow continue (will prompt for checklist completion)"
 else
   echo "Manual (step-by-step):"
   echo "  → /plan"

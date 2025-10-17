@@ -37,7 +37,7 @@ Note: Use /flow for original workflow (backup)
 
 If `$ARGUMENTS` is "continue":
 - Set `CONTINUE_MODE = true`
-- Load workflow state from `.spec-flow/workflow-state.json`
+- Load workflow state from `specs/*/workflow-state.yaml`
 - Resume from last completed phase
 
 Else:
@@ -66,35 +66,192 @@ echo ""
 - `remote-staging-prod` - Full staging → production workflow
 - `remote-direct` - Remote repo, direct to main (no staging)
 
+## BRANCH MANAGEMENT
+
+**Purpose**: Ensure clean worktree and create feature branch if on main/master
+
+**Process**:
+
+```bash
+# Check if in git repository
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "⚠️  Git not detected, continuing without branch"
+  BRANCH_NAME="local"
+else
+  # Check for clean worktree
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "❌ Worktree is not clean. Please commit or stash changes first:"
+    echo ""
+    git status --short
+    echo ""
+    echo "Options:"
+    echo "  git stash          # Stash uncommitted changes"
+    echo "  git commit -am \"\" # Commit changes"
+    echo "  git reset --hard   # Discard all changes (DANGER)"
+    exit 1
+  fi
+
+  # Get current branch
+  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+  # If on main or master, create feature branch
+  if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" == "master" ]]; then
+    echo "📍 Currently on $CURRENT_BRANCH"
+    echo "Creating feature branch..."
+    echo ""
+
+    # Generate branch name: feat/NNN-slug
+    # Find next feature number
+    MAX_NUM=0
+    while IFS= read -r dir; do
+      if [[ $dir =~ ([0-9]{3})- ]]; then
+        NUM=$((10#${BASH_REMATCH[1]}))
+        if (( NUM > MAX_NUM )); then
+          MAX_NUM=$NUM
+        fi
+      fi
+    done < <(find specs -maxdepth 1 -mindepth 1 -type d 2>/dev/null || true)
+
+    FEATURE_NUM=$(printf '%03d' $((MAX_NUM + 1)))
+    BASE_BRANCH_NAME="feat/$FEATURE_NUM-$SLUG"
+    BRANCH_NAME="$BASE_BRANCH_NAME"
+
+    # Check if branch exists, handle conflicts
+    COUNTER=2
+    while git rev-parse --verify --quiet "$BRANCH_NAME" >/dev/null 2>&1; do
+      BRANCH_NAME="$BASE_BRANCH_NAME-$COUNTER"
+      COUNTER=$((COUNTER + 1))
+    done
+
+    # Create and checkout new branch
+    git checkout -b "$BRANCH_NAME"
+    echo "✅ Created feature branch: $BRANCH_NAME"
+  else
+    BRANCH_NAME="$CURRENT_BRANCH"
+    echo "📍 Continuing on current branch: $BRANCH_NAME"
+  fi
+fi
+
+echo ""
+```
+
+**State Updates**:
+- Store branch name in workflow-state.yaml for tracking
+
 ## INITIALIZE WORKFLOW STATE
 
 **Create or load workflow state file:**
 
-State file location: `.spec-flow/workflow-state.json`
+State file location: `specs/$SLUG/workflow-state.yaml` (per-feature state tracking)
 
 **For new workflows:**
-Create state file with:
-```json
-{
-  "feature": "[feature-slug]",
-  "feature_description": "[original user input]",
-  "project_type": "[local-only|remote-staging-prod|remote-direct]",
-  "current_phase": 0,
-  "phases_completed": [],
-  "phase_summaries": {},
-  "started_at": "[ISO timestamp]",
-  "last_updated": "[ISO timestamp]",
-  "status": "in_progress",
-  "manual_gates": {
-    "preview": false,
-    "validate_staging": false
-  },
-  "timings": {}
+
+```bash
+# Source state management functions
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+  source .spec-flow/scripts/bash/workflow-state.sh 2>/dev/null || {
+    echo "⚠️  Workflow state management not available on Windows (use PowerShell)"
+    # Fallback to basic tracking if needed
+  }
+else
+  source .spec-flow/scripts/bash/workflow-state.sh
+fi
+
+# Create feature directory if needed
+FEATURE_DIR="specs/$SLUG"
+mkdir -p "$FEATURE_DIR"
+
+# Initialize comprehensive workflow state
+# This creates workflow-state.yaml with:
+# - Feature metadata (slug, title, branch_name, timestamps, roadmap_status)
+# - Deployment model (auto-detected: staging-prod, direct-prod, local-only)
+# - Workflow phases tracking
+# - Quality gates and manual gates
+# - Deployment state (staging, production)
+# - Artifacts paths
+initialize_workflow_state "$FEATURE_DIR" "$SLUG" "$FEATURE_DESCRIPTION" "$BRANCH_NAME"
+
+echo "✅ Workflow state initialized: $FEATURE_DIR/workflow-state.yaml"
+echo ""
+
+# Source roadmap management functions
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+  source .spec-flow/scripts/bash/roadmap-manager.sh 2>/dev/null || {
+    echo "⚠️  Roadmap management not available on Windows (use PowerShell)"
+  }
+else
+  source .spec-flow/scripts/bash/roadmap-manager.sh
+fi
+
+# Mark feature as in progress in roadmap
+mark_feature_in_progress "$SLUG" 2>/dev/null || {
+  echo "Note: Could not update roadmap (feature may not be in roadmap yet)"
 }
+echo ""
 ```
 
 **For continue mode:**
-Read existing state file to determine next phase and project type.
+
+```bash
+# Find most recent feature directory
+FEATURE_DIR=$(ls -td specs/*/ | head -1)
+STATE_FILE="$FEATURE_DIR/workflow-state.yaml"
+
+# Auto-migrate from JSON if needed
+if [ ! -f "$STATE_FILE" ] && [ -f "$FEATURE_DIR/workflow-state.json" ]; then
+  echo "🔄 Migrating workflow state to YAML..."
+  yq eval -P "$FEATURE_DIR/workflow-state.json" > "$STATE_FILE"
+fi
+
+if [ ! -f "$STATE_FILE" ]; then
+  echo "❌ No workflow state found. Run /spec-flow with a feature description first."
+  exit 1
+fi
+
+# Source state management functions
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+  source .spec-flow/scripts/bash/workflow-state.sh 2>/dev/null
+else
+  source .spec-flow/scripts/bash/workflow-state.sh
+fi
+
+# Get current phase and status
+CURRENT_PHASE=$(yq eval '.workflow.phase' "$STATE_FILE")
+WORKFLOW_STATUS=$(yq eval '.workflow.status' "$STATE_FILE")
+
+echo "Resuming from: $CURRENT_PHASE (status: $WORKFLOW_STATUS)"
+echo ""
+
+# Determine next phase
+NEXT_PHASE=$(get_next_phase "$FEATURE_DIR")
+
+if [ -z "$NEXT_PHASE" ]; then
+  echo "✅ Workflow already complete!"
+  exit 0
+fi
+
+echo "Continuing with: $NEXT_PHASE"
+echo ""
+```
+
+**State Schema:**
+
+The new state file includes comprehensive tracking:
+- **Feature metadata**: slug, title, created/updated timestamps
+- **Deployment model**: staging-prod, direct-prod, or local-only (auto-detected)
+- **Workflow tracking**: current phase, completed phases, failed phases
+- **Manual gates**: preview, validate-staging (with approval status)
+- **Quality gates**: pre-flight, code review, rollback capability
+- **Deployment state**: staging and production (URLs, IDs, timestamps)
+- **Artifacts**: Paths to all generated documents
+- **Token budget**: Phase-based tracking with compaction alerts
+
+This enables:
+- Resume capability via `/ship continue`
+- Status visualization via `/ship-status`
+- Deployment model adaptation
+- Quality gate blocking
+- Rollback capability tracking
 
 ## EXECUTION STRATEGY
 
@@ -132,11 +289,19 @@ if [ "$STATUS" != "completed" ]; then
   echo "❌ Phase 0 blocked: $SUMMARY"
   echo "Blockers:"
   # Print blockers from result
+
+  # Update state to failed
+  update_workflow_phase "$FEATURE_DIR" "spec-flow" "failed"
   exit 1
 fi
 
-# Store phase summary in workflow-state.json
-# Update phases_completed array
+# Update workflow state: mark spec-flow phase complete
+update_workflow_phase "$FEATURE_DIR" "spec-flow" "completed"
+
+# Store phase summary in artifacts
+ARTIFACT_PATH="$FEATURE_DIR/spec.md"
+yq eval -i ".artifacts.spec = \"$ARTIFACT_PATH\"" "$STATE_FILE"
+
 # Log progress
 echo "✅ Phase 0 complete: $SUMMARY"
 echo "Key decisions:"
@@ -146,8 +311,10 @@ echo ""
 # Check if clarification needed
 if [ "$NEEDS_CLARIFICATION" = "true" ]; then
   NEXT_PHASE="clarify"
+  update_workflow_phase "$FEATURE_DIR" "clarify" "in_progress"
 else
   NEXT_PHASE="plan"
+  update_workflow_phase "$FEATURE_DIR" "plan" "in_progress"
 fi
 ```
 
@@ -292,9 +459,26 @@ echo ""
    TASKS_FILE="$FEATURE_DIR/tasks.md"
    ERROR_LOG="$FEATURE_DIR/error-log.md"
 
-   # Count completed tasks
-   COMPLETED_COUNT=$(grep -c "^✅ T[0-9]\{3\}" "$NOTES_FILE" || echo "0")
-   TOTAL_TASKS=$(grep -c "^T[0-9]\{3\}" "$TASKS_FILE" || echo "0")
+   # Detect task format (user-story vs tdd-phase)
+   TASK_FORMAT="tdd-phase"  # default
+   grep -q "\[US[0-9]\]" "$TASKS_FILE" && TASK_FORMAT="user-story"
+
+   if [ "$TASK_FORMAT" = "user-story" ]; then
+     # Track by priority/user story
+     P1_TOTAL=$(grep -c "\[P1\]" "$TASKS_FILE" 2>/dev/null || echo 0)
+     P1_COMPLETE=$(grep -c "✅.*\[P1\]" "$NOTES_FILE" 2>/dev/null || echo 0)
+     P2_TOTAL=$(grep -c "\[P2\]" "$TASKS_FILE" 2>/dev/null || echo 0)
+     P2_COMPLETE=$(grep -c "✅.*\[P2\]" "$NOTES_FILE" 2>/dev/null || echo 0)
+     P3_TOTAL=$(grep -c "\[P3\]" "$TASKS_FILE" 2>/dev/null || echo 0)
+     P3_COMPLETE=$(grep -c "✅.*\[P3\]" "$NOTES_FILE" 2>/dev/null || echo 0)
+
+     COMPLETED_COUNT=$((P1_COMPLETE + P2_COMPLETE + P3_COMPLETE))
+     TOTAL_TASKS=$((P1_TOTAL + P2_TOTAL + P3_TOTAL))
+   else
+     # Track by total tasks (TDD format)
+     COMPLETED_COUNT=$(grep -c "^✅ T[0-9]\{3\}" "$NOTES_FILE" || echo "0")
+     TOTAL_TASKS=$(grep -c "^T[0-9]\{3\}" "$TASKS_FILE" || echo "0")
+   fi
 
    # Get files changed
    FILES_CHANGED=$(git diff --name-only main | wc -l)
@@ -304,9 +488,16 @@ echo ""
    ```
 
 3. **Create phase summary:**
-   - Build summary: "Implemented {COMPLETED_COUNT}/{TOTAL_TASKS} tasks. Changed {FILES_CHANGED} files."
+   ```bash
+   if [ "$TASK_FORMAT" = "user-story" ]; then
+     SUMMARY="Implemented P1: $P1_COMPLETE/$P1_TOTAL, P2: $P2_COMPLETE/$P2_TOTAL, P3: $P3_COMPLETE/$P3_TOTAL. Changed $FILES_CHANGED files."
+   else
+     SUMMARY="Implemented $COMPLETED_COUNT/$TOTAL_TASKS tasks. Changed $FILES_CHANGED files."
+   fi
+   ```
    - Extract key decisions from NOTES.md
    - Store in workflow-state.json phase_summaries
+   - Include task_format in phase metadata
 
 4. **Check for blockers:**
    - IF COMPLETED_COUNT < TOTAL_TASKS:
@@ -367,7 +558,7 @@ echo "3. Verify acceptance criteria from spec"
 echo "4. When satisfied, continue: /spec-flow continue"
 echo ""
 
-# Update workflow-state.json status to "awaiting_preview"
+# Update workflow-state.yaml status to "awaiting_preview"
 # Save and exit (user will run /spec-flow continue after testing)
 ```
 
@@ -376,7 +567,7 @@ echo ""
 **Check project type (skip for local-only):**
 
 ```bash
-PROJECT_TYPE=$(grep -o '"project_type":\s*"[^"]*"' .spec-flow/workflow-state.json | cut -d'"' -f4)
+PROJECT_TYPE=$(yq eval '.deployment_model' "$STATE_FILE")
 
 if [ "$PROJECT_TYPE" = "local-only" ]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -441,7 +632,7 @@ echo "3. Check Lighthouse CI scores"
 echo "4. When approved, continue: /spec-flow continue"
 echo ""
 
-# Update workflow-state.json status to "awaiting_staging_validation"
+# Update workflow-state.yaml status to "awaiting_staging_validation"
 # Save and exit
 ```
 
@@ -508,9 +699,9 @@ echo "Feature: $SLUG"
 echo "Status: Shipped to Production"
 echo ""
 echo "Summary:"
-# Print phase summaries from workflow-state.json
+# Print phase summaries from workflow-state.yaml
 echo ""
-echo "Workflow state saved to .spec-flow/workflow-state.json"
+echo "Workflow state saved to specs/$SLUG/workflow-state.yaml"
 ```
 
 ## ERROR HANDLING

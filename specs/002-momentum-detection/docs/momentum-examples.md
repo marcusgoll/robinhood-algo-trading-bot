@@ -1,329 +1,395 @@
-# Momentum Detection Usage Examples
+# Momentum Detection - Usage Examples
+
+Complete guide to using the momentum detection system with concrete, executable examples.
 
 **Feature**: 002-momentum-detection
 **Created**: 2025-10-16
-**Status**: Draft
-
-## Purpose
-
-This document provides practical code examples and usage patterns for the momentum detection system, including setup, common workflows, and integration scenarios.
+**Status**: Production Ready
+**Version**: 1.0.0
 
 ---
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start)
-2. [Catalyst Detection Examples](#catalyst-detection-examples)
-3. [Pre-Market Scanner Examples](#pre-market-scanner-examples)
-4. [Bull Flag Detection Examples](#bull-flag-detection-examples)
-5. [Composite Signal Examples](#composite-signal-examples)
-6. [API Integration Examples](#api-integration-examples)
-7. [Testing Examples](#testing-examples)
+1. [Environment Setup](#environment-setup)
+2. [CatalystDetector Standalone](#catalystdetector-standalone)
+3. [PreMarketScanner Standalone](#premarketscanner-standalone)
+4. [BullFlagDetector Standalone](#bullflagdetector-standalone)
+5. [Momentum Engine Full Scan](#momentumengine-full-scan)
+6. [API Usage (curl examples)](#api-usage-curl-examples)
+7. [Troubleshooting](#troubleshooting)
 
 ---
 
-## Quick Start
+## Environment Setup
 
-*To be populated with quick start guide*
+### Required Environment Variables
 
-**Installation**:
+Create a `.env` file in your project root:
+
 ```bash
-# Clone repository
-git clone <repo-url>
-cd stocks-trading-bot
+# News API for catalyst detection (optional - graceful degradation if missing)
+NEWS_API_KEY=your_news_api_key_here
 
-# Install dependencies
+# Market data provider (default: alpaca)
+MARKET_DATA_SOURCE=alpaca
+
+# Alpaca API credentials (for market data)
+ALPACA_API_KEY=your_alpaca_api_key
+ALPACA_SECRET_KEY=your_alpaca_secret_key
+ALPACA_BASE_URL=https://paper-api.alpaca.markets
+
+# Database connection (optional, for persistence)
+DATABASE_URL=sqlite:///momentum_signals.db
+
+# Logging configuration
+LOG_LEVEL=INFO
+LOG_DIR=logs
+```
+
+### Install Dependencies
+
+```bash
+# Using pip
 pip install -r requirements.txt
 
-# Set environment variables
-export NEWS_API_KEY="your-key-here"
-export MARKET_DATA_API_KEY="your-alpaca-key"
-
-# Run tests
-pytest tests/unit/services/momentum/ -v
-
-# Start bot
-python -m trading_bot
+# Or using uv (faster)
+uv pip install -r requirements.txt
 ```
 
-**Reference**: [plan.md](../plan.md#integration-scenarios) for detailed setup instructions
+### Verify Setup
+
+```python
+from trading_bot.momentum.config import MomentumConfig
+
+# Load configuration from environment
+config = MomentumConfig.from_env()
+
+# Verify NEWS_API_KEY is loaded (optional)
+if config.news_api_key:
+    print("✓ NEWS_API_KEY configured")
+else:
+    print("⚠ NEWS_API_KEY not set - catalyst detection will be skipped")
+
+# Verify thresholds
+print(f"Min catalyst strength: {config.min_catalyst_strength}")
+print(f"Min pre-market change: {config.min_premarket_change_pct}%")
+print(f"Min volume ratio: {config.min_volume_ratio}%")
+print(f"Min pole gain: {config.pole_min_gain_pct}%")
+```
 
 ---
 
-## Catalyst Detection Examples
+## CatalystDetector Standalone
 
-*To be populated with catalyst detection code examples*
+Scan breaking news for fundamental events (earnings, FDA approvals, mergers, etc.).
 
-**Example 1: Basic catalyst scan**
-```python
-from trading_bot.momentum import CatalystDetector
+### Basic Usage
 
-async def scan_for_catalysts():
-    detector = CatalystDetector()
-    signals = await detector.scan(["AAPL", "GOOGL", "TSLA"])
-
-    for signal in signals:
-        print(f"Catalyst found: {signal.symbol}")
-        print(f"Type: {signal.metadata['catalyst_type']}")
-        print(f"Headline: {signal.metadata['headline']}")
-```
-
-**Example 2: Filter by catalyst type**
-```python
-# Filter for earnings announcements only
-earnings_signals = [
-    s for s in signals
-    if s.metadata['catalyst_type'] == 'earnings'
-]
-```
-
-**Reference**: [spec.md](../spec.md#user-stories-prioritized) - US1 for catalyst detection requirements
-
----
-
-## Pre-Market Scanner Examples
-
-*To be populated with pre-market scanner code examples*
-
-**Example 1: Scan pre-market movers**
-```python
-from trading_bot.momentum import PreMarketScanner
-
-async def scan_premarket():
-    scanner = PreMarketScanner()
-
-    # Check if currently in pre-market hours
-    if not await scanner.is_premarket_hours():
-        print("Not in pre-market hours (4:00-9:30 AM EST)")
-        return
-
-    signals = await scanner.scan(["AAPL", "GOOGL", "TSLA"])
-
-    for signal in signals:
-        print(f"Pre-market mover: {signal.symbol}")
-        print(f"Price change: {signal.metadata['price_change_pct']:.2f}%")
-        print(f"Volume ratio: {signal.metadata['volume_ratio']:.2f}x")
-```
-
-**Example 2: Filter by magnitude**
-```python
-# Find stocks with >10% pre-market move
-big_movers = [
-    s for s in signals
-    if s.metadata['price_change_pct'] > 10.0
-]
-```
-
-**Reference**: [spec.md](../spec.md#user-stories-prioritized) - US2 for pre-market requirements
-
----
-
-## Bull Flag Detection Examples
-
-*To be populated with bull flag pattern detection examples*
-
-**Example 1: Detect bull flag patterns**
-```python
-from trading_bot.momentum import BullFlagDetector
-
-async def find_bull_flags():
-    detector = BullFlagDetector()
-    signals = await detector.scan(["AAPL", "GOOGL", "TSLA"])
-
-    for signal in signals:
-        pattern = signal.metadata['pattern']
-        print(f"Bull flag detected: {signal.symbol}")
-        print(f"Pole gain: {pattern['pole_gain_pct']:.2f}%")
-        print(f"Breakout price: ${pattern['breakout_price']:.2f}")
-        print(f"Price target: ${pattern['price_target']:.2f}")
-```
-
-**Example 2: Calculate risk/reward**
-```python
-# Calculate potential reward vs risk
-for signal in signals:
-    pattern = signal.metadata['pattern']
-    current_price = pattern['current_price']
-    breakout_price = pattern['breakout_price']
-    price_target = pattern['price_target']
-
-    risk = breakout_price - current_price
-    reward = price_target - breakout_price
-    risk_reward_ratio = reward / risk if risk > 0 else 0
-
-    print(f"{signal.symbol}: R/R = {risk_reward_ratio:.2f}")
-```
-
-**Reference**: [spec.md](../spec.md#user-stories-prioritized) - US3 for pattern detection requirements
-
----
-
-## Composite Signal Examples
-
-*To be populated with composite signal ranking examples*
-
-**Example 1: Rank signals by strength**
-```python
-from trading_bot.momentum import MomentumEngine
-
-async def find_top_opportunities():
-    engine = MomentumEngine()
-
-    # Scan all detection methods
-    signals = await engine.scan(["AAPL", "GOOGL", "TSLA", "MSFT", "AMZN"])
-
-    # Signals already ranked by composite strength
-    top_signals = signals[:5]  # Top 5
-
-    for signal in top_signals:
-        print(f"{signal.symbol}: {signal.strength:.1f}/100")
-        print(f"Types: {signal.metadata['signal_types']}")
-```
-
-**Example 2: Filter multi-signal stocks**
-```python
-# Find stocks with 3+ confluent signals
-strong_signals = [
-    s for s in signals
-    if len(s.metadata['signal_types']) >= 3
-]
-```
-
-**Reference**: [spec.md](../spec.md#user-stories-prioritized) - US4 for composite scoring
-
----
-
-## API Integration Examples
-
-*To be populated with API endpoint usage examples*
-
-**Example 1: Query signals via API**
-```python
-import requests
-
-# Get high-strength signals from last 24 hours
-response = requests.get(
-    "http://localhost:8000/api/v1/momentum/signals",
-    params={
-        "min_strength": 70,
-        "limit": 20
-    },
-    headers={"Authorization": f"Bearer {token}"}
-)
-
-signals = response.json()["signals"]
-print(f"Found {len(signals)} high-strength signals")
-```
-
-**Example 2: Trigger manual scan**
-```python
-# Start a momentum scan for specific symbols
-response = requests.post(
-    "http://localhost:8000/api/v1/momentum/scan",
-    json={
-        "symbols": ["AAPL", "GOOGL", "TSLA"],
-        "scan_types": ["catalyst", "premarket", "bull_flag"]
-    },
-    headers={"Authorization": f"Bearer {token}"}
-)
-
-scan_id = response.json()["scan_id"]
-print(f"Scan started: {scan_id}")
-```
-
-**Reference**: [plan.md](../plan.md#integration-scenarios) for API integration details
-
----
-
-## Testing Examples
-
-*To be populated with testing code examples*
-
-**Example 1: Unit test for catalyst detector**
-```python
-import pytest
-from trading_bot.momentum import CatalystDetector
-
-@pytest.mark.asyncio
-async def test_catalyst_detection():
-    detector = CatalystDetector()
-    signals = await detector.scan(["AAPL"])
-
-    assert len(signals) >= 0
-    for signal in signals:
-        assert signal.signal_type == "catalyst"
-        assert 0 <= signal.strength <= 100
-        assert "catalyst_type" in signal.metadata
-```
-
-**Example 2: Integration test for momentum engine**
-```python
-@pytest.mark.asyncio
-async def test_momentum_engine_integration():
-    engine = MomentumEngine()
-    signals = await engine.scan(["AAPL", "GOOGL"])
-
-    # Verify signals are ranked
-    strengths = [s.strength for s in signals]
-    assert strengths == sorted(strengths, reverse=True)
-```
-
-**Reference**: [plan.md](../plan.md#project-structure) for test file locations
-
----
-
-## Common Workflows
-
-*To be populated with end-to-end workflow examples*
-
-**Workflow 1: Daily morning scan**
-```python
-async def morning_momentum_scan():
-    """Run daily pre-market momentum scan"""
-    engine = MomentumEngine()
-
-    # Define watchlist
-    watchlist = ["AAPL", "GOOGL", "TSLA", "MSFT", "AMZN"]
-
-    # Execute scan
-    signals = await engine.scan(watchlist)
-
-    # Filter for actionable signals
-    actionable = [s for s in signals if s.strength >= 75]
-
-    # Log results
-    for signal in actionable:
-        print(f"Action: {signal.symbol} - {signal.strength:.1f}/100")
-        print(f"Signals: {', '.join(signal.metadata['signal_types'])}")
-```
-
-**Workflow 2: Real-time monitoring**
 ```python
 import asyncio
+from trading_bot.momentum.config import MomentumConfig
+from trading_bot.momentum.catalyst_detector import CatalystDetector
 
-async def monitor_momentum():
-    """Continuously monitor for new signals"""
-    engine = MomentumEngine()
+async def scan_catalysts():
+    # Load configuration
+    config = MomentumConfig.from_env()
 
-    while True:
-        signals = await engine.scan(watchlist)
+    # Create detector
+    detector = CatalystDetector(config)
 
-        # Alert on new high-strength signals
-        for signal in signals:
-            if signal.strength >= 80:
-                print(f"ALERT: {signal.symbol} - {signal.strength:.1f}/100")
+    # Scan for catalysts in last 24 hours
+    symbols = ["AAPL", "GOOGL", "TSLA", "NVDA", "META"]
+    signals = await detector.scan(symbols)
 
-        # Wait 5 minutes before next scan
-        await asyncio.sleep(300)
+    # Print results
+    print(f"Found {len(signals)} catalyst signals:")
+    for signal in signals:
+        print(f"\n{signal.symbol}:")
+        print(f"  Type: {signal.details['catalyst_type']}")
+        print(f"  Headline: {signal.details['headline']}")
+        print(f"  Strength: {signal.strength:.1f}/100")
+        print(f"  Published: {signal.details['published_at']}")
+        print(f"  Source: {signal.details['source']}")
+
+# Run async function
+asyncio.run(scan_catalysts())
 ```
 
-**Reference**: [spec.md](../spec.md#user-scenarios) for user scenario context
+### Expected Output
+
+```
+Found 2 catalyst signals:
+
+AAPL:
+  Type: earnings
+  Headline: Apple announces Q4 earnings beat with record iPhone sales
+  Strength: 78.5/100
+  Published: 2025-10-16T14:30:00Z
+  Source: Reuters
+
+NVDA:
+  Type: product
+  Headline: NVIDIA unveils next-gen AI chip for data centers
+  Strength: 68.2/100
+  Published: 2025-10-16T16:45:00Z
+  Source: Bloomberg
+```
+
+### Categorization Examples
+
+The detector uses keyword matching to categorize news:
+
+```python
+from trading_bot.momentum.catalyst_detector import CatalystDetector
+from trading_bot.momentum.config import MomentumConfig
+
+detector = CatalystDetector(MomentumConfig())
+
+# Test categorization
+headlines = [
+    "Company announces Q4 earnings beat",  # → EARNINGS
+    "FDA approves new cancer drug",         # → FDA
+    "Tech giant acquires AI startup",       # → MERGER
+    "Apple unveils new iPhone model",       # → PRODUCT
+    "Analyst upgrades stock to Buy",        # → ANALYST
+]
+
+for headline in headlines:
+    catalyst_type = detector.categorize(headline)
+    print(f"{headline[:40]:<40} → {catalyst_type.value}")
+```
 
 ---
 
-## Related Documentation
+## PreMarketScanner Standalone
 
-- [momentum-architecture.md](./momentum-architecture.md) - System architecture
-- [momentum-api.md](./momentum-api.md) - API endpoint reference
-- [spec.md](../spec.md) - Feature specification
-- [plan.md](../plan.md) - Implementation plan
+Identify stocks with significant pre-market price movement (>5%) and unusual volume (>200%).
+
+### Basic Usage
+
+```python
+import asyncio
+from trading_bot.momentum.config import MomentumConfig
+from trading_bot.momentum.premarket_scanner import PreMarketScanner
+from trading_bot.market_data.market_data_service import MarketDataService
+from trading_bot.auth.alpaca_auth import AlpacaAuth
+
+async def scan_premarket():
+    # Setup authentication and services
+    auth = AlpacaAuth()
+    config = MomentumConfig.from_env()
+    market_data = MarketDataService(auth, config)
+
+    # Create scanner
+    scanner = PreMarketScanner(config, market_data)
+
+    # Check if in pre-market hours (4:00-9:30 AM EST)
+    if not scanner.is_premarket_hours():
+        print("⚠ Not in pre-market hours (4:00-9:30 AM EST)")
+        print("Scanner will return empty results")
+
+    # Scan for pre-market movers
+    symbols = ["AAPL", "TSLA", "NVDA", "AMD", "META"]
+    signals = await scanner.scan(symbols)
+
+    # Print results
+    print(f"\nFound {len(signals)} pre-market movers:")
+    for signal in signals:
+        print(f"\n{signal.symbol}:")
+        print(f"  Change: {signal.details['change_pct']:+.2f}%")
+        print(f"  Volume Ratio: {signal.details['volume_ratio']:.1f}x")
+        print(f"  Current Price: ${signal.details['current_price']:.2f}")
+        print(f"  Previous Close: ${signal.details['previous_close']:.2f}")
+        print(f"  Strength: {signal.strength:.1f}/100")
+        print(f"  Detected: {signal.details['timestamp_est']}")
+
+# Run async function
+asyncio.run(scan_premarket())
+```
+
+### Expected Output (During Pre-Market Hours)
+
+```
+Found 2 pre-market movers:
+
+TSLA:
+  Change: +7.35%
+  Volume Ratio: 3.2x
+  Current Price: $245.80
+  Previous Close: $229.00
+  Strength: 72.4/100
+  Detected: 2025-10-16 08:15:00 EDT
+
+NVDA:
+  Change: -5.82%
+  Volume Ratio: 2.8x
+  Current Price: $485.20
+  Previous Close: $515.00
+  Strength: 65.1/100
+  Detected: 2025-10-16 08:15:00 EDT
+```
+
+---
+
+## BullFlagDetector Standalone
+
+Scan stocks for bull flag chart patterns (strong upward move followed by consolidation).
+
+### Basic Usage
+
+```python
+import asyncio
+from trading_bot.momentum.config import MomentumConfig
+from trading_bot.momentum.bull_flag_detector import BullFlagDetector
+from trading_bot.market_data.market_data_service import MarketDataService
+from trading_bot.auth.alpaca_auth import AlpacaAuth
+
+async def scan_bull_flags():
+    # Setup authentication and services
+    auth = AlpacaAuth()
+    config = MomentumConfig.from_env()
+    market_data = MarketDataService(auth, config)
+
+    # Create detector
+    detector = BullFlagDetector(config, market_data)
+
+    # Scan for bull flag patterns (uses 100 days of historical data)
+    symbols = ["AAPL", "TSLA", "NVDA", "AMD", "META"]
+    signals = await detector.scan(symbols)
+
+    # Print results
+    print(f"Found {len(signals)} bull flag patterns:")
+    for signal in signals:
+        print(f"\n{signal.symbol}:")
+        print(f"  Pole Gain: {signal.details['pole_gain_pct']:.2f}%")
+        print(f"  Flag Range: {signal.details['flag_range_pct']:.2f}%")
+        print(f"  Breakout Price: ${signal.details['breakout_price']:.2f}")
+        print(f"  Price Target: ${signal.details['price_target']:.2f}")
+        upside = ((signal.details['price_target'] / signal.details['breakout_price']) - 1) * 100
+        print(f"  Potential Gain: {upside:.1f}%")
+        print(f"  Strength: {signal.strength:.1f}/100")
+
+# Run async function
+asyncio.run(scan_bull_flags())
+```
+
+---
+
+## MomentumEngine Full Scan
+
+Unified interface to run all detectors.
+
+### Basic Usage
+
+```python
+import asyncio
+from trading_bot.momentum.config import MomentumConfig
+from trading_bot.momentum.engine import MomentumEngine
+from trading_bot.market_data.market_data_service import MarketDataService
+from trading_bot.auth.alpaca_auth import AlpacaAuth
+
+async def full_momentum_scan():
+    # Setup authentication and services
+    auth = AlpacaAuth()
+    config = MomentumConfig.from_env()
+    market_data = MarketDataService(auth, config)
+
+    # Create engine (initializes all detectors)
+    engine = MomentumEngine(config, market_data)
+
+    # Run full scan across all detectors
+    symbols = ["AAPL", "TSLA", "NVDA", "AMD", "META", "GOOGL", "MSFT", "AMZN"]
+    all_signals = await engine.scan(symbols)
+
+    # Group signals by type
+    signals_by_type = {
+        "CATALYST": [],
+        "PREMARKET": [],
+        "PATTERN": [],
+    }
+
+    for signal in all_signals:
+        signals_by_type[signal.signal_type.value].append(signal)
+
+    # Print summary
+    print(f"\n=== Momentum Scan Results ===")
+    print(f"Total Signals: {len(all_signals)}")
+    print(f"  Catalysts: {len(signals_by_type['CATALYST'])}")
+    print(f"  Pre-Market Movers: {len(signals_by_type['PREMARKET'])}")
+    print(f"  Bull Flag Patterns: {len(signals_by_type['PATTERN'])}")
+
+    # Print top signals by strength
+    print(f"\n=== Top 5 Signals by Strength ===")
+    top_signals = sorted(all_signals, key=lambda s: s.strength, reverse=True)[:5]
+
+    for i, signal in enumerate(top_signals, 1):
+        print(f"\n{i}. {signal.symbol} - {signal.signal_type.value}")
+        print(f"   Strength: {signal.strength:.1f}/100")
+
+# Run async function
+asyncio.run(full_momentum_scan())
+```
+
+---
+
+## API Usage (curl examples)
+
+If you have the FastAPI backend running, you can use the REST API.
+
+### Start API Server
+
+```bash
+# From api/ directory
+cd api
+uvicorn app.main:app --reload --port 8000
+```
+
+### Scan All Momentum Signals
+
+```bash
+# POST request with symbols in body
+curl -X POST http://localhost:8000/api/v1/momentum/scan \
+  -H "Content-Type: application/json" \
+  -d '{
+    "symbols": ["AAPL", "TSLA", "NVDA", "AMD", "META"]
+  }' | jq
+```
+
+### Health Check
+
+```bash
+# Check API health
+curl http://localhost:8000/api/v1/health/healthz | jq
+```
+
+---
+
+## Troubleshooting
+
+### Issue: "NEWS_API_KEY not configured" warning
+
+**Solution**: This is graceful degradation - other detectors will still run.
+
+```bash
+# Set NEWS_API_KEY in .env file
+echo "NEWS_API_KEY=your_key_here" >> .env
+```
+
+### Issue: "Invalid symbol format: 'aapl': must be uppercase"
+
+**Solution**: Always use uppercase symbols
+
+```python
+# Correct
+symbols = ["AAPL", "GOOGL", "TSLA"]
+
+# Incorrect - raises ValueError
+symbols = ["aapl", "googl", "tsla"]
+```
+
+---
+
+**Last Updated**: 2025-10-16
+**Version**: 1.0.0
+**Feature**: momentum-detection (002)

@@ -1,0 +1,257 @@
+# Trade Logging API Contract
+# Python API (Classes, Methods, Data Structures)
+
+## TradeRecord Data Structure
+
+```python
+TradeRecord:
+  type: dataclass
+  fields:
+    # Core Trade Data
+    timestamp: str  # ISO 8601 UTC
+    symbol: str
+    action: Literal["BUY", "SELL"]
+    quantity: int
+    price: Decimal
+    total_value: Decimal
+
+    # Execution Context
+    order_id: str
+    execution_mode: Literal["PAPER", "LIVE"]
+    account_id: Optional[str]
+
+    # Strategy Metadata
+    strategy_name: str
+    entry_type: str
+    stop_loss: Optional[Decimal]
+    target: Optional[Decimal]
+
+    # Decision Audit Trail
+    decision_reasoning: str
+    indicators_used: list[str]
+    risk_reward_ratio: Optional[float]
+
+    # Outcome Tracking
+    outcome: Optional[Literal["win", "loss", "breakeven", "open"]]
+    profit_loss: Optional[Decimal]
+    hold_duration_seconds: Optional[int]
+    exit_timestamp: Optional[str]
+    exit_reasoning: Optional[str]
+
+    # Performance Metrics
+    slippage: Optional[Decimal]
+    commission: Optional[Decimal]
+    net_profit_loss: Optional[Decimal]
+
+    # Compliance & Audit
+    session_id: str
+    bot_version: str
+    config_hash: str
+
+  methods:
+    to_json() -> dict:
+      description: "Serialize to JSON-safe dictionary"
+      returns: Dictionary with all fields, Decimals converted to strings
+
+    to_jsonl_line() -> str:
+      description: "Serialize to single-line JSON for JSONL format"
+      returns: Compact JSON string without whitespace
+
+    validate() -> None:
+      description: "Validate all field constraints"
+      raises:
+        - ValueError: If any field fails validation
+```
+
+## StructuredTradeLogger Class
+
+```python
+StructuredTradeLogger:
+  constructor:
+    __init__(log_dir: Path = Path("logs/trades")) -> None:
+      description: "Initialize structured trade logger"
+      parameters:
+        log_dir: Directory for JSONL files (default: logs/trades)
+      creates:
+        - log_dir if it doesn't exist
+        - Sets file permissions to 700
+
+  methods:
+    log_trade(trade_record: TradeRecord) -> None:
+      description: "Append trade record to today's JSONL file"
+      parameters:
+        trade_record: Complete trade record to log
+      behavior:
+        - Validates trade_record
+        - Appends to logs/trades/YYYY-MM-DD.jsonl
+        - Creates daily file if doesn't exist
+        - Non-blocking I/O (<5ms write latency)
+      raises:
+        - ValueError: If trade_record validation fails
+        - IOError: If file write fails
+
+    rotate_logs(keep_days: int = 90) -> None:
+      description: "Delete JSONL files older than keep_days"
+      parameters:
+        keep_days: Number of days to retain (default: 90)
+      behavior:
+        - Scans logs/trades/ directory
+        - Deletes files older than keep_days
+        - Completes in <50ms
+      returns: Number of files deleted
+
+    get_log_path(date: datetime.date) -> Path:
+      description: "Get path to JSONL file for specific date"
+      parameters:
+        date: Date for which to get log file path
+      returns: Path to logs/trades/YYYY-MM-DD.jsonl
+```
+
+## TradeQueryHelper Class
+
+```python
+TradeQueryHelper:
+  constructor:
+    __init__(log_dir: Path = Path("logs/trades")) -> None:
+      description: "Initialize trade query helper"
+      parameters:
+        log_dir: Directory containing JSONL files
+
+  methods:
+    get_trades_by_date(date: datetime.date) -> list[TradeRecord]:
+      description: "Load all trades for specific date"
+      parameters:
+        date: Date to query
+      returns: List of TradeRecord objects
+      performance: <500ms for 1000 trades
+
+    get_trades_by_symbol(symbol: str, start_date: Optional[datetime.date] = None, end_date: Optional[datetime.date] = None) -> list[TradeRecord]:
+      description: "Load trades for specific symbol"
+      parameters:
+        symbol: Stock ticker (e.g., "AAPL")
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+      returns: List of TradeRecord objects
+      performance: <500ms for 1000 trades
+
+    get_trades_by_outcome(outcome: Literal["win", "loss", "breakeven", "open"], start_date: Optional[datetime.date] = None, end_date: Optional[datetime.date] = None) -> list[TradeRecord]:
+      description: "Load trades with specific outcome"
+      parameters:
+        outcome: Trade outcome to filter by
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+      returns: List of TradeRecord objects
+
+    calculate_daily_summary(date: datetime.date) -> dict:
+      description: "Calculate summary statistics for date"
+      parameters:
+        date: Date to summarize
+      returns:
+        {
+          "total_trades": int,
+          "wins": int,
+          "losses": int,
+          "win_rate": float,
+          "total_pnl": Decimal,
+          "avg_win": Decimal,
+          "avg_loss": Decimal,
+          "largest_win": Decimal,
+          "largest_loss": Decimal
+        }
+      performance: <500ms
+
+    calculate_strategy_performance(strategy_name: str, start_date: Optional[datetime.date] = None, end_date: Optional[datetime.date] = None) -> dict:
+      description: "Calculate performance metrics for strategy"
+      parameters:
+        strategy_name: Strategy to analyze
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+      returns:
+        {
+          "strategy_name": str,
+          "total_trades": int,
+          "win_rate": float,
+          "avg_rr_ratio": float,
+          "total_pnl": Decimal,
+          "sharpe_ratio": Optional[float]
+        }
+      performance: <1s
+```
+
+## File Format Contracts
+
+### JSONL File Format
+```
+Location: logs/trades/YYYY-MM-DD.jsonl
+Format: One JSON object per line (newline-delimited)
+Encoding: UTF-8
+Permissions: 700 (owner read/write/execute only)
+Rotation: Daily (new file per calendar day UTC)
+Retention: 90 days (configurable)
+
+Example:
+{"timestamp":"2025-01-09T14:32:15.123Z","symbol":"AAPL","action":"BUY",...}\n
+{"timestamp":"2025-01-09T14:45:30.456Z","symbol":"AAPL","action":"SELL",...}\n
+```
+
+### Field Constraints
+```
+timestamp: ISO 8601 UTC format, non-empty
+symbol: 1-5 uppercase alphanumeric characters
+action: Exactly "BUY" or "SELL"
+quantity: Positive integer, max 10000
+price: Positive Decimal, max 2 decimal places
+execution_mode: Exactly "PAPER" or "LIVE"
+decision_reasoning: Non-empty string, max 500 characters
+```
+
+## Integration Points
+
+### TradingBot Integration
+```python
+# In src/trading_bot/bot.py
+
+class TradingBot:
+    def __init__(self, config: Config):
+        self.logger = TradingLogger(config)
+        self.structured_logger = StructuredTradeLogger()  # NEW
+
+    def execute_trade(self, symbol: str, action: str, quantity: int, price: Decimal) -> bool:
+        # Existing text logging (unchanged)
+        self.logger.log_trade(...)
+
+        # NEW: Structured logging
+        trade_record = TradeRecord(
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            symbol=symbol,
+            action=action,
+            quantity=quantity,
+            price=price,
+            total_value=quantity * price,
+            order_id=self._generate_order_id(),
+            execution_mode=self.config.mode,
+            strategy_name=self._get_current_strategy(),
+            decision_reasoning=self._get_decision_context(),
+            session_id=self.session_id,
+            bot_version=self.version,
+            config_hash=self.config_hash,
+            # ... other fields
+        )
+        self.structured_logger.log_trade(trade_record)
+```
+
+## Backwards Compatibility Guarantees
+
+1. **Existing TradingLogger**: Unchanged, continues to work
+2. **Existing log files**: logs/trades.log unchanged
+3. **TradingBot.execute_trade()**: Signature unchanged, behavior extended
+4. **Configuration**: No new required config (structured logging optional)
+5. **Dependencies**: No new packages (stdlib only)
+
+## Performance Contracts
+
+- log_trade(): <5ms write latency (non-blocking)
+- rotate_logs(): <50ms execution time
+- get_trades_by_date(): <500ms for 1000 trades
+- calculate_daily_summary(): <500ms
+- File size: <1MB per 100 trades (compact JSON)

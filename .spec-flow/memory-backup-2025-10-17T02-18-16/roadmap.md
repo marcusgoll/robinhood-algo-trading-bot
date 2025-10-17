@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-08 (market-data-module shipped)
+**Last updated**: 2025-10-16 (health-check v1.4.0 shipped to master)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -169,25 +169,253 @@
   - Code quality: A (95/100) from senior code review
   - Documentation: spec, plan, tasks, analysis-report, optimization-report, code-review-report
 
-## In Progress
-
-<!-- Currently implementing -->
+### startup-sequence
+- **Title**: Bot startup and initialization
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-08
+- **Commit**: b5a73f4
+- **Spec**: specs/startup-sequence/
+- **Delivered**:
+  - StartupOrchestrator class with dependency-ordered initialization
+  - Startup banner display (PAPER/LIVE mode indicators)
+  - Configuration loading and validation (§Pre_Deploy)
+  - Logging system initialization with dedicated startup.log
+  - Mode switcher initialization (paper/live mode management)
+  - Circuit breaker initialization and health verification
+  - Trading bot initialization with component health checks
+  - Comprehensive status summary before trading begins
+  - --dry-run flag for validation-only mode
+  - --json flag for machine-readable status output
+  - Fail-fast error handling with clear remediation guidance
+  - Automatic directory creation (logs/, data/, backtests/results/)
+  - Exit codes (0=success, 1=config error, 2=validation error, 3=init failure)
+  - Startup duration tracking (131ms, 97.4% under 5s target)
+  - 16 unit tests + 4 integration tests (100% pass rate)
+  - Type safety: mypy errors reduced 25 → 1
+  - Full Constitution v1.0.0 compliance (§Safety_First, §Pre_Deploy, §Audit_Everything)
+  - Documentation: spec, plan, tasks, analysis-report, optimization-report
 
 ### error-handling-framework
 - **Title**: API error handling framework
 - **Area**: infra
 - **Role**: all
 - **Intra**: No
-- **Branch**: error-handling-framework
-- **Spec**: specs/error-handling-framework/spec.md
-- **Updated**: 2025-01-08
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Retry logic for API failures (§Risk_Management)
-  - Rate limit detection and exponential backoff
-  - Network error recovery
-  - Graceful shutdown on critical errors
-  - [PIGGYBACK: bot.py has basic error handling]
+- **Date**: 2025-10-08
+- **Spec**: specs/error-handling-framework/
+- **Delivered**:
+  - Exception hierarchy (RetriableError, NonRetriableError, RateLimitError)
+  - RetryPolicy configuration system with validation
+  - @with_retry decorator with exponential backoff (1s, 2s, 4s) + jitter
+  - Rate limit detection (HTTP 429 with Retry-After header support)
+  - Circuit breaker with sliding window (5 failures in 60s triggers shutdown)
+  - Callbacks (on_retry, on_exhausted) for custom handling
+  - Integration with existing TradingLogger (§Audit_Everything)
+  - Exception chaining preservation for debugging
+  - Predefined policies (DEFAULT, AGGRESSIVE, CONSERVATIVE)
+  - 27 unit tests (100% pass rate)
+  - Test coverage: 87-96% per module
+  - Type safety: mypy --strict passes (100% type coverage)
+  - Security audit: 0 vulnerabilities
+  - Performance: <100ms overhead per retry
+  - Senior code review: 8.5/10 (APPROVED)
+  - Full Constitution v1.0.0 compliance (§Risk_Management, §Safety_First, §Audit_Everything)
+  - Production-ready, available for immediate use
+  - Documentation: spec, plan, tasks, analysis, optimization-report, code-review-report
+
+### credentials-manager
+- **Title**: Secure credentials management
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-09
+- **Commit**: e1114ed
+- **Spec**: specs/credentials-manager/
+- **Delivered**:
+  - utils/security.py module with 4 credential masking functions (100% coverage)
+  - Device token persistence via dotenv.set_key() to .env file
+  - MFA secret format validation (16-char base32 regex: ^[A-Z2-7]{16}$)
+  - Device token optional validation in ConfigValidator
+  - RobinhoodAuth.save_device_token_to_env() method
+  - RobinhoodAuth.login_with_device_token() with automatic MFA fallback
+  - Updated login() to try device token first (reduces MFA fatigue)
+  - Credential masking in all logs (username, password, MFA secret, device token)
+  - DEVICE_TOKEN field in Config and .env.example
+  - 40 unit + integration + performance tests (100% pass rate)
+  - Test coverage: 85.57% (robinhood_auth), 100% (security)
+  - Validation performance: <500ms (actual ~5-10ms)
+  - Full Constitution v1.0.0 compliance (§Security, §Code_Quality, §Audit_Everything)
+  - Production-ready with comprehensive documentation
+  - Documentation: spec, plan, tasks, analysis-report, README credentials section
+
+### trade-logging
+- **Title**: Enhanced trade logging with structured JSONL format
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-09
+- **Commit**: 7c685bd
+- **Spec**: specs/trade-logging/
+- **Delivered**:
+  - TradeRecord dataclass with 27 fields (core data, strategy metadata, decision audit, outcome tracking, performance metrics, compliance)
+  - StructuredTradeLogger class with daily JSONL file rotation (logs/trades/YYYY-MM-DD.jsonl)
+  - TradeQueryHelper class with analytics queries (date range, symbol filtering, win rate calculation)
+  - Thread-safe concurrent writes with file locking (0.405ms write latency, 10 threads verified)
+  - Streaming I/O with generator pattern for memory efficiency (O(1) per record)
+  - Dual logging: Backwards-compatible text logs + new structured JSONL logs
+  - Field validation in TradeRecord.__post_init__() (symbol format, numeric constraints, required fields)
+  - Graceful error degradation (OSError caught, logged to stderr, bot continues)
+  - TradingBot integration with all 27 fields populated (session_id, bot_version, config_hash, order_id)
+  - Decimal precision preservation (string serialization in JSON)
+  - ISO 8601 UTC timestamps with 'Z' suffix
+  - Compact JSONL format (~709KB for 1000 trades)
+  - 20 tests (5 unit trade_record, 6 unit structured_logger, 4 unit query_helper, 3 integration, 2 smoke) - 100% pass rate
+  - Test coverage: 95.89% (query_helper 89.47%, structured_logger 100%, trade_record 98.21%)
+  - Performance: Write 0.405ms (12.3x faster than 5ms target), Query 15.17ms for 1000 trades (32.9x faster than 500ms target)
+  - Security: 0 vulnerabilities (bandit scan 607 lines), Windows ACL file permissions (owner-only)
+  - Senior code review: GOOD (0 critical, 0 important, 30 minor auto-fixed)
+  - Contract compliance: 100% (27 fields, 10 methods verified)
+  - KISS/DRY: No violations
+  - Full Constitution v1.0.0 compliance (§Audit_Everything, §Data_Integrity, §Safety_First, §Testing)
+  - Production-ready, local-only feature (no staging/production deployment needed)
+  - Documentation: spec, plan, tasks, contracts/api.yaml, analysis-report, optimization-report, code-review-report
+
+### order-management
+- **Title**: Order management foundation
+- **Area**: api
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-10
+- **Spec**: specs/order-management/
+- **Delivered**:
+  - Limit-order submission/cancel/status gateway with `with_retry` resilience
+  - OrderManager service coordinating SafetyChecks, AccountData, and JSONL audit logging
+  - TradingBot integration (live path delegates to OrderManager with limit-only enforcement)
+  - Order management configuration block (offsets, slippage guard, strategy overrides)
+  - Structured order log runbook (`logs/orders.jsonl`) + dry-run evidence
+  - 39 test cases across order management + trading bot (95.03 % module coverage)
+  - Documentation: spec, plan, tasks, optimization-report, code-review
+
+### performance-tracking
+- **Title**: Performance tracking and analytics
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-15
+- **Commit**: a021c81
+- **Spec**: specs/performance-tracking/
+- **Delivered**:
+  - PerformanceTracker class with daily/weekly/monthly aggregation
+  - AlertEvaluator for threshold monitoring against configured targets
+  - Cache utilities with incremental MD5-based updates
+  - CLI interface: `python -m trading_bot.performance` with export functionality
+  - JSON/Markdown exports for machine-readable and human-readable outputs
+  - Schema validation: 100% contract compliance
+  - Win/loss ratio calculator across time windows
+  - Streak tracking (current and historical win/loss streaks)
+  - Risk-reward metrics with alerts when R:R falls below 1:1
+  - Alert system via JSONL logging (logs/performance/performance-alerts.jsonl)
+  - 13 tests (100% pass rate)
+  - Test coverage: 92% average (alerts 95.56%, cache 87.50%, cli 94.64%, models 100%, tracker 92.00%)
+  - Performance: 1.24s test suite execution
+  - Security: 0 vulnerabilities (Bandit clean)
+  - Code quality: 0 linting issues (Ruff clean, 27 auto-fixes applied)
+  - Senior code review: APPROVED FOR SHIP
+  - Full Constitution v1.0.0 compliance (§Audit_Everything, §Data_Integrity, §Testing_Requirements)
+  - Documentation: spec, plan, tasks, local-ship-report, code-review-report, optimization-report
+
+### trade-management-rules
+- **Title**: ATR-based trade management rules
+- **Area**: strategy
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-16
+- **Release**: v1.3.0 - Trade management rules with break-even, scale-in, catastrophic exit
+- **Spec**: specs/atr-stop-adjustment/ (extended with trade rules)
+- **Delivered**:
+  - PositionState dataclass: Immutable position state tracking (entry, current price, ATR, scale-in count, flags)
+  - RuleActivation dataclass: Rule decision output (action, reason, quantity, new_stop_price)
+  - evaluate_break_even_rule(): Move stop to entry at 2xATR favorable move (idempotent)
+  - evaluate_scale_in_rule(): Add 50% position at 1.5xATR (max 3 scale-ins, portfolio risk limit 2%)
+  - evaluate_catastrophic_exit_rule(): Close position at 3xATR adverse move
+  - Volatility-adaptive rules using ATR thresholds
+  - Portfolio risk management (2% maximum total portfolio risk)
+  - Idempotent break-even rule (executes once per position via flag tracking)
+  - Decimal precision for all financial calculations
+  - Comprehensive validation (ATR availability, thresholds, limits)
+  - Detailed audit reasons for every rule activation
+  - 6 trade management tests (100% pass rate in 0.31s)
+  - 14 risk_management suite tests passing (no regressions in 1.93s)
+  - Full Constitution v1.0.0 compliance (§Risk_Management, §Safety_First, §Testing_Requirements)
+  - Production-ready, awaits position manager integration
+  - Documentation: trade-rules-ship-report.md, NOTES.md (T006-T011 complete)
+
+### health-check
+- **Title**: Session health monitoring
+- **Area**: api
+- **Role**: all
+- **Intra**: Yes
+- **Date**: 2025-10-16
+- **Release**: v1.4.0 - Session health monitoring with auto-reauth and result caching
+- **Spec**: specs/health-check/
+- **Commit**: eb8ea86
+- **Delivered**:
+  - SessionHealthMonitor class with periodic health checks (every 5 minutes)
+  - Automatic authentication refresh on 401/403 errors
+  - 10-second result caching to reduce API load (~98% reduction)
+  - Thread-safe session status tracking with threading.Lock
+  - HealthCheckResult dataclass: Success/failure with latency and reauth metadata
+  - SessionHealthStatus dataclass: Uptime, health check count, reauth count tracking
+  - HealthCheckLogger: Structured JSONL logging for all health events
+  - @with_retry decorator integration for automatic retries with exponential backoff
+  - Circuit breaker integration for persistent failure handling
+  - Pre-trade health check validation (blocking trades on session failure)
+  - Graceful degradation for paper trading mode
+  - Integration with TradingBot: start/stop/execute_trade lifecycle
+  - 14 unit tests (100% pass rate, 14.11s execution)
+  - Code coverage: 92-94% (session_health 92.74%, health_logger 90%, __init__ 100%)
+  - Type safety: MyPy strict mode (0 errors)
+  - Security: Bandit scan (0 vulnerabilities, 407 lines analyzed)
+  - Code quality: Ruff linting (all checks passed)
+  - Performance: ~100-200ms health check latency (target <2000ms)
+  - Full Constitution v1.0.0 compliance (§Safety_First, §Risk_Management, §Audit_Everything)
+  - Production-ready, local-only feature (no staging/production deployment needed)
+  - Documentation: spec, plan, tasks, analysis, optimization-report, PRODUCTION-READY.md
+
+### stock-screener
+- **Title**: Stock screener and filtering
+- **Area**: api
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-16
+- **Release**: v1.0.0 - Stock screener MVP with 4 filters and pagination
+- **Spec**: specs/001-stock-screener/
+- **Commits**: f92332e, 1282144, d5e877e, 87d3c5c, a90db5b, d20c615, 4b05774, 74c3da8
+- **Delivered**:
+  - ScreenerService class with 4 filter types: price, volume, float, daily_change
+  - AND logic combining all filters
+  - Pagination support (offset/limit/has_more/next_offset)
+  - Results sorted by volume descending
+  - ScreenerQuery/StockScreenerMatch/ScreenerResult dataclasses with validation
+  - ScreenerLogger with thread-safe JSONL audit trail (daily rotation)
+  - ScreenerConfig with environment variable overrides
+  - Graceful degradation on missing market data (skip filter, log gap, continue)
+  - @with_retry decorator integration with exponential backoff + circuit breaker
+  - Input validation with actionable error messages
+  - 78 tests (68 unit + 10 integration, 100% pass rate)
+  - Code coverage: 90%+ target met
+  - Type safety: 100% (MyPy strict mode, 0 errors after auto-fixes)
+  - Security: 0 vulnerabilities (Bandit scan)
+  - Performance: P95 ~110ms (target <500ms, 78% margin)
+  - All 8 Constitution principles verified (§Safety_First, §Code_Quality, §Risk_Management, §Testing_Requirements, §Audit_Everything, §Error_Handling, §Security, §Data_Integrity)
+  - 15+ artifacts: spec, plan, data-model, tasks, analysis, code-review, optimization-report, preview-checklist, finalization-summary, contracts/api.yaml, etc.
+  - Production-ready, local-only feature (no staging/production deployment needed)
+  - Simple 2-command rollback (git revert + restart)
+
+## In Progress
+
+<!-- Currently implementing -->
 
 ## Next
 
@@ -201,47 +429,6 @@
 
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
-
-### startup-sequence
-- **Title**: Bot startup and initialization
-- **Area**: infra
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Validate environment (§Pre_Deploy)
-  - Authenticate with MFA
-  - Load config
-  - Check market status
-  - Verify account access
-  - Display dashboard
-  - Enter main loop
-  - [BLOCKED: authentication-module, configuration-validator, status-dashboard]
-
-### credentials-manager
-- **Title**: Secure credentials management
-- **Area**: infra
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 2.25
-- **Requirements**:
-  - Secure storage of credentials (§Security)
-  - Validate MFA secret format
-  - Test authentication on first run
-  - Store device token for faster subsequent logins
-  - [BLOCKED: environment-config]
-
-### trade-logging
-- **Title**: Trade history database/CSV
-- **Area**: infra
-- **Role**: all
-- **Intra**: Yes
-- **Impact**: 4 | **Effort**: 2 | **Confidence**: 1.0 | **Score**: 2.00
-- **Requirements**:
-  - Save all trades to CSV (timestamp, symbol, action, quantity, price, P&L)
-  - Track daily performance metrics (§Audit_Everything)
-  - Export trade history
-  - [BLOCKED: logging-system]
 
 ### status-dashboard
 - **Title**: CLI status dashboard & performance metrics
@@ -259,67 +446,8 @@
   - Update real-time
   - Export daily summary
   - Compare against targets
-  - [BLOCKED: account-data-module, performance-tracking]
+  - [UNBLOCKED: account-data-module shipped, performance-tracking ready (trade-logging provides data)]
   - [MERGED: performance-metrics-dashboard]
-
-### health-check
-- **Title**: Session health monitoring
-- **Area**: api
-- **Role**: all
-- **Intra**: Yes
-- **Impact**: 4 | **Effort**: 2 | **Confidence**: 0.9 | **Score**: 1.80
-- **Requirements**:
-  - Ping API every 5 minutes to maintain session
-  - Verify authentication status
-  - Log session duration
-  - Auto-reauth if token expires
-  - [UNBLOCKED: authentication-module shipped]
-
-### order-management
-- **Title**: Order management foundation
-- **Area**: api
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 3 | **Confidence**: 0.8 | **Score**: 1.33
-- **Requirements**:
-  - Place limit buy orders with offset
-  - Place limit sell orders with offset
-  - Cancel all open orders function
-  - Get order status and fill info
-  - [UNBLOCKED: authentication-module shipped, safety-checks shipped]
-
-### performance-tracking
-- **Title**: Performance tracking and analytics
-- **Area**: infra
-- **Role**: all
-- **Intra**: No
-- **Impact**: 4 | **Effort**: 2 | **Confidence**: 1.0 | **Score**: 2.00
-- **Requirements**:
-  - Win/loss ratio calculator (daily/weekly/monthly)
-  - Track total wins vs losses
-  - Display current streak (wins/losses)
-  - Alert when below target win rate
-  - Average profit per winning trade
-  - Average loss per losing trade
-  - Calculate and display current risk-reward ratio
-  - Alert if R:R falls below 1:1
-  - Daily trade log with timestamps and P&L
-  - [BLOCKED: trade-logging]
-  - [PIGGYBACK: extends trade-logging with analytics]
-  - [MERGED: win-rate-tracking, avg-win-loss-calculator]
-
-### stock-screener
-- **Title**: Stock screener and filtering
-- **Area**: api
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 3 | **Confidence**: 0.8 | **Score**: 1.33
-- **Requirements**:
-  - Filter by price range ($2-$20)
-  - Relative volume filter (5x+ average)
-  - Float size filter (under 20M shares)
-  - Daily performance filter (10%+ movers)
-  - [BLOCKED: market-data-module]
 
 ### momentum-detection
 - **Title**: Momentum and catalyst detection
@@ -444,18 +572,6 @@
   - Identify daily/4H support and resistance levels
   - Track rejection and breakout patterns
   - [BLOCKED: technical-indicators]
-
-### trade-management-rules
-- **Title**: Trade management rules
-- **Area**: strategy
-- **Role**: all
-- **Intra**: No
-- **Impact**: 5 | **Effort**: 2 | **Confidence**: 0.8 | **Score**: 2.00
-- **Requirements**:
-  - Prevent early break-even stops
-  - Add to winning positions (scaling in)
-  - Cut losing trades early (§Risk_Management)
-  - [BLOCKED: order-management]
 
 ### level2-integration
 - **Title**: Level 2 order flow integration

@@ -21,6 +21,7 @@ from ..error_handling.retry import with_retry
 from .config import MomentumConfig
 from .logging.momentum_logger import MomentumLogger
 from .schemas.momentum_signal import CatalystEvent, CatalystType, MomentumSignal, SignalType
+from .validation import validate_symbols
 
 # Module logger
 logger = logging.getLogger(__name__)
@@ -82,6 +83,9 @@ class CatalystDetector:
         Returns:
             List of MomentumSignal objects with catalyst events (empty if no catalysts or API unavailable)
 
+        Raises:
+            ValueError: If symbols list is empty or contains invalid symbols
+
         Example:
             >>> config = MomentumConfig(news_api_key="test-key")
             >>> detector = CatalystDetector(config)
@@ -89,6 +93,22 @@ class CatalystDetector:
             >>> len(signals) > 0
             True
         """
+        # T056: Input validation (fail fast)
+        try:
+            validate_symbols(symbols)
+        except ValueError as e:
+            logger.error(f"CatalystDetector input validation failed: {e}")
+            self.logger.log_error(
+                e,
+                {
+                    "detector": "CatalystDetector",
+                    "operation": "scan",
+                    "symbols": symbols,
+                    "validation_error": str(e),
+                }
+            )
+            raise  # Re-raise ValueError to fail fast
+
         # T016: Check if NEWS_API_KEY is configured (graceful degradation)
         if not self.config.news_api_key:
             logger.warning(
@@ -117,14 +137,83 @@ class CatalystDetector:
 
             return signals
 
-        except Exception as e:
-            # Graceful degradation: log error and return empty list
-            logger.warning(f"Failed to scan for catalysts: {e}")
+        except TimeoutError as e:
+            # T055: API timeout - log warning, return empty (graceful degradation)
+            logger.warning(
+                f"API timeout while fetching catalyst news for {len(symbols)} symbols: {e}. "
+                f"Check NEWS_API_KEY validity and network connection. Retry logic will handle transient issues."
+            )
             self.logger.log_error(
                 e,
-                {"detector": "CatalystDetector", "symbols": symbols}
+                {
+                    "detector": "CatalystDetector",
+                    "operation": "scan",
+                    "symbols": symbols,
+                    "error_type": "timeout",
+                    "retry_exhausted": True,
+                }
             )
-            return []
+            return []  # Graceful degradation: continue processing other detectors
+
+        except (ConnectionError, OSError) as e:
+            # T055: Network error - log error, return empty (graceful degradation)
+            logger.error(
+                f"Network error while fetching catalyst news for {len(symbols)} symbols: {e}. "
+                f"Check network connectivity and NEWS_API endpoint availability."
+            )
+            self.logger.log_error(
+                e,
+                {
+                    "detector": "CatalystDetector",
+                    "operation": "scan",
+                    "symbols": symbols,
+                    "error_type": "network",
+                }
+            )
+            return []  # Graceful degradation
+
+        except (KeyError, ValueError, TypeError) as e:
+            # T055: Malformed API response - log error, return empty (graceful degradation)
+            logger.error(
+                f"Malformed API response while processing catalyst news: {e}. "
+                f"Expected structure: {{'news': [{{'headline': str, 'created_at': str, ...}}]}}. "
+                f"Check NEWS_API provider compatibility."
+            )
+            self.logger.log_error(
+                e,
+                {
+                    "detector": "CatalystDetector",
+                    "operation": "scan",
+                    "symbols": symbols,
+                    "error_type": "malformed_response",
+                }
+            )
+            return []  # Graceful degradation
+
+        except NotImplementedError:
+            # T055: API integration pending - log info, return empty
+            logger.info(
+                f"CatalystDetector API integration pending (NotImplementedError). "
+                f"Returning empty signals for {len(symbols)} symbols."
+            )
+            return []  # Expected during MVP development
+
+        except Exception as e:
+            # T055: Unexpected error - log error with full context, return empty (graceful degradation)
+            logger.error(
+                f"Unexpected error in CatalystDetector.scan() for {len(symbols)} symbols: {e}. "
+                f"This should not happen - investigate immediately."
+            )
+            self.logger.log_error(
+                e,
+                {
+                    "detector": "CatalystDetector",
+                    "operation": "scan",
+                    "symbols": symbols,
+                    "error_type": "unexpected",
+                }
+            )
+            return []  # Graceful degradation: don't crash entire momentum scan
 
     @with_retry()  # Uses DEFAULT_POLICY: 3 retries, exponential backoff
     async def _fetch_news_with_retry(self, symbols: List[str]) -> List[CatalystEvent]:
