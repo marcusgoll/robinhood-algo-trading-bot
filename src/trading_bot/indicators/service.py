@@ -1,7 +1,7 @@
 """Technical indicators service facade."""
 
 from decimal import Decimal
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
 from datetime import datetime
 
 from .calculators import VWAPCalculator, EMACalculator, MACDCalculator
@@ -12,7 +12,7 @@ from .exceptions import InsufficientDataError
 class TechnicalIndicatorsService:
     """Facade service for technical indicators (VWAP, EMA, MACD)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize technical indicators service."""
         self.vwap_calc = VWAPCalculator()
         self.ema_calc = EMACalculator(period_9=9, period_20=20)
@@ -24,7 +24,7 @@ class TechnicalIndicatorsService:
         self._last_macd: Optional[Decimal] = None
         self._last_signal: Optional[Decimal] = None
 
-    def get_vwap(self, bars: List[dict]) -> VWAPResult:
+    def get_vwap(self, bars: List[Dict[str, Any]]) -> VWAPResult:
         """
         Calculate VWAP for entry validation.
 
@@ -42,7 +42,7 @@ class TechnicalIndicatorsService:
 
         return self.vwap_calc.calculate(bars)
 
-    def get_emas(self, bars: List[dict]) -> EMAResult:
+    def get_emas(self, bars: List[Dict[str, Any]]) -> EMAResult:
         """
         Calculate 9 and 20 period EMAs.
 
@@ -70,7 +70,7 @@ class TechnicalIndicatorsService:
 
         return result
 
-    def get_macd(self, bars: List[dict]) -> MACDResult:
+    def get_macd(self, bars: List[Dict[str, Any]]) -> MACDResult:
         """
         Calculate MACD with signal line and histogram.
 
@@ -98,7 +98,7 @@ class TechnicalIndicatorsService:
 
         return result
 
-    def validate_entry(self, bars: List[dict]) -> Tuple[bool, str]:
+    def validate_entry(self, bars: List[Dict[str, Any]]) -> Tuple[bool, str]:
         """
         Conservative entry validation: price > VWAP AND MACD > 0.
 
@@ -128,7 +128,7 @@ class TechnicalIndicatorsService:
 
         return True, f"Valid entry: price > VWAP ({vwap_result.price} > {vwap_result.vwap}) AND MACD > 0 ({macd_result.macd_line})"
 
-    def check_exit_signals(self, bars: List[dict]) -> Optional[str]:
+    def check_exit_signals(self, bars: List[Dict[str, Any]]) -> Optional[str]:
         """
         Check for exit signals (MACD crossing negative).
 
@@ -159,7 +159,7 @@ class TechnicalIndicatorsService:
         except InsufficientDataError:
             return None
 
-    def reset_state(self):
+    def reset_state(self) -> None:
         """Reset state tracking (useful for new trading sessions)."""
         self._last_ema_9 = None
         self._last_ema_20 = None

@@ -7,13 +7,13 @@ Pattern: src/trading_bot/indicators/service.py (class structure with facade patt
 Constitution §Fail_Safe: Validate all inputs, fail-fast on invalid data
 """
 
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from decimal import Decimal
 from datetime import datetime
 
 from .config import BullFlagConfig
 from .models import BullFlagResult, FlagpoleData, ConsolidationData
-from .exceptions import PatternNotFoundError, InvalidConfigurationError
+from .exceptions import PatternNotFoundError
 from ..indicators.exceptions import InsufficientDataError
 
 
@@ -57,7 +57,7 @@ class BullFlagDetector:
         """
         self.config = config
 
-    def detect(self, bars: List[dict], symbol: str) -> BullFlagResult:
+    def detect(self, bars: List[Dict[str, Any]], symbol: str) -> BullFlagResult:
         """
         Detect bull flag pattern in price data.
 
@@ -150,9 +150,11 @@ class BullFlagDetector:
 
             # Apply risk/reward filtering
             if risk_params['risk_reward_ratio'] < self.config.min_risk_reward_ratio:
+                ratio = risk_params['risk_reward_ratio']
+                min_ratio = self.config.min_risk_reward_ratio
                 return self._create_failed_result(
                     symbol,
-                    f"Risk/reward ratio {risk_params['risk_reward_ratio']} below minimum {self.config.min_risk_reward_ratio}"
+                    f"Risk/reward ratio {ratio} below minimum {min_ratio}"
                 )
 
             # Calculate quality score
@@ -191,7 +193,7 @@ class BullFlagDetector:
                 reason=f"Pattern detection failed: {str(e)}"
             )
 
-    def _detect_flagpole(self, bars: List[dict]) -> Optional[FlagpoleData]:
+    def _detect_flagpole(self, bars: List[Dict[str, Any]]) -> Optional[FlagpoleData]:
         """
         Detect flagpole phase (initial strong upward movement).
 
@@ -215,7 +217,8 @@ class BullFlagDetector:
         Example:
             flagpole = detector._detect_flagpole(bars)
             if flagpole:
-                print(f"Flagpole: {flagpole.gain_pct}% gain over {flagpole.end_idx - flagpole.start_idx} bars")
+                duration = flagpole.end_idx - flagpole.start_idx
+                print(f"Flagpole: {flagpole.gain_pct}% gain over {duration} bars")
         """
         # Handle edge cases: empty or insufficient bars
         if not bars or len(bars) < self.config.min_flagpole_bars:
@@ -228,8 +231,9 @@ class BullFlagDetector:
         best_flagpole = None
 
         # Try extending from minimum bars to maximum bars
-        for end_idx in range(start_idx + self.config.min_flagpole_bars - 1,
-                            min(start_idx + self.config.max_flagpole_bars, len(bars))):
+        min_bars = start_idx + self.config.min_flagpole_bars - 1
+        max_bars = min(start_idx + self.config.max_flagpole_bars, len(bars))
+        for end_idx in range(min_bars, max_bars):
 
             # Extract candidate bars
             flagpole_bars = bars[start_idx:end_idx + 1]
@@ -242,12 +246,14 @@ class BullFlagDetector:
             gain_pct = ((high_price - start_price) / start_price) * Decimal("100")
 
             # Check if gain is within valid range
-            if gain_pct >= self.config.min_flagpole_gain and gain_pct <= self.config.max_flagpole_gain:
+            min_gain = self.config.min_flagpole_gain
+            max_gain = self.config.max_flagpole_gain
+            if gain_pct >= min_gain and gain_pct <= max_gain:
                 # Calculate average volume
                 total_volume = sum(Decimal(str(bar["volume"])) for bar in flagpole_bars)
                 avg_volume = total_volume / Decimal(str(duration))
 
-                # Update best flagpole - greedly extend to find longest valid pattern
+                # Update best flagpole - greedily extend to longest valid
                 best_flagpole = FlagpoleData(
                     start_idx=start_idx,
                     end_idx=end_idx,
@@ -264,7 +270,7 @@ class BullFlagDetector:
 
     def _detect_consolidation(
         self,
-        bars: List[dict],
+        bars: List[Dict[str, Any]],
         flagpole: FlagpoleData
     ) -> Optional[ConsolidationData]:
         """
@@ -293,7 +299,9 @@ class BullFlagDetector:
         Example:
             consolidation = detector._detect_consolidation(bars, flagpole)
             if consolidation:
-                print(f"Consolidation: {consolidation.upper_boundary} - {consolidation.lower_boundary}")
+                upper = consolidation.upper_boundary
+                lower = consolidation.lower_boundary
+                print(f"Consolidation: {upper} - {lower}")
         """
         # Start scanning bars AFTER flagpole ends (index = flagpole.end_idx + 1)
         start_idx = flagpole.end_idx + 1
@@ -305,11 +313,11 @@ class BullFlagDetector:
         # Calculate flagpole gain absolute value for retracement calculation
         gain_absolute = flagpole.high_price - flagpole.start_price
 
-        # Strategy: Find the LONGEST valid consolidation (prefer longer patterns over shorter ones)
+        # Strategy: Find the LONGEST valid consolidation (prefer longer patterns)
         # Try durations from maximum down to minimum
-        best_consolidation = None
-
-        for duration in range(self.config.max_consolidation_bars, self.config.min_consolidation_bars - 1, -1):
+        min_duration = self.config.min_consolidation_bars
+        max_duration = self.config.max_consolidation_bars
+        for duration in range(max_duration, min_duration - 1, -1):
             end_idx = start_idx + duration - 1
 
             # Check if we have enough bars
@@ -319,11 +327,11 @@ class BullFlagDetector:
             # Extract consolidation candidate bars
             consolidation_bars = bars[start_idx:end_idx + 1]
 
-            # Validate duration (should always be valid given our range, but double-check)
-            if len(consolidation_bars) < self.config.min_consolidation_bars:
+            # Validate duration (should be valid given range, double-check)
+            if len(consolidation_bars) < min_duration:
                 continue
 
-            if len(consolidation_bars) > self.config.max_consolidation_bars:
+            if len(consolidation_bars) > max_duration:
                 continue
 
             # Calculate boundaries using closes
@@ -332,10 +340,11 @@ class BullFlagDetector:
             lower_boundary = min(closes)
 
             # Calculate retracement percentage
-            # retracement = ((flagpole.high_price - low_of_consolidation) / flagpole.gain_absolute) * 100
-            retracement_pct = ((flagpole.high_price - lower_boundary) / gain_absolute) * Decimal("100")
+            # retracement = (high - low_consolidation) / gain * 100
+            retracement = flagpole.high_price - lower_boundary
+            retracement_pct = (retracement / gain_absolute) * Decimal("100")
 
-            # Validate retracement is within range (min_retracement_pct <= retracement <= max_retracement_pct)
+            # Validate retracement is within range
             if retracement_pct < self.config.min_retracement_pct:
                 continue
 
@@ -343,12 +352,14 @@ class BullFlagDetector:
                 continue
 
             # Calculate average volume during consolidation
-            total_volume = sum(Decimal(str(bar["volume"])) for bar in consolidation_bars)
-            avg_volume = total_volume / Decimal(str(len(consolidation_bars)))
+            total_vol = sum(Decimal(str(bar["volume"]))
+                            for bar in consolidation_bars)
+            avg_volume = total_vol / Decimal(str(len(consolidation_bars)))
 
-            # Validate volume pattern: consolidation volume should be LESS than flagpole volume
-            # avg_consolidation_volume < (flagpole.avg_volume * volume_decay_threshold)
-            if avg_volume >= (flagpole.avg_volume * self.config.volume_decay_threshold):
+            # Validate volume pattern: consolidation < flagpole volume
+            decay_threshold = self.config.volume_decay_threshold
+            max_allowed_vol = flagpole.avg_volume * decay_threshold
+            if avg_volume >= max_allowed_vol:
                 continue
 
             # Valid consolidation found - return immediately (longest valid match)
@@ -365,7 +376,7 @@ class BullFlagDetector:
 
     def _confirm_breakout(
         self,
-        bars: List[dict],
+        bars: List[Dict[str, Any]],
         consolidation: ConsolidationData
     ) -> Optional[Decimal]:
         """
@@ -420,8 +431,8 @@ class BullFlagDetector:
                 continue
 
             # Calculate price move percentage above resistance
-            move_pct = ((close_price - consolidation.upper_boundary) /
-                       consolidation.upper_boundary) * Decimal("100")
+            price_diff = close_price - consolidation.upper_boundary
+            move_pct = (price_diff / consolidation.upper_boundary) * Decimal("100")
 
             # Check if price move meets minimum requirement
             if move_pct < self.config.min_breakout_move_pct:
@@ -442,7 +453,7 @@ class BullFlagDetector:
         # No valid breakout found within confirmation window
         return None
 
-    def _validate_with_indicators(self, bars: List[dict]) -> dict:
+    def _validate_with_indicators(self, bars: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Validate pattern with technical indicators (VWAP, MACD, EMA).
 
@@ -459,6 +470,9 @@ class BullFlagDetector:
                 - 'vwap': Decimal - Current VWAP value
                 - 'macd': Decimal - Current MACD line value
                 - 'ema_9': Decimal - Current EMA(9) value
+                - 'price_above_vwap': bool - True if price > VWAP
+                - 'macd_positive': bool - True if MACD > 0
+                - 'ema_aligned': bool - True if price within 2% of EMA(9)
                 - 'validation_passed': bool - True if all checks passed
 
         Example:
@@ -466,20 +480,71 @@ class BullFlagDetector:
             if indicators['validation_passed']:
                 print(f"VWAP: {indicators['vwap']}, MACD: {indicators['macd']}")
         """
-        # Stub implementation
-        return {
-            'vwap': Decimal('0'),
-            'macd': Decimal('0'),
-            'ema_9': Decimal('0'),
-            'validation_passed': False
-        }
+        # Import TechnicalIndicatorsService
+        from ..indicators.service import TechnicalIndicatorsService
+
+        try:
+            # Instantiate TechnicalIndicatorsService
+            indicators_service = TechnicalIndicatorsService()
+
+            # Get current price from latest bar
+            current_price = Decimal(str(bars[-1]['close']))
+
+            # Get VWAP value
+            vwap_result = indicators_service.get_vwap(bars)
+            vwap_value = vwap_result.vwap
+
+            # Get MACD value
+            macd_result = indicators_service.get_macd(bars)
+            macd_value = macd_result.macd_line
+
+            # Get EMA-9 value
+            ema_result = indicators_service.get_emas(bars)
+            ema_9_value = ema_result.ema_9
+
+            # Validate entry criteria
+            price_above_vwap = current_price > vwap_value
+            macd_positive = macd_value > Decimal('0')
+
+            # Check if price is within 2% of EMA-9
+            if ema_9_value > Decimal('0'):
+                ema_diff_pct = abs(current_price - ema_9_value) / ema_9_value * Decimal('100')
+                ema_aligned = ema_diff_pct <= Decimal('2.0')
+            else:
+                ema_aligned = False
+
+            # All criteria must pass
+            validation_passed = price_above_vwap and macd_positive and ema_aligned
+
+            return {
+                'vwap': vwap_value,
+                'macd': macd_value,
+                'ema_9': ema_9_value,
+                'price_above_vwap': price_above_vwap,
+                'macd_positive': macd_positive,
+                'ema_aligned': ema_aligned,
+                'validation_passed': validation_passed
+            }
+
+        except Exception:
+            # Degrade gracefully on error - return failed validation
+            # Log error if possible (can be enhanced later)
+            return {
+                'vwap': Decimal('0'),
+                'macd': Decimal('0'),
+                'ema_9': Decimal('0'),
+                'price_above_vwap': False,
+                'macd_positive': False,
+                'ema_aligned': False,
+                'validation_passed': False
+            }
 
     def _calculate_risk_parameters(
         self,
         flagpole: FlagpoleData,
         consolidation: ConsolidationData,
         breakout_price: Decimal
-    ) -> dict:
+    ) -> Dict[str, Any]:
         """
         Calculate risk management parameters (entry, stop-loss, target, R/R).
 
@@ -544,7 +609,7 @@ class BullFlagDetector:
         self,
         flagpole: FlagpoleData,
         consolidation: ConsolidationData,
-        indicators: dict
+        indicators: Dict[str, Any]
     ) -> int:
         """
         Calculate pattern quality score (0-100).
@@ -650,7 +715,8 @@ class BullFlagDetector:
 
         # Check EMA proximity (price within 2% of EMA-9)
         if 'ema_9' in indicators and indicators['ema_9'] > Decimal('0'):
-            ema_diff_pct = abs(current_price - indicators['ema_9']) / indicators['ema_9'] * Decimal('100')
+            ema_diff = abs(current_price - indicators['ema_9'])
+            ema_diff_pct = (ema_diff / indicators['ema_9']) * Decimal('100')
             if ema_diff_pct <= Decimal('2.0'):
                 aligned_count += 1
 
@@ -700,12 +766,12 @@ class BullFlagDetector:
             symbol: Stock ticker symbol
             error: Error message to log
         """
-        import os
         from pathlib import Path
 
         # Try to find specs/003-entry-logic-bull-flag/error-log.md
         try:
-            specs_dir = Path(__file__).parent.parent.parent.parent / "specs" / "003-entry-logic-bull-flag"
+            base_path = Path(__file__).parent.parent.parent.parent
+            specs_dir = base_path / "specs" / "003-entry-logic-bull-flag"
             error_log = specs_dir / "error-log.md"
 
             if specs_dir.exists():
@@ -730,7 +796,7 @@ class BullFlagDetector:
 # Standalone functions for testing
 # These wrap the class methods for easier test imports
 
-def detect_flagpole(bars: List[dict]) -> Optional[FlagpoleData]:
+def detect_flagpole(bars: List[Dict[str, Any]]) -> Optional[FlagpoleData]:
     """
     Standalone function to detect flagpole pattern.
 
@@ -753,7 +819,7 @@ def detect_flagpole(bars: List[dict]) -> Optional[FlagpoleData]:
 
 
 def detect_consolidation(
-    bars: List[dict],
+    bars: List[Dict[str, Any]],
     flagpole: FlagpoleData
 ) -> Optional[ConsolidationData]:
     """
@@ -780,7 +846,7 @@ def detect_consolidation(
 
 def confirm_breakout(
     consolidation: ConsolidationData,
-    confirmation_bar: dict,
+    confirmation_bar: Dict[str, Any],
     bar_index: Optional[int] = None
 ) -> Optional[Decimal]:
     """
@@ -802,7 +868,6 @@ def confirm_breakout(
         result = confirm_breakout(consolidation, bar)
     """
     config = BullFlagConfig()
-    detector = BullFlagDetector(config)
 
     # For standalone function, we need to handle the single bar case
     # Convert confirmation_bar to a list if needed
@@ -820,14 +885,16 @@ def confirm_breakout(
         return None
 
     # Calculate price move percentage
-    price_move_pct = ((close_price - consolidation.upper_boundary) / consolidation.upper_boundary) * Decimal("100")
+    price_diff = close_price - consolidation.upper_boundary
+    price_move_pct = (price_diff / consolidation.upper_boundary) * Decimal("100")
 
     # Validate minimum price move
     if price_move_pct < config.min_breakout_move_pct:
         return None
 
     # Calculate volume increase percentage
-    volume_increase_pct = ((volume - consolidation.avg_volume) / consolidation.avg_volume) * Decimal("100")
+    vol_diff = volume - consolidation.avg_volume
+    volume_increase_pct = (vol_diff / consolidation.avg_volume) * Decimal("100")
 
     # Validate minimum volume increase
     if volume_increase_pct < config.min_breakout_volume_increase:
@@ -841,7 +908,7 @@ def calculate_risk_parameters(
     flagpole: FlagpoleData,
     consolidation: ConsolidationData,
     breakout_price: Decimal
-) -> dict:
+) -> Dict[str, Any]:
     """
     Standalone function to calculate risk parameters.
 
@@ -868,7 +935,7 @@ def calculate_risk_parameters(
 def calculate_quality_score(
     flagpole: FlagpoleData,
     consolidation: ConsolidationData,
-    indicators: dict
+    indicators: Dict[str, Any]
 ) -> int:
     """
     Standalone function to calculate quality score.

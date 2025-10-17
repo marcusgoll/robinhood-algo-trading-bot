@@ -29,7 +29,8 @@ class BullFlagConfig:
         min_breakout_move_pct: Minimum price move on breakout (default: 1.0%)
         min_quality_score: Minimum pattern quality score (default: 60)
         min_risk_reward_ratio: Minimum risk/reward ratio (default: 2.0)
-        volume_decay_threshold: Maximum volume increase threshold during consolidation (default: 0.9)
+        volume_decay_threshold: Max volume increase threshold during
+            consolidation (default: 0.9)
 
     Example:
         config = BullFlagConfig(min_flagpole_gain=Decimal('7.0'), min_quality_score=70)
@@ -77,8 +78,11 @@ class BullFlagConfig:
             )
 
         if self.min_flagpole_gain >= self.max_flagpole_gain:
+            min_gain = self.min_flagpole_gain
+            max_gain = self.max_flagpole_gain
             raise ValueError(
-                f"min_flagpole_gain ({self.min_flagpole_gain}) must be < max_flagpole_gain ({self.max_flagpole_gain})"
+                f"min_flagpole_gain ({min_gain}) must be < "
+                f"max_flagpole_gain ({max_gain})"
             )
 
         # Validate flagpole bars range
@@ -93,8 +97,11 @@ class BullFlagConfig:
             )
 
         if self.min_flagpole_bars >= self.max_flagpole_bars:
+            min_bars = self.min_flagpole_bars
+            max_bars = self.max_flagpole_bars
             raise ValueError(
-                f"min_flagpole_bars ({self.min_flagpole_bars}) must be < max_flagpole_bars ({self.max_flagpole_bars})"
+                f"min_flagpole_bars ({min_bars}) must be < "
+                f"max_flagpole_bars ({max_bars})"
             )
 
         # Validate consolidation bars range
@@ -109,8 +116,11 @@ class BullFlagConfig:
             )
 
         if self.min_consolidation_bars >= self.max_consolidation_bars:
+            min_cons = self.min_consolidation_bars
+            max_cons = self.max_consolidation_bars
             raise ValueError(
-                f"min_consolidation_bars ({self.min_consolidation_bars}) must be < max_consolidation_bars ({self.max_consolidation_bars})"
+                f"min_consolidation_bars ({min_cons}) must be < "
+                f"max_consolidation_bars ({max_cons})"
             )
 
         # Validate retracement percentages
@@ -125,14 +135,18 @@ class BullFlagConfig:
             )
 
         if self.min_retracement_pct >= self.max_retracement_pct:
+            min_ret = self.min_retracement_pct
+            max_ret = self.max_retracement_pct
             raise ValueError(
-                f"min_retracement_pct ({self.min_retracement_pct}) must be < max_retracement_pct ({self.max_retracement_pct})"
+                f"min_retracement_pct ({min_ret}) must be < "
+                f"max_retracement_pct ({max_ret})"
             )
 
         # Validate breakout volume increase
         if self.min_breakout_volume_increase <= 0:
+            vol_inc = self.min_breakout_volume_increase
             raise ValueError(
-                f"min_breakout_volume_increase must be > 0, got {self.min_breakout_volume_increase}"
+                f"min_breakout_volume_increase must be > 0, got {vol_inc}"
             )
 
         # Validate breakout move percentage
