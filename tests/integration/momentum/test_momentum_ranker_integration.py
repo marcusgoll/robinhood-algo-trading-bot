@@ -232,7 +232,7 @@ async def test_momentum_ranker_e2e_ranks_signals_correctly(
     Coverage: ≥90% critical path (rank, score_composite, aggregation)
     """
     # GIVEN: Initialize ranker
-    ranker = MomentumRanker(config=mock_config, logger=mock_logger)
+    ranker = MomentumRanker(momentum_logger=mock_logger)
 
     # WHEN: Rank mixed signals
     ranked_signals = ranker.rank(mixed_signals_all_types)
@@ -339,7 +339,7 @@ async def test_momentum_ranker_groups_signals_by_symbol(
         create_test_signal("MSFT", SignalType.PATTERN, 90.0, current_time),
     ]
 
-    ranker = MomentumRanker(config=mock_config, logger=mock_logger)
+    ranker = MomentumRanker(momentum_logger=mock_logger)
 
     # WHEN: Rank signals
     ranked = ranker.rank(signals)
@@ -396,7 +396,7 @@ async def test_momentum_ranker_handles_missing_signals(
         create_test_signal("ONLYC", SignalType.PATTERN, 85.0, current_time),
     ]
 
-    ranker = MomentumRanker(config=mock_config, logger=mock_logger)
+    ranker = MomentumRanker(momentum_logger=mock_logger)
 
     # WHEN: Rank signals with missing types
     ranked = ranker.rank(signals)
@@ -453,7 +453,7 @@ async def test_momentum_ranker_performance(
     Coverage: Performance validation
     """
     # GIVEN: Initialize ranker
-    ranker = MomentumRanker(config=mock_config, logger=mock_logger)
+    ranker = MomentumRanker(momentum_logger=mock_logger)
 
     # WHEN: Measure ranking time
     start_time = datetime.now(UTC)
@@ -502,7 +502,7 @@ async def test_momentum_ranker_empty_input(
     Coverage: Edge case handling
     """
     # GIVEN: Initialize ranker
-    ranker = MomentumRanker(config=mock_config, logger=mock_logger)
+    ranker = MomentumRanker(momentum_logger=mock_logger)
 
     # WHEN: Rank empty list
     ranked = ranker.rank([])
@@ -548,7 +548,7 @@ async def test_momentum_ranker_composite_signals_excluded(
         ),
     ]
 
-    ranker = MomentumRanker(config=mock_config, logger=mock_logger)
+    ranker = MomentumRanker(momentum_logger=mock_logger)
 
     # WHEN: Rank signals with COMPOSITE in input
     ranked = ranker.rank(signals)
@@ -589,7 +589,7 @@ async def test_momentum_ranker_score_composite_unit(
     Coverage: score_composite() method (unit test within integration suite)
     """
     # GIVEN: Initialize ranker
-    ranker = MomentumRanker(config=mock_config, logger=mock_logger)
+    ranker = MomentumRanker(momentum_logger=mock_logger)
 
     # Test case 1: All signals present (from spec example)
     composite = ranker.score_composite(

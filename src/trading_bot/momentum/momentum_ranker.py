@@ -154,6 +154,10 @@ class MomentumRanker:
             details_dict: dict[str, Any] = {
                 "composite_score": composite_score,
                 "signal_count": len(symbol_signals),
+                # Add component scores from aggregation
+                "catalyst_score": scores.get(SignalType.CATALYST, 0.0),
+                "premarket_score": scores.get(SignalType.PREMARKET, 0.0),
+                "pattern_score": scores.get(SignalType.PATTERN, 0.0),
             }
 
             # Add individual signal details
