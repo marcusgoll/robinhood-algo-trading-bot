@@ -1,0 +1,60 @@
+# Momentum Detection Feature - Workflow State
+feature:
+  slug: "002-momentum-detection"
+  title: "Momentum and catalyst detection"
+  description: "Identify stocks with breaking news catalysts, track pre-market movers, scan for bull flag patterns"
+  created_at: "2025-10-16T20:45:00Z"
+  
+deployment_model: "local-only"
+
+workflow:
+  phase: "tasks"
+  status: "pending"
+  phases_completed:
+    - "spec"
+    - "plan"
+  current_phase_start: "2025-10-16T21:10:00Z"
+  
+quality_gates:
+  pre_flight:
+    passed: false
+    timestamp: null
+  code_review:
+    passed: false
+    timestamp: null
+    
+manual_gates:
+  preview:
+    status: "pending"
+  validate_staging:
+    status: "pending"
+
+phase_summaries:
+  spec:
+    status: "completed"
+    requirements_count: 20
+    user_stories_count: 7
+    key_decisions: 5
+    blockers: 3
+    clarifications_needed: false
+  plan:
+    status: "completed"
+    research_decisions: 4
+    components_to_reuse: 3
+    new_components: 4
+    unknowns_identified: 4
+
+artifacts:
+  spec: "specs/002-momentum-detection/spec.md"
+  notes: "specs/002-momentum-detection/NOTES.md"
+  research: "specs/002-momentum-detection/research.md"
+  plan: "specs/002-momentum-detection/plan.md"
+  data_model: "specs/002-momentum-detection/data-model.md"
+  contracts: "specs/002-momentum-detection/contracts/api.yaml"
+  quickstart: "specs/002-momentum-detection/quickstart.md"
+  tasks: null
+  analysis: null
+  code_review: null
+  optimization_report: null
+  preview_checklist: null
+  finalization_summary: null

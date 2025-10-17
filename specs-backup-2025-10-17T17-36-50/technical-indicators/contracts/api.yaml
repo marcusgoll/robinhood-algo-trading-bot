@@ -1,0 +1,308 @@
+# Technical Indicators API Contract
+#
+# Internal Python API for technical indicator calculations
+# (Not a REST API - internal service interface)
+
+indicators:
+  TechnicalIndicatorsService:
+    description: Facade for technical indicator calculations with market data integration
+    methods:
+      get_vwap:
+        description: Calculate current VWAP for symbol from intraday data
+        parameters:
+          - name: symbol
+            type: str
+            required: true
+            example: "AAPL"
+        returns:
+          type: VWAPResult
+          schema:
+            symbol: str
+            vwap: Decimal
+            price: Decimal
+            calculated_at: datetime
+            bars_used: int
+        raises:
+          - InsufficientDataError: If fewer than 10 intraday bars available
+          - DataValidationError: If OHLCV data invalid
+          - RateLimitError: If API rate limit exceeded (after retries)
+
+      get_emas:
+        description: Calculate EMAs for symbol (default 9 and 20-period)
+        parameters:
+          - name: symbol
+            type: str
+            required: true
+            example: "AAPL"
+          - name: periods
+            type: list[int] | None
+            required: false
+            default: [9, 20]
+        returns:
+          type: EMAResult
+          schema:
+            symbol: str
+            ema_9: Decimal
+            ema_20: Decimal
+            current_price: Decimal
+            calculated_at: datetime
+            crossover: CrossoverSignal | None
+        raises:
+          - InsufficientDataError: If fewer than (max_period * 2) bars available
+          - DataValidationError: If OHLCV data invalid
+
+      get_macd:
+        description: Calculate MACD indicator (12/26/9 periods)
+        parameters:
+          - name: symbol
+            type: str
+            required: true
+            example: "AAPL"
+        returns:
+          type: MACDResult
+          schema:
+            symbol: str
+            macd_line: Decimal
+            signal_line: Decimal
+            histogram: Decimal
+            calculated_at: datetime
+        raises:
+          - InsufficientDataError: If fewer than 35 bars available
+          - DataValidationError: If OHLCV data invalid
+
+      get_all_indicators:
+        description: Calculate all indicators for symbol (batch operation)
+        parameters:
+          - name: symbol
+            type: str
+            required: true
+            example: "AAPL"
+        returns:
+          type: IndicatorSet
+          schema:
+            symbol: str
+            vwap: VWAPResult
+            emas: EMAResult
+            macd: MACDResult
+            calculated_at: datetime
+        raises:
+          - InsufficientDataError: If insufficient data for any indicator
+          - DataValidationError: If OHLCV data invalid
+
+      validate_entry:
+        description: Validate entry conditions (price > VWAP AND MACD > 0)
+        parameters:
+          - name: symbol
+            type: str
+            required: true
+            example: "AAPL"
+          - name: price
+            type: Decimal
+            required: true
+            example: Decimal("152.50")
+        returns:
+          type: EntryValidation
+          schema:
+            allowed: bool
+            reason: str
+            vwap: Decimal
+            macd: Decimal
+            price: Decimal
+            validated_at: datetime
+        raises:
+          - InsufficientDataError: If indicators cannot be calculated
+          - DataValidationError: If input price invalid
+
+      check_exit_signals:
+        description: Check for MACD exit signals (zero cross, bearish crossover)
+        parameters:
+          - name: symbol
+            type: str
+            required: true
+            example: "AAPL"
+        returns:
+          type: list[ExitSignal]
+          schema:
+            - reason: str
+              macd_value: Decimal
+              signal_value: Decimal
+              triggered_at: datetime
+        raises:
+          - InsufficientDataError: If insufficient data for MACD calculation
+
+      refresh_indicators:
+        description: Refresh indicators for multiple symbols (intraday update)
+        parameters:
+          - name: symbols
+            type: list[str]
+            required: true
+            example: ["AAPL", "GOOGL", "TSLA"]
+        returns:
+          type: None
+          description: Updates internal cache (implementation detail)
+        raises:
+          - DataValidationError: If any symbol invalid
+
+calculators:
+  VWAPCalculator:
+    description: VWAP calculation and validation
+    methods:
+      calculate:
+        description: Calculate VWAP from intraday OHLCV data
+        parameters:
+          - name: ohlcv
+            type: pd.DataFrame
+            required: true
+            columns: [date, open, high, low, close, volume]
+        returns:
+          type: VWAPResult
+        raises:
+          - InsufficientDataError: If fewer than 10 bars
+          - ValueError: If invalid data (negative prices, zero volume)
+
+      validate_entry:
+        description: Check if price is above VWAP (long entry allowed)
+        parameters:
+          - name: price
+            type: Decimal
+            required: true
+          - name: vwap
+            type: Decimal
+            required: true
+        returns:
+          type: bool
+          description: True if price > vwap, False otherwise
+
+  EMACalculator:
+    description: EMA calculation and crossover detection
+    methods:
+      calculate_ema:
+        description: Calculate exponential moving average for given period
+        parameters:
+          - name: prices
+            type: pd.Series
+            required: true
+            description: Close prices
+          - name: period
+            type: int
+            required: true
+            example: 9
+        returns:
+          type: pd.Series
+          description: EMA values (same length as input)
+        raises:
+          - InsufficientDataError: If fewer than (period * 2) bars
+
+      detect_crossover:
+        description: Detect EMA crossover event (bullish or bearish)
+        parameters:
+          - name: ema_short
+            type: Decimal
+            required: true
+            description: Current 9-period EMA
+          - name: ema_long
+            type: Decimal
+            required: true
+            description: Current 20-period EMA
+          - name: prev_short
+            type: Decimal
+            required: true
+            description: Previous 9-period EMA
+          - name: prev_long
+            type: Decimal
+            required: true
+            description: Previous 20-period EMA
+        returns:
+          type: CrossoverSignal | None
+          description: CrossoverSignal if crossover detected, None otherwise
+
+      check_proximity:
+        description: Check if price is within threshold % of EMA
+        parameters:
+          - name: price
+            type: Decimal
+            required: true
+          - name: ema
+            type: Decimal
+            required: true
+          - name: threshold_pct
+            type: float
+            required: true
+            example: 2.0
+        returns:
+          type: bool
+          description: True if within threshold, False otherwise
+
+  MACDCalculator:
+    description: MACD calculation and signal detection
+    methods:
+      calculate:
+        description: Calculate MACD indicator (line, signal, histogram)
+        parameters:
+          - name: prices
+            type: pd.Series
+            required: true
+            description: Close prices
+        returns:
+          type: MACDResult
+        raises:
+          - InsufficientDataError: If fewer than 35 bars
+
+      validate_momentum:
+        description: Check if MACD is positive (long entry momentum confirmation)
+        parameters:
+          - name: macd_line
+            type: Decimal
+            required: true
+        returns:
+          type: bool
+          description: True if macd_line > 0, False otherwise
+
+      detect_divergence:
+        description: Detect MACD divergence (histogram change)
+        parameters:
+          - name: current
+            type: MACDResult
+            required: true
+          - name: previous
+            type: MACDResult
+            required: true
+        returns:
+          type: DivergenceSignal | None
+          description: DivergenceSignal if divergence detected, None otherwise
+
+      check_exit_signal:
+        description: Check for MACD exit conditions
+        parameters:
+          - name: current
+            type: MACDResult
+            required: true
+          - name: previous
+            type: MACDResult
+            required: true
+        returns:
+          type: ExitSignal | None
+          description: ExitSignal if exit condition met, None otherwise
+
+exceptions:
+  InsufficientDataError:
+    description: Insufficient historical data for indicator calculation
+    base: ValueError
+    attributes:
+      - name: symbol
+        type: str
+      - name: required_bars
+        type: int
+      - name: available_bars
+        type: int
+
+  DataValidationError:
+    description: Invalid market data (negative prices, zero volume, NaN)
+    base: ValueError
+    attributes:
+      - name: field
+        type: str
+      - name: value
+        type: Any
+      - name: constraint
+        type: str

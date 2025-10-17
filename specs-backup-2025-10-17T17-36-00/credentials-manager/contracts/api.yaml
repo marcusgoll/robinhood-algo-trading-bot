@@ -1,0 +1,113 @@
+openapi: 3.0.0
+info:
+  title: Credentials Management Internal API
+  description: Internal API schema for credential validation and token management
+  version: 1.0.0
+
+components:
+  schemas:
+    Credentials:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          format: email
+          description: Robinhood account email
+          example: user@example.com
+        password:
+          type: string
+          minLength: 8
+          description: Robinhood account password (masked in logs)
+          example: "********"
+        mfa_secret:
+          type: string
+          pattern: "^[A-Z2-7]{16}$"
+          description: TOTP MFA secret (16-char base32)
+          example: ABCDEFGHIJKLMNOP
+        device_token:
+          type: string
+          description: Device token for passwordless auth (optional)
+          example: 1a2b3c4d5e6f7g8h9i0j
+          nullable: true
+
+    MaskedCredentials:
+      type: object
+      description: Credentials with sensitive data masked for logging
+      properties:
+        username:
+          type: string
+          example: "joh***@example.com"
+        password:
+          type: string
+          example: "*****"
+        mfa_secret:
+          type: string
+          example: "****"
+        device_token:
+          type: string
+          example: "1a2b3c4d***"
+
+    ValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: Overall validation status
+        errors:
+          type: array
+          items:
+            type: string
+          description: List of validation errors (must be empty if valid=true)
+        warnings:
+          type: array
+          items:
+            type: string
+          description: List of validation warnings
+
+    AuthEvent:
+      type: object
+      description: Structured log event for authentication operations
+      required:
+        - event
+        - auth_method
+        - username
+        - timestamp
+      properties:
+        event:
+          type: string
+          enum:
+            - auth_success
+            - auth_failed
+            - device_token_stored
+            - device_token_refreshed
+            - credentials_validated
+            - credentials_validation_failed
+          description: Event type
+        auth_method:
+          type: string
+          enum:
+            - device_token
+            - mfa
+          description: Authentication method used
+        username:
+          type: string
+          description: Masked username for audit trail
+          example: "joh***@example.com"
+        duration_ms:
+          type: integer
+          description: Operation duration in milliseconds
+          example: 1234
+        error:
+          type: string
+          description: Error message if event is failure
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+          description: Event timestamp (UTC)
+
+# Internal methods (not REST endpoints - Python API only)
+paths: {}  # No external API endpoints - internal module only

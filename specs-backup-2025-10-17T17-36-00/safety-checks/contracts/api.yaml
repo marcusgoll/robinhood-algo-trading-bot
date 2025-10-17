@@ -1,0 +1,127 @@
+# Safety Checks Module Contract
+
+## Internal Python API (not REST API)
+
+### SafetyChecks Class
+
+```python
+class SafetyChecks:
+    def __init__(self, config: Config) -> None:
+        """Initialize safety checks with configuration."""
+
+    def validate_trade(
+        self,
+        symbol: str,
+        action: str,  # "BUY" or "SELL"
+        quantity: int,
+        price: float,
+        current_buying_power: float
+    ) -> SafetyResult:
+        """
+        Validate trade against all safety checks.
+
+        Args:
+            symbol: Stock symbol (e.g., "AAPL")
+            action: Trade action ("BUY" or "SELL")
+            quantity: Number of shares
+            price: Price per share
+            current_buying_power: Available buying power from account
+
+        Returns:
+            SafetyResult with is_safe, reason, circuit_breaker_triggered
+        """
+
+    def check_buying_power(
+        self,
+        quantity: int,
+        price: float,
+        current_buying_power: float
+    ) -> bool:
+        """Check if sufficient buying power exists."""
+
+    def check_trading_hours(self) -> bool:
+        """Check if current time is within trading hours."""
+
+    def check_daily_loss_limit(self, current_daily_pnl: float, portfolio_value: float) -> bool:
+        """Check if daily loss limit exceeded."""
+
+    def check_consecutive_losses(self) -> bool:
+        """Check if consecutive loss limit exceeded."""
+
+    def calculate_position_size(
+        self,
+        entry_price: float,
+        stop_loss_price: float,
+        account_balance: float
+    ) -> PositionSize:
+        """Calculate position size based on risk."""
+
+    def check_duplicate_order(self, symbol: str, action: str) -> bool:
+        """Check for duplicate pending orders."""
+
+    def trigger_circuit_breaker(self, reason: str) -> None:
+        """Trigger circuit breaker with reason."""
+
+    def reset_circuit_breaker(self) -> None:
+        """Reset circuit breaker (manual only)."""
+```
+
+### Data Classes
+
+```python
+@dataclass
+class SafetyResult:
+    is_safe: bool
+    reason: Optional[str] = None
+    circuit_breaker_triggered: bool = False
+
+@dataclass
+class PositionSize:
+    dollar_amount: float
+    share_quantity: int
+    risk_amount: float
+    stop_loss_price: float
+```
+
+### Usage Example
+
+```python
+from src.trading_bot.safety_checks import SafetyChecks, SafetyResult
+from src.trading_bot.config import Config
+
+config = Config.from_env_and_json()
+safety = SafetyChecks(config)
+
+# Validate trade
+result = safety.validate_trade(
+    symbol="AAPL",
+    action="BUY",
+    quantity=100,
+    price=150.00,
+    current_buying_power=10000.00
+)
+
+if result.is_safe:
+    # Execute trade
+    print("Trade allowed")
+else:
+    print(f"Trade blocked: {result.reason}")
+    if result.circuit_breaker_triggered:
+        print("Circuit breaker triggered - manual reset required")
+```
+
+### Error Conditions
+
+**Blocked Trade Reasons**:
+- "Insufficient buying power: $X available, $Y required"
+- "Outside trading hours (7am-10am EST)"
+- "Daily loss limit exceeded: X% (limit: Y%)"
+- "3 consecutive losses detected"
+- "Circuit breaker active - manual reset required"
+- "Duplicate order detected for SYMBOL"
+- "Position size exceeds 5% portfolio limit"
+
+**Exceptions**:
+- ValueError: Invalid parameters (negative price, invalid symbol)
+- FileNotFoundError: Circuit breaker state file missing (creates new)
+- JSONDecodeError: Corrupt state file (trips circuit breaker for safety)

@@ -1,0 +1,637 @@
+openapi: 3.0.0
+
+info:
+  title: Momentum and Catalyst Detection API
+  version: 1.0.0
+  description: Backend API for detecting and ranking high-probability trading opportunities
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+  - url: http://localhost:3000
+    description: Next.js proxy (dev)
+
+paths:
+  /api/v1/momentum/signals:
+    get:
+      summary: List detected momentum signals
+      operationId: listSignals
+      description: Retrieve momentum signals filtered by type, strength, and time range
+
+      parameters:
+        - name: symbols
+          in: query
+          description: Comma-separated stock symbols (e.g., "AAPL,GOOGL")
+          schema:
+            type: string
+            example: "AAPL,GOOGL,TSLA"
+
+        - name: signal_type
+          in: query
+          description: Filter by signal type
+          schema:
+            type: string
+            enum: [catalyst, premarket_mover, bull_flag]
+          example: "bull_flag"
+
+        - name: min_strength
+          in: query
+          description: Only return signals with strength >= this value (0-100)
+          schema:
+            type: number
+            minimum: 0
+            maximum: 100
+            default: 0
+          example: 70
+
+        - name: max_strength
+          in: query
+          description: Only return signals with strength <= this value (0-100)
+          schema:
+            type: number
+            minimum: 0
+            maximum: 100
+            default: 100
+
+        - name: start_time
+          in: query
+          description: ISO 8601 UTC timestamp (default last 24 hours)
+          schema:
+            type: string
+            format: date-time
+          example: "2025-10-16T00:00:00Z"
+
+        - name: end_time
+          in: query
+          description: ISO 8601 UTC timestamp (default now)
+          schema:
+            type: string
+            format: date-time
+          example: "2025-10-16T23:59:59Z"
+
+        - name: sort_by
+          in: query
+          description: Sort column
+          schema:
+            type: string
+            enum: [strength, timestamp, symbol]
+            default: strength
+
+        - name: sort_order
+          in: query
+          description: Sort direction
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+
+        - name: limit
+          in: query
+          description: Results per page (max 1000)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+
+        - name: offset
+          in: query
+          description: Pagination offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignalListResponse'
+
+        400:
+          description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        401:
+          description: Unauthorized (missing auth token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+      tags: [Signals]
+
+  /api/v1/momentum/signals/{id}:
+    get:
+      summary: Get specific signal by ID
+      operationId: getSignal
+      description: Retrieve full details of a specific momentum signal
+
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Signal UUID
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+      responses:
+        200:
+          description: Signal found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signal:
+                    $ref: '#/components/schemas/MomentumSignal'
+
+        404:
+          description: Signal not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+      tags: [Signals]
+
+  /api/v1/momentum/scan:
+    post:
+      summary: Trigger momentum scan (async)
+      operationId: startScan
+      description: |
+        Start an asynchronous scan for momentum signals.
+        Returns immediately with scan_id for polling status.
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanRequest'
+
+      responses:
+        202:
+          description: Scan started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanStartResponse'
+
+        400:
+          description: Bad request (invalid symbols/scan_types)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        429:
+          description: Rate limit exceeded (max 10 scans/min)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+      tags: [Scans]
+
+  /api/v1/momentum/scan/{scanId}:
+    get:
+      summary: Get scan status and results
+      operationId: getScanStatus
+      description: Poll for scan completion status and results
+
+      parameters:
+        - name: scanId
+          in: path
+          required: true
+          description: Scan UUID from initial POST /scan response
+          schema:
+            type: string
+            format: uuid
+          example: "660f9500-e29b-41d4-a716-446655440111"
+
+      responses:
+        200:
+          description: Scan status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanStatusResponse'
+
+        404:
+          description: Scan not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+      tags: [Scans]
+
+  /api/v1/momentum/health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      description: Check if momentum detection service is operational
+
+      responses:
+        200:
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, degraded]
+                  dependencies:
+                    type: object
+                    properties:
+                      market_data:
+                        type: string
+                        enum: [ok, error]
+                      news_api:
+                        type: string
+                        enum: [ok, error]
+                      logging:
+                        type: string
+                        enum: [ok, error]
+
+        503:
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+      tags: [Health]
+
+components:
+  schemas:
+    # Core Data Models
+
+    MomentumSignal:
+      type: object
+      description: Detected trading opportunity
+      required: [id, symbol, signal_type, timestamp, strength, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique signal identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+        symbol:
+          type: string
+          description: Stock ticker symbol
+          pattern: '^[A-Z]{1,5}$'
+          example: "AAPL"
+
+        signal_type:
+          type: string
+          enum: [catalyst, premarket_mover, bull_flag]
+          description: Type of signal detected
+          example: "bull_flag"
+
+        timestamp:
+          type: string
+          format: date-time
+          description: When signal was detected (UTC ISO 8601)
+          example: "2025-10-16T14:30:00Z"
+
+        strength:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Composite signal strength score (0-100)
+          example: 85.5
+
+        metadata:
+          type: object
+          description: Type-specific signal metadata
+          example:
+            pole_gain_pct: 12.3
+            breakout_price: 195.50
+            price_target: 210.00
+
+        created_at:
+          type: string
+          format: date-time
+          description: When signal was logged (UTC ISO 8601)
+          example: "2025-10-16T14:30:00Z"
+
+        updated_at:
+          type: string
+          format: date-time
+          description: Last modified timestamp
+          example: "2025-10-16T14:30:00Z"
+
+    CatalystEvent:
+      type: object
+      description: News-driven catalyst event
+      properties:
+        id:
+          type: string
+          format: uuid
+
+        symbol:
+          type: string
+          pattern: '^[A-Z]{1,5}$'
+
+        catalyst_type:
+          type: string
+          enum:
+            - earnings
+            - fda_approval
+            - merger
+            - product_launch
+            - analyst_upgrade
+            - analyst_downgrade
+
+        headline:
+          type: string
+          maxLength: 500
+
+        published_at:
+          type: string
+          format: date-time
+
+        source:
+          type: string
+          example: "Alpaca News"
+
+        source_url:
+          type: string
+          format: uri
+
+    PreMarketMover:
+      type: object
+      description: Pre-market activity data
+      properties:
+        symbol:
+          type: string
+          pattern: '^[A-Z]{1,5}$'
+
+        price_change_pct:
+          type: number
+          format: float
+          example: 7.5
+
+        volume:
+          type: integer
+          minimum: 0
+          example: 2500000
+
+        avg_volume:
+          type: integer
+          minimum: 0
+          example: 1000000
+
+        volume_ratio:
+          type: number
+          format: float
+          example: 2.5
+
+        timestamp:
+          type: string
+          format: date-time
+
+    BullFlagPattern:
+      type: object
+      description: Technical pattern data
+      properties:
+        symbol:
+          type: string
+          pattern: '^[A-Z]{1,5}$'
+
+        pole_gain_pct:
+          type: number
+          format: float
+          example: 12.3
+
+        flag_range_pct:
+          type: number
+          format: float
+          example: 4.5
+
+        breakout_price:
+          type: number
+          format: float
+          example: 195.50
+
+        breakout_distance_pct:
+          type: number
+          format: float
+          example: 2.8
+
+        price_target:
+          type: number
+          format: float
+          example: 210.00
+
+        pattern_valid:
+          type: boolean
+
+    # Request/Response Schemas
+
+    ScanRequest:
+      type: object
+      description: Request to start a momentum scan
+      required: [symbols]
+      properties:
+        symbols:
+          type: array
+          items:
+            type: string
+            pattern: '^[A-Z]{1,5}$'
+          minItems: 1
+          maxItems: 500
+          description: Stock symbols to scan
+          example: ["AAPL", "GOOGL", "TSLA"]
+
+        scan_types:
+          type: array
+          items:
+            type: string
+            enum: [catalyst, premarket, bull_flag]
+          description: Which detectors to run (default all)
+          example: ["catalyst", "bull_flag"]
+
+    ScanStartResponse:
+      type: object
+      description: Response when scan successfully started
+      properties:
+        scan_id:
+          type: string
+          format: uuid
+          description: ID to use for polling status
+          example: "660f9500-e29b-41d4-a716-446655440111"
+
+        status:
+          type: string
+          enum: [queued, running]
+          example: "queued"
+
+        estimated_completion:
+          type: string
+          format: date-time
+          description: Estimated completion time (UTC ISO 8601)
+          example: "2025-10-16T14:35:00Z"
+
+    ScanStatusResponse:
+      type: object
+      description: Scan status and results
+      properties:
+        scan_id:
+          type: string
+          format: uuid
+
+        status:
+          type: string
+          enum: [queued, running, completed, failed]
+
+        started_at:
+          type: string
+          format: date-time
+
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+        symbols_scanned:
+          type: integer
+          example: 100
+
+        signals_found:
+          type: integer
+          example: 15
+
+        signals:
+          type: array
+          items:
+            $ref: '#/components/schemas/MomentumSignal'
+
+        error:
+          type: string
+          nullable: true
+          description: Error message if status=failed
+
+    SignalListResponse:
+      type: object
+      description: Paginated list of signals
+      properties:
+        signals:
+          type: array
+          items:
+            $ref: '#/components/schemas/MomentumSignal'
+
+        total:
+          type: integer
+          description: Total signals matching filter
+          example: 150
+
+        count:
+          type: integer
+          description: Signals in this page
+          example: 100
+
+        has_more:
+          type: boolean
+          description: Whether more results available
+          example: true
+
+        next_offset:
+          type: integer
+          description: Offset for next page
+          example: 100
+
+    ErrorResponse:
+      type: object
+      description: Error response
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid symbol format"
+
+        error_id:
+          type: string
+          description: Error tracking ID for support
+          example: "ERR-001-ABC123"
+
+        details:
+          type: object
+          nullable: true
+          description: Additional error context
+          example:
+            invalid_symbols: ["INVALID"]
+            valid_symbols: ["AAPL"]
+
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp (UTC ISO 8601)
+
+  # Security Schemes (inherited from trading_bot auth)
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: JWT token from trading_bot auth
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Signals
+    description: Query and retrieve momentum signals
+
+  - name: Scans
+    description: Trigger and monitor momentum detection scans
+
+  - name: Health
+    description: Service health and diagnostics

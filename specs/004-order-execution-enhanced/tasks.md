@@ -161,14 +161,14 @@
 
 ## Core Services
 
-- [ ] **T010** Create OrderValidator service in api/src/services/order_validator.py
+- [ ] **T010** [P] Create OrderValidator service in api/src/services/order_validator.py
   - Methods: validate_order(), validate_balance(), validate_risk_limits()
   - Returns: ValidationResult (valid: bool, error_code, message)
   - Validation rules: From spec.md FR-001, FR-002, FR-003
   - Pattern: api/src/services/payment_validator.py
   - From: plan.md [VALIDATION LAYERING]
 
-- [ ] **T011** Create OrderExecutor service in api/src/services/order_executor.py
+- [ ] **T011** [P] Create OrderExecutor service in api/src/services/order_executor.py
   - Methods: execute_order(), retry_order(), check_duplicate()
   - Idempotent key: `{trader_id}:{symbol}:{quantity}:{price}:{timestamp}:v1`
   - Retry logic: 3 attempts, exponential backoff (1s, 2s, 4s)
@@ -176,7 +176,7 @@
   - Pattern: api/src/services/payment_executor.py
   - From: plan.md [ORDER RETRY WITH IDEMPOTENCY]
 
-- [ ] **T012** Create StatusOrchestrator service in api/src/services/status_orchestrator.py
+- [ ] **T012** [P] Create StatusOrchestrator service in api/src/services/status_orchestrator.py
   - Methods: publish_status(), subscribe_to_updates(), handle_fill_event()
   - Event types: order.submitted, order.filled, order.rejected
   - Latency target: < 500ms (NFR-002)
@@ -416,6 +416,19 @@
   - Import: OrderForm, OrderList, OrderStatusSocket components
   - From: spec.md User Scenarios
 
+- [ ] **T074** [US1] Create POST /api/v1/orders/{id}/cancel endpoint in api/src/modules/orders/controller.py
+  - Request: Accept POST /api/v1/orders/{id}/cancel
+  - Behavior:
+    1. Verify order exists and trader owns it (authorization)
+    2. Check status = PENDING (can only cancel pending orders)
+    3. Update status → CANCELLED
+    4. Log action=CANCELLED in execution_logs
+    5. Return 200 with updated OrderResponse
+  - Error handling: 400 if order not PENDING, 404 if order not found, 401 if unauthorized
+  - Latency: < 500ms (FR-007)
+  - Pattern: api/src/modules/orders/controller.py POST endpoint
+  - From: contracts/api.yaml /api/v1/orders/{id}/cancel, spec.md FR-007
+
 ---
 
 # Phase 7: Polish & Cross-Cutting Concerns
@@ -476,21 +489,21 @@
 
 # Summary
 
-**Total Tasks**: 35
+**Total Tasks**: 36
 - Setup: 2 tasks
 - Foundational: 8 tasks
-- US1 (Validation): 9 tasks
+- US1 (Validation): 10 tasks (T015-T031, T074)
 - US2 (Status Updates): 9 tasks
 - US3 (Error Recovery): 4 tasks
 - Polish & Deployment: 3 tasks
 
-**Parallelizable**: 12 tasks marked [P]
+**Parallelizable**: 15 tasks marked [P] (T002, T005-T012, T015-T017, T025-T027, T035-T036, T055-T056, T081, T086-T087)
 
-**MVP Scope**: Phase 3 (US1: Validation) = 11 tasks (T001-T031)
+**MVP Scope**: Phase 3 (US1: Validation) = 12 tasks (T015-T031, T074)
 
 **Testing**: TDD required (tests before implementation)
 
 **Coverage Target**: 100% new code, ≥80% existing modified code
 
-**Next Phase**: /analyze (consistency check + implementation hints)
+**Next Phase**: /implement (execution with TDD workflow)
 

@@ -1,0 +1,422 @@
+openapi: 3.0.0
+info:
+  title: Stock Screener API
+  version: 1.0.0
+  description: Real-time stock screener for identifying high-probability trading setups
+  contact:
+    name: Trading Bot Team
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development
+  - url: https://api.robinhood.com/api/v1
+    description: Production (future)
+
+paths:
+  /screener/filter:
+    post:
+      summary: Filter stocks by technical criteria
+      operationId: filterStocks
+      description: |
+        Apply one or more technical filters to identify candidate stocks.
+        All filters are optional (None = skip that filter).
+        Filters are combined with AND logic (all must pass).
+        Results sorted by volume descending.
+      requestBody:
+        description: Screener query with filter parameters
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreenerQuery'
+            examples:
+              basicPriceFilter:
+                summary: Price range filter only
+                value:
+                  min_price: 2.0
+                  max_price: 20.0
+                  limit: 500
+                  offset: 0
+              volumeSpike:
+                summary: Identify volume spikes (5x average)
+                value:
+                  relative_volume: 5.0
+                  limit: 500
+              combinedSetup:
+                summary: Complete trading setup criteria
+                value:
+                  min_price: 2.0
+                  max_price: 20.0
+                  relative_volume: 5.0
+                  float_max: 20
+                  min_daily_change: 10.0
+                  limit: 500
+      responses:
+        '200':
+          description: Screener query successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreenerResult'
+              examples:
+                success:
+                  summary: Successful query
+                  value:
+                    query_id: "550e8400-e29b-41d4-a716-446655440000"
+                    stocks:
+                      - symbol: "TSLA"
+                        bid_price: 248.50
+                        volume: 2500000
+                        volume_avg_100d: 500000
+                        float_shares: 3000000000
+                        daily_open: 245.25
+                        daily_close: 248.50
+                        daily_change_pct: 1.33
+                        daily_change_direction: "up"
+                        matched_filters: ["price_range", "relative_volume", "daily_movers"]
+                        data_gaps: []
+                        timestamp: "2025-10-16T14:32:15.234Z"
+                      - symbol: "NVDA"
+                        bid_price: 142.25
+                        volume: 1800000
+                        volume_avg_100d: 360000
+                        float_shares: 2500000000
+                        daily_open: 140.75
+                        daily_close: 142.25
+                        daily_change_pct: 1.07
+                        daily_change_direction: "up"
+                        matched_filters: ["price_range", "relative_volume"]
+                        data_gaps: []
+                        timestamp: "2025-10-16T14:32:15.234Z"
+                    query_timestamp: "2025-10-16T14:32:15.234Z"
+                    result_count: 2
+                    total_count: 47
+                    execution_time_ms: 187.3
+                    page_info:
+                      offset: 0
+                      limit: 500
+                      has_more: false
+                      page_number: 1
+                    errors: []
+                    api_calls_made: 47
+                    cache_hit: false
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidRange:
+                  summary: Invalid price range
+                  value:
+                    error: "min_price must be < max_price"
+                    details:
+                      field: "min_price"
+                      value: 20.0
+                      constraint: "< max_price (2.0)"
+                invalidLimit:
+                  summary: Invalid page limit
+                  value:
+                    error: "limit must be 1-500"
+                    details:
+                      field: "limit"
+                      value: 1000
+                      constraint: "1 <= limit <= 500"
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rateLimited:
+                  summary: Rate limit error
+                  value:
+                    error: "Rate limit exceeded. Try again in 30 seconds."
+                    details:
+                      retry_after_seconds: 30
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                serverError:
+                  summary: Server error
+                  value:
+                    error: "Internal server error"
+                    details:
+                      error_type: "RetriableError"
+                      retry_count: 3
+
+components:
+  schemas:
+    ScreenerQuery:
+      type: object
+      properties:
+        min_price:
+          type: number
+          format: decimal
+          nullable: true
+          minimum: 0
+          example: 2.0
+          description: Minimum bid price (e.g., $2.00)
+        max_price:
+          type: number
+          format: decimal
+          nullable: true
+          minimum: 0
+          example: 20.0
+          description: Maximum bid price (e.g., $20.00)
+        relative_volume:
+          type: number
+          format: float
+          nullable: true
+          minimum: 1.0
+          example: 5.0
+          description: Volume multiplier vs 100-day average (e.g., 5.0 = 5x average)
+        float_max:
+          type: integer
+          nullable: true
+          minimum: 1
+          example: 20
+          description: Maximum public float in millions (e.g., 20 = under 20M shares)
+        min_daily_change:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          example: 10.0
+          description: Minimum daily % move absolute value (e.g., 10.0 = ±10%)
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 500
+          description: Results per page (1-500, default 500)
+        offset:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Pagination offset (default 0)
+      description: Screener query with optional filter parameters. All filters optional; combined with AND logic.
+      example:
+        min_price: 2.0
+        max_price: 20.0
+        relative_volume: 5.0
+        float_max: 20
+        min_daily_change: 10.0
+        limit: 500
+        offset: 0
+
+    StockScreenerMatch:
+      type: object
+      required:
+        - symbol
+        - bid_price
+        - volume
+        - daily_open
+        - daily_close
+        - daily_change_pct
+        - matched_filters
+      properties:
+        symbol:
+          type: string
+          pattern: '^[A-Z]{1,5}$'
+          example: "TSLA"
+          description: Stock ticker symbol
+        bid_price:
+          type: number
+          format: decimal
+          example: 248.50
+          description: Current bid price
+        volume:
+          type: integer
+          minimum: 0
+          example: 2500000
+          description: Current session volume (shares)
+        volume_avg_100d:
+          type: integer
+          nullable: true
+          minimum: 0
+          example: 500000
+          description: 100-day average volume (null if unavailable, e.g., IPO)
+        float_shares:
+          type: integer
+          nullable: true
+          minimum: 1
+          example: 3000000000
+          description: Public float in shares (null if unavailable)
+        daily_open:
+          type: number
+          format: decimal
+          example: 245.25
+          description: Day opening price
+        daily_close:
+          type: number
+          format: decimal
+          example: 248.50
+          description: Current price
+        daily_change_pct:
+          type: number
+          format: float
+          example: 1.33
+          description: Daily change percent (absolute value)
+        daily_change_direction:
+          type: string
+          enum: [up, down]
+          example: "up"
+          description: Direction of daily change
+        matched_filters:
+          type: array
+          items:
+            type: string
+          example: ["price_range", "relative_volume", "daily_movers"]
+          description: Which filters this stock passed
+        data_gaps:
+          type: array
+          items:
+            type: string
+          example: []
+          description: Fields unavailable for this stock
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-10-16T14:32:15.234Z"
+          description: Quote timestamp (UTC)
+      description: Single stock matching screener filters
+
+    PageInfo:
+      type: object
+      required:
+        - offset
+        - limit
+        - has_more
+        - page_number
+      properties:
+        offset:
+          type: integer
+          example: 0
+          description: Current offset in results
+        limit:
+          type: integer
+          example: 500
+          description: Page size
+        has_more:
+          type: boolean
+          example: false
+          description: True if more results available beyond this page
+        next_offset:
+          type: integer
+          nullable: true
+          example: null
+          description: Suggested offset for next page (null if no more results)
+        page_number:
+          type: integer
+          example: 1
+          description: 1-indexed current page number
+      description: Pagination metadata
+
+    ScreenerResult:
+      type: object
+      required:
+        - query_id
+        - stocks
+        - query_timestamp
+        - result_count
+        - total_count
+        - execution_time_ms
+        - page_info
+        - errors
+      properties:
+        query_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+          description: Unique query ID (trace across audit logs)
+        stocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockScreenerMatch'
+          minItems: 0
+          maxItems: 500
+          description: Stocks matching all applied filters (0-500 per page)
+        query_timestamp:
+          type: string
+          format: date-time
+          example: "2025-10-16T14:32:15.234Z"
+          description: When query was executed (UTC)
+        result_count:
+          type: integer
+          minimum: 0
+          example: 42
+          description: Number of stocks in this page
+        total_count:
+          type: integer
+          minimum: 0
+          example: 42
+          description: Total matches across all pages (before pagination)
+        execution_time_ms:
+          type: number
+          format: float
+          minimum: 0
+          example: 187.3
+          description: Query execution latency (milliseconds)
+        page_info:
+          $ref: '#/components/schemas/PageInfo'
+        errors:
+          type: array
+          items:
+            type: string
+          example: []
+          description: Data gaps encountered (e.g., stocks with missing float data)
+        api_calls_made:
+          type: integer
+          minimum: 0
+          example: 47
+          description: Number of market data API calls made
+        cache_hit:
+          type: boolean
+          example: false
+          description: Whether result was served from cache (future feature)
+      description: Complete screener query result with metadata
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          nullable: true
+          properties:
+            field:
+              type: string
+              description: Field causing error (if validation error)
+            value:
+              type: string
+              description: Invalid value provided
+            constraint:
+              type: string
+              description: Constraint violated
+            error_type:
+              type: string
+              description: Error type (if server error)
+            retry_count:
+              type: integer
+              description: Retry attempts made (if rate limit)
+            retry_after_seconds:
+              type: integer
+              description: Suggested seconds to wait (if rate limit)
+      description: Error response with diagnostic details
+      example:
+        error: "min_price must be < max_price"
+        details:
+          field: "min_price"
+          value: 20.0
+          constraint: "< max_price (2.0)"
