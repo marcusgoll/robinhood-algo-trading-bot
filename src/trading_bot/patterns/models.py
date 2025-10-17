@@ -18,7 +18,8 @@ class FlagpoleData:
         end_idx: Bar index where flagpole ends
         gain_pct: Percentage gain from start to end (e.g., Decimal('5.5') for 5.5%)
         high_price: Highest price reached during flagpole
-        start_price: Price at the start of flagpole
+        start_price: Price at the start of flagpole (low of first bar)
+        open_price: Open price at the start of flagpole (for risk/reward calculation)
         avg_volume: Average volume during flagpole period
     """
     start_idx: int
@@ -26,6 +27,7 @@ class FlagpoleData:
     gain_pct: Decimal
     high_price: Decimal
     start_price: Decimal
+    open_price: Decimal
     avg_volume: Decimal
 
 

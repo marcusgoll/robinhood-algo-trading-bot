@@ -41,12 +41,14 @@ class TestFlagpoleData:
         avg_volume = Decimal("2000000")
 
         # When: Creating FlagpoleData instance
+        open_price = Decimal("175.50")
         flagpole = FlagpoleData(
             start_idx=start_idx,
             end_idx=end_idx,
             gain_pct=gain_pct,
             high_price=high_price,
             start_price=start_price,
+            open_price=open_price,
             avg_volume=avg_volume
         )
 
@@ -56,6 +58,7 @@ class TestFlagpoleData:
         assert flagpole.gain_pct == gain_pct
         assert flagpole.high_price == high_price
         assert flagpole.start_price == start_price
+        assert flagpole.open_price == open_price
         assert flagpole.avg_volume == avg_volume
 
     def test_flagpole_decimal_precision(self):
@@ -72,12 +75,14 @@ class TestFlagpoleData:
         avg_volume = Decimal("1234567.89")
 
         # When: Creating FlagpoleData with precise decimals
+        open_price = Decimal("171.5000")
         flagpole = FlagpoleData(
             start_idx=0,
             end_idx=5,
             gain_pct=gain_pct,
             high_price=high_price,
             start_price=start_price,
+            open_price=open_price,
             avg_volume=avg_volume
         )
 
@@ -85,12 +90,14 @@ class TestFlagpoleData:
         assert flagpole.gain_pct == Decimal("5.5")
         assert flagpole.high_price == Decimal("180.5555")
         assert flagpole.start_price == Decimal("171.2345")
+        assert flagpole.open_price == Decimal("171.5000")
         assert flagpole.avg_volume == Decimal("1234567.89")
 
         # Verify types are Decimal, not float
         assert isinstance(flagpole.gain_pct, Decimal)
         assert isinstance(flagpole.high_price, Decimal)
         assert isinstance(flagpole.start_price, Decimal)
+        assert isinstance(flagpole.open_price, Decimal)
         assert isinstance(flagpole.avg_volume, Decimal)
 
     def test_flagpole_data_with_minimum_values(self):
@@ -107,6 +114,7 @@ class TestFlagpoleData:
             gain_pct=Decimal("5.0"),  # Minimum 5% gain
             high_price=Decimal("105.00"),
             start_price=Decimal("100.00"),
+            open_price=Decimal("100.00"),
             avg_volume=Decimal("1")  # Minimum volume
         )
 
@@ -129,6 +137,7 @@ class TestFlagpoleData:
             gain_pct=Decimal("25.5"),  # Strong gain
             high_price=Decimal("999.99"),
             start_price=Decimal("750.00"),
+            open_price=Decimal("750.00"),
             avg_volume=Decimal("50000000")  # High volume
         )
 
@@ -151,6 +160,7 @@ class TestFlagpoleData:
             gain_pct=Decimal("8.5"),
             high_price=Decimal("189.88"),
             start_price=Decimal("175.00"),
+            open_price=Decimal("175.00"),
             avg_volume=Decimal("2000000")
         )
 
@@ -160,6 +170,7 @@ class TestFlagpoleData:
             gain_pct=Decimal("8.5"),
             high_price=Decimal("189.88"),
             start_price=Decimal("175.00"),
+            open_price=Decimal("175.00"),
             avg_volume=Decimal("2000000")
         )
 
@@ -180,6 +191,7 @@ class TestFlagpoleData:
             gain_pct=Decimal("8.5"),
             high_price=Decimal("189.88"),
             start_price=Decimal("175.00"),
+            open_price=Decimal("175.00"),
             avg_volume=Decimal("2000000")
         )
 
@@ -189,6 +201,7 @@ class TestFlagpoleData:
             gain_pct=Decimal("9.0"),  # Different gain
             high_price=Decimal("189.88"),
             start_price=Decimal("175.00"),
+            open_price=Decimal("175.00"),
             avg_volume=Decimal("2000000")
         )
 
@@ -391,6 +404,7 @@ class TestBullFlagResult:
             gain_pct=Decimal("8.5"),
             high_price=Decimal("189.88"),
             start_price=Decimal("175.00"),
+            open_price=Decimal("175.00"),
             avg_volume=Decimal("2000000")
         )
 
@@ -484,6 +498,7 @@ class TestBullFlagResult:
             gain_pct=Decimal("8.5"),
             high_price=Decimal("189.88"),
             start_price=Decimal("175.00"),
+            open_price=Decimal("175.00"),
             avg_volume=Decimal("2000000")
         )
 
@@ -717,6 +732,7 @@ class TestBullFlagResult:
             gain_pct=Decimal("8.5"),
             high_price=Decimal("189.88"),
             start_price=Decimal("175.00"),
+            open_price=Decimal("175.00"),
             avg_volume=Decimal("2000000")
         )
 

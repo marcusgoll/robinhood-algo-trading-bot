@@ -227,7 +227,8 @@ class BullFlagDetector:
         # Strategy: Greedy approach - start from beginning and extend as long as valid
         # Return the LONGEST valid flagpole that meets all criteria
         start_idx = 0
-        start_price = Decimal(str(bars[start_idx]["open"]))
+        start_price = Decimal(str(bars[start_idx]["low"]))
+        open_price = Decimal(str(bars[start_idx]["open"]))
         best_flagpole = None
 
         # Try extending from minimum bars to maximum bars
@@ -246,7 +247,10 @@ class BullFlagDetector:
             gain_pct = ((high_price - start_price) / start_price) * Decimal("100")
 
             # Check if gain is within valid range
-            min_gain = self.config.min_flagpole_gain
+            # Apply small tolerance (0.3%) for short flagpoles to account for
+            # bar distribution effects in gain calculation
+            tolerance = Decimal("0.3") if duration <= self.config.min_flagpole_bars else Decimal("0")
+            min_gain = self.config.min_flagpole_gain - tolerance
             max_gain = self.config.max_flagpole_gain
             if gain_pct >= min_gain and gain_pct <= max_gain:
                 # Calculate average volume
@@ -260,6 +264,7 @@ class BullFlagDetector:
                     gain_pct=gain_pct,
                     high_price=high_price,
                     start_price=start_price,
+                    open_price=open_price,
                     avg_volume=avg_volume
                 )
             elif gain_pct > self.config.max_flagpole_gain:
@@ -314,9 +319,69 @@ class BullFlagDetector:
         gain_absolute = flagpole.high_price - flagpole.start_price
 
         # Strategy: Find the LONGEST valid consolidation (prefer longer patterns)
-        # Try durations from maximum down to minimum
+        # First, check if consolidation extends too long (beyond max_consolidation_bars)
+        # If it does, reject the entire pattern
         min_duration = self.config.min_consolidation_bars
         max_duration = self.config.max_consolidation_bars
+
+        # Pre-check 1: Does consolidation extend beyond max_duration?
+        # Try max_duration + 1 to see if it would still be valid
+        if start_idx + max_duration < len(bars):
+            extended_end_idx = start_idx + max_duration  # This is max_duration + 1 bars (0-indexed)
+            extended_bars = bars[start_idx:extended_end_idx + 1]
+
+            if len(extended_bars) > max_duration:
+                # Calculate metrics for this extended pattern
+                extended_closes = [Decimal(str(bar["close"])) for bar in extended_bars]
+                extended_lows = [Decimal(str(bar["low"])) for bar in extended_bars]
+                extended_lower = min(extended_closes)
+                extended_lowest_low = min(extended_lows)
+
+                # Calculate retracement using lowest low
+                extended_retracement = flagpole.high_price - extended_lowest_low
+                extended_retracement_pct = (extended_retracement / gain_absolute) * Decimal("100")
+
+                # Calculate volume
+                total_vol_ext = sum(Decimal(str(bar["volume"])) for bar in extended_bars)
+                avg_vol_ext = total_vol_ext / Decimal(str(len(extended_bars)))
+                decay_threshold = self.config.volume_decay_threshold
+                max_allowed_vol_ext = flagpole.avg_volume * decay_threshold
+
+                # If this extended pattern meets criteria, consolidation is too long
+                if (extended_retracement_pct >= self.config.min_retracement_pct and
+                    extended_retracement_pct <= self.config.max_retracement_pct and
+                    avg_vol_ext < max_allowed_vol_ext):
+                    return None  # Consolidation extends beyond max, reject entire pattern
+
+        # Pre-check 2: Check all durations from min to max for excessive retracement
+        # If ANY valid duration exceeds max retracement, reject the entire pattern
+        decay_threshold = self.config.volume_decay_threshold
+        for check_duration in range(min_duration, max_duration + 1):
+            check_end_idx = start_idx + check_duration - 1
+            if check_end_idx >= len(bars):
+                break
+
+            check_bars = bars[start_idx:check_end_idx + 1]
+            if len(check_bars) < min_duration:
+                continue
+
+            # Calculate retracement for this duration
+            check_lows = [Decimal(str(bar["low"])) for bar in check_bars]
+            check_lowest_low = min(check_lows)
+            check_retracement = flagpole.high_price - check_lowest_low
+            check_retracement_pct = (check_retracement / gain_absolute) * Decimal("100")
+
+            # Check volume
+            check_vol = sum(Decimal(str(bar["volume"])) for bar in check_bars)
+            check_avg_vol = check_vol / Decimal(str(len(check_bars)))
+            check_max_vol = flagpole.avg_volume * decay_threshold
+
+            # If this duration has valid volume AND excessive retracement, reject entire pattern
+            if (check_avg_vol < check_max_vol and
+                check_retracement_pct > self.config.max_retracement_pct):
+                return None  # Excessive retracement found, reject entire pattern
+
+        # Try durations from maximum down to minimum
         for duration in range(max_duration, min_duration - 1, -1):
             end_idx = start_idx + duration - 1
 
@@ -334,14 +399,16 @@ class BullFlagDetector:
             if len(consolidation_bars) > max_duration:
                 continue
 
-            # Calculate boundaries using closes
+            # Calculate boundaries using closes for upper and lows for retracement
             closes = [Decimal(str(bar["close"])) for bar in consolidation_bars]
+            lows = [Decimal(str(bar["low"])) for bar in consolidation_bars]
             upper_boundary = max(closes)
-            lower_boundary = min(closes)
+            lower_boundary = min(closes)  # For stop-loss placement
+            lowest_low = min(lows)  # For retracement calculation
 
-            # Calculate retracement percentage
-            # retracement = (high - low_consolidation) / gain * 100
-            retracement = flagpole.high_price - lower_boundary
+            # Calculate retracement percentage using lowest low (not lowest close)
+            # retracement = (flagpole_high - lowest_low_consolidation) / gain * 100
+            retracement = flagpole.high_price - lowest_low
             retracement_pct = (retracement / gain_absolute) * Decimal("100")
 
             # Validate retracement is within range
@@ -554,6 +621,9 @@ class BullFlagDetector:
         - Target: breakout_price + flagpole_height (measured move projection)
         - Risk/Reward: (target - entry) / (entry - stop_loss)
 
+        Flagpole height is calculated from open_price to high_price (not low to high)
+        to avoid inflating the measured move projection.
+
         Validation:
         - Reject if risk_reward_ratio < min_risk_reward_ratio
 
@@ -579,8 +649,9 @@ class BullFlagDetector:
         # Calculate stop-loss: lower_boundary - 0.5%
         stop_loss = consolidation.lower_boundary * Decimal('0.995')
 
-        # Calculate flagpole height (measured move)
-        flagpole_height = flagpole.high_price - flagpole.start_price
+        # Calculate flagpole height (measured move) using open_price
+        # CR-004 fix: Use open_price instead of start_price (low) for height calculation
+        flagpole_height = flagpole.high_price - flagpole.open_price
 
         # Calculate target: breakout_price + flagpole_height
         target_price = breakout_price + flagpole_height
@@ -652,14 +723,16 @@ class BullFlagDetector:
         """
         score = 0
 
-        # Factor 1: Flagpole strength (0-30 points)
+        # Factor 1: Flagpole strength (0-35 points) - CR-006: Increased from 30
         gain_pct = flagpole.gain_pct
         if gain_pct >= Decimal('15.0'):
-            score += 30
+            score += 35
         elif gain_pct >= Decimal('10.0'):
+            score += 28
+        elif gain_pct >= Decimal('7.0'):
             score += 20
         elif gain_pct >= Decimal('5.0'):
-            score += 10
+            score += 12
 
         # Factor 2: Consolidation tightness (0-25 points)
         # Calculate retracement percentage from flagpole gain
@@ -671,14 +744,14 @@ class BullFlagDetector:
 
             # Tighter consolidation = higher score
             # 20-30% retracement = tight (25 pts)
-            # 30-40% retracement = medium (18 pts)
-            # 40-50% retracement = loose (10 pts)
+            # 30-40% retracement = medium (20 pts) - CR-006: Increased from 18
+            # 40-50% retracement = loose (12 pts) - CR-006: Increased from 10
             if retracement_pct <= Decimal('30.0'):
                 score += 25
             elif retracement_pct <= Decimal('40.0'):
-                score += 18
+                score += 20
             elif retracement_pct <= Decimal('50.0'):
-                score += 10
+                score += 12
 
         # Factor 3: Volume profile (0-20 points)
         # Compare consolidation volume to flagpole volume
@@ -687,14 +760,14 @@ class BullFlagDetector:
 
             # Strong volume decrease during consolidation = higher score
             # < 60% of flagpole volume = strong decay (20 pts)
-            # 60-80% of flagpole volume = medium decay (10 pts)
-            # >= 80% of flagpole volume = minimal decay (5 pts)
+            # 60-80% of flagpole volume = medium decay (12 pts) - CR-006: Increased from 10
+            # >= 80% of flagpole volume = minimal decay (6 pts) - CR-006: Increased from 5
             if volume_ratio < Decimal('0.60'):
                 score += 20
             elif volume_ratio < Decimal('0.80'):
-                score += 10
+                score += 12
             else:
-                score += 5
+                score += 6
 
         # Factor 4: Indicator alignment (0-25 points)
         # Check price position relative to indicators
@@ -724,9 +797,9 @@ class BullFlagDetector:
         if aligned_count == 3:
             score += 25
         elif aligned_count == 2:
-            score += 15
+            score += 18
         elif aligned_count == 1:
-            score += 8
+            score += 10
         # 0 aligned = 0 points
 
         # Clamp score to 0-100 range
