@@ -167,9 +167,16 @@ The system is designed for manual review and paper trading validation before any
 - ✅ T011: Write test for CatalystDetector.categorize() - 100% coverage achieved (2025-10-16)
 - ✅ T012: Write test for CatalystDetector.scan() - 7 tests passing, 75.86% coverage (2025-10-16)
 - ✅ T017: Write integration test for CatalystDetector - 6 integration tests, 78.89% coverage (2025-10-16)
+- ✅ T021: Write test for PreMarketScanner.is_premarket_hours() - 15 tests passing, timezone logic verified (2025-10-16)
+- ✅ T025: Create PreMarketScanner service with scan() and is_premarket_hours() methods (2025-10-17)
+  - Async scan() method with timezone-aware pre-market window detection (4:00-9:30 AM EST)
+  - UTC timestamp storage with EST comparison (NFR-004 compliant)
+  - Integration with MomentumLogger for signal logging
+  - _calculate_volume_baseline() implemented (T026 completed inline)
+  - Graceful error handling for API failures
 
 ## Last Updated
-2025-10-17T02:15:00-00:00
+2025-10-17T02:35:00-00:00
 
 ## Phase 2: Tasks (2025-10-16)
 

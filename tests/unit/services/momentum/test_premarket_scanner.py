@@ -43,9 +43,11 @@ def mock_logger():
 
 @pytest.fixture
 def mock_market_data_service():
-    """Return mock MarketDataService."""
+    """Return mock MarketDataService with synchronous get_quote."""
     service = Mock()
-    service.get_quote = AsyncMock()
+    # MarketDataService.get_quote() is synchronous, not async
+    service.get_quote = Mock()
+    service.get_historical_data = Mock()
     return service
 
 

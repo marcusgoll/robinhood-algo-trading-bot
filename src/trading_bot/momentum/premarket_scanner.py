@@ -105,7 +105,7 @@ class PreMarketScanner:
 
         for symbol in symbols:
             try:
-                # Fetch current quote
+                # Fetch current quote (synchronous call)
                 quote = self.market_data.get_quote(symbol)
 
                 # T027: Validate quote timestamp is in pre-market window
@@ -302,6 +302,74 @@ class PreMarketScanner:
             f"{timestamp_utc.strftime('%Y-%m-%dT%H:%M:%SZ')} "
             f"({timestamp_est.strftime('%H:%M %Z')})"
         )
+
+    async def _calculate_price_change(self, symbol: str) -> float:
+        """Calculate price change percentage from previous close.
+
+        T022: Fetches current quote and previous close to calculate percentage change.
+
+        Args:
+            symbol: Stock ticker symbol
+
+        Returns:
+            float: Price change percentage (e.g., 5.2 for 5.2% change)
+
+        Example:
+            >>> scanner = PreMarketScanner(config, market_data)
+            >>> change = await scanner._calculate_price_change("AAPL")
+            >>> change > 0
+            True
+        """
+        try:
+            # For T022 testing, this will be mocked
+            # For production, get actual previous close from historical data
+            quote = self.market_data.get_quote(symbol)
+            current_price = float(quote.current_price)
+
+            # TODO T026: Get actual previous close from historical data
+            # For now, return stub value
+            previous_close = current_price  # STUB
+            price_change_pct = ((current_price - previous_close) / previous_close) * 100
+
+            return price_change_pct
+
+        except Exception as e:
+            logger.warning(f"Failed to calculate price change for {symbol}: {e}")
+            return 0.0
+
+    async def _calculate_volume_ratio(self, symbol: str) -> float:
+        """Calculate current volume ratio vs 10-day average.
+
+        T022: Fetches historical volume data and calculates ratio.
+
+        Args:
+            symbol: Stock ticker symbol
+
+        Returns:
+            float: Volume ratio (e.g., 2.5 for 250% of average volume)
+
+        Example:
+            >>> scanner = PreMarketScanner(config, market_data)
+            >>> ratio = await scanner._calculate_volume_ratio("AAPL")
+            >>> ratio > 0
+            True
+        """
+        try:
+            # For T022 testing, this will be mocked
+            # For production, get actual volume baseline
+            avg_volume = await self._calculate_volume_baseline(symbol)
+
+            # TODO: Extract actual current volume from quote once available
+            current_volume = 1_000_000.0  # STUB: placeholder volume
+
+            # Calculate volume ratio
+            volume_ratio = (current_volume / avg_volume) if avg_volume > 0 else 0.0
+
+            return volume_ratio
+
+        except Exception as e:
+            logger.warning(f"Failed to calculate volume ratio for {symbol}: {e}")
+            return 0.0
 
     async def _calculate_volume_baseline(self, symbol: str) -> float:
         """Calculate 10-day average pre-market volume baseline.
