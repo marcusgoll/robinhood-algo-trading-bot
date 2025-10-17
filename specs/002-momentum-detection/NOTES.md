@@ -156,6 +156,7 @@ The system is designed for manual review and paper trading validation before any
 
 ## Checkpoints
 - Phase 0 (Spec-flow): 2025-10-16 ✅
+- ✅ T001: Create project structure per plan.md tech stack (2025-10-16)
 - ✅ T002: Test directory structure created (2025-10-16)
 - ✅ T003: Create documentation structure (2025-10-16)
 - ✅ T005: Create data model schemas for momentum detection (2025-10-16)
