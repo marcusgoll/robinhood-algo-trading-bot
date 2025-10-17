@@ -188,13 +188,14 @@
   - Pattern: api/src/services/payment_executor.py
   - From: plan.md [ORDER RETRY WITH IDEMPOTENCY]
 
-- [ ] **T012** [P] Create StatusOrchestrator service in api/src/services/status_orchestrator.py
+- [x] **T012** [P] Create StatusOrchestrator service in api/src/services/status_orchestrator.py
   - Methods: publish_status(), subscribe_to_updates(), handle_fill_event()
   - Event types: order.submitted, order.filled, order.rejected
   - Latency target: < 500ms (NFR-002)
   - REUSE: EventBus (api/src/lib/event_bus.py)
   - Pattern: api/src/services/notification_coordinator.py
   - From: plan.md [EVENT-DRIVEN STATUS UPDATES]
+  - Evidence: StatusOrchestrator created in api/app/services/ with 6 methods (publish_status, publish_order_filled, publish_order_partial, publish_order_rejected, subscribe_to_trader_orders, handle_fill_event). 23 tests passing (17 unit + 6 integration). P99 latency: 56.87ms (<500ms requirement). Commit: 094c022
 
 ---
 
