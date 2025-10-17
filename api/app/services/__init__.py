@@ -5,9 +5,15 @@ from app.services.order_validator import (
     ValidationResult,
     ErrorCode,
 )
+from app.services.status_orchestrator import (
+    StatusOrchestrator,
+    OrderEventType,
+)
 
 __all__ = [
     "OrderValidator",
     "ValidationResult",
     "ErrorCode",
+    "StatusOrchestrator",
+    "OrderEventType",
 ]
