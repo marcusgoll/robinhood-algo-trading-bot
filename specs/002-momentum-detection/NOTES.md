@@ -180,6 +180,14 @@ The system is designed for manual review and paper trading validation before any
   - Integrated into scan() workflow - skips quotes with invalid timestamps
   - _format_timestamp_log() helper for dual UTC/EST logging
   - 12 tests passing: boundary conditions, weekends, DST edge cases
+- ✅ T022: Write test for PreMarketScanner.scan() - 7 tests passing, volume/price logic verified (2025-10-17)
+  - Test suite includes: both thresholds met, low volume exclusion, low price change exclusion
+  - Boundary condition tests: exactly 5.0% change and 200% volume
+  - Multi-symbol test: 4 symbols with mixed results, correctly filters to 2 signals
+  - MomentumSignal structure validation: all required fields present and correct types
+  - Signal strength calculation verified: price and volume weighted correctly
+  - Helper methods _calculate_price_change() and _calculate_volume_ratio() implemented
+  - Strength formula: 60% price component + 40% volume component, scales 5-20% and 2.0-5.0x
 
 ## Last Updated
 2025-10-17T02:50:00-00:00
