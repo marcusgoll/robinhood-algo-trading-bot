@@ -199,7 +199,7 @@ class Order(BaseModel):
 
     # Relationships
     fills = relationship("Fill", back_populates="order", cascade="all, delete-orphan")
-    # execution_logs = relationship("ExecutionLog", back_populates="order", cascade="all, delete-orphan")
+    execution_logs = relationship("ExecutionLog", back_populates="order", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         """
