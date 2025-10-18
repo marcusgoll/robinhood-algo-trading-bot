@@ -102,6 +102,68 @@ class TestOrderValidatorSyntaxValidation:
         assert result.valid is True
         assert result.error_code is None
 
+    def test_valid_stop_order(self):
+        """Test that a valid stop order passes syntax validation."""
+        # Arrange
+        validator = OrderValidator(
+            exchange_adapter=MockExchangeAdapter(),
+            trader_repository=MockTraderRepository()
+        )
+        order = MockOrderRequest(
+            symbol="TSLA",
+            quantity=50,
+            order_type=OrderType.STOP.value,
+            price=Decimal("200.00")
+        )
+
+        # Act
+        result = validator.validate_syntax(order)
+
+        # Assert
+        assert result.valid is True
+        assert result.error_code is None
+        assert result.message == ""
+
+    def test_minimum_quantity(self):
+        """Test that minimum quantity (1 share) passes validation."""
+        # Arrange
+        validator = OrderValidator(
+            exchange_adapter=MockExchangeAdapter(),
+            trader_repository=MockTraderRepository()
+        )
+        order = MockOrderRequest(
+            symbol="AAPL",
+            quantity=1,
+            order_type=OrderType.MARKET.value
+        )
+
+        # Act
+        result = validator.validate_syntax(order)
+
+        # Assert
+        assert result.valid is True
+        assert result.error_code is None
+
+    def test_maximum_quantity(self):
+        """Test that large quantity (100,000 shares) passes validation - no hard upper limit."""
+        # Arrange
+        validator = OrderValidator(
+            exchange_adapter=MockExchangeAdapter(),
+            trader_repository=MockTraderRepository()
+        )
+        order = MockOrderRequest(
+            symbol="AAPL",
+            quantity=100000,
+            order_type=OrderType.MARKET.value
+        )
+
+        # Act
+        result = validator.validate_syntax(order)
+
+        # Assert
+        assert result.valid is True
+        assert result.error_code is None
+
     def test_empty_symbol_fails(self):
         """Test that empty symbol fails validation."""
         # Arrange
@@ -413,6 +475,95 @@ class TestOrderValidatorBalanceValidation:
         assert result.valid is False
         assert result.error_code == ErrorCode.TRADER_NOT_FOUND
         assert "trader not found" in result.message.lower()
+
+    def test_insufficient_balance_exact_threshold(self):
+        """Test that order slightly over balance fails (edge case testing)."""
+        # Arrange
+        trader = MockTrader(
+            id=str(uuid4()),
+            available_balance=Decimal("14999.99"),
+            daily_loss_limit=Decimal("5000.00"),
+            daily_losses=Decimal("0.00"),
+            max_position_size=1000,
+            current_position=0
+        )
+        validator = OrderValidator(
+            exchange_adapter=MockExchangeAdapter(price=Decimal("150.00")),
+            trader_repository=MockTraderRepository(trader=trader)
+        )
+        order = MockOrderRequest(
+            symbol="AAPL",
+            quantity=100,  # 100 * $150 = $15,000
+            order_type=OrderType.MARKET.value
+        )
+
+        # Act
+        result = validator.validate_balance(trader.id, order)
+
+        # Assert
+        assert result.valid is False
+        assert result.error_code == ErrorCode.INSUFFICIENT_BALANCE
+        assert "Insufficient funds" in result.message
+        assert result.details is not None
+        assert result.details["required_balance"] == 15000.0
+        assert result.details["available_balance"] == 14999.99
+
+    def test_sufficient_balance_with_commission(self):
+        """Test that balance calculation accounts for order cost (commission handled by execution layer)."""
+        # Arrange
+        trader = MockTrader(
+            id=str(uuid4()),
+            available_balance=Decimal("15100.00"),  # Buffer above exact cost
+            daily_loss_limit=Decimal("5000.00"),
+            daily_losses=Decimal("0.00"),
+            max_position_size=1000,
+            current_position=0
+        )
+        validator = OrderValidator(
+            exchange_adapter=MockExchangeAdapter(price=Decimal("150.00")),
+            trader_repository=MockTraderRepository(trader=trader)
+        )
+        order = MockOrderRequest(
+            symbol="AAPL",
+            quantity=100,  # 100 * $150 = $15,000
+            order_type=OrderType.MARKET.value
+        )
+
+        # Act
+        result = validator.validate_balance(trader.id, order)
+
+        # Assert
+        assert result.valid is True
+        assert result.error_code is None
+
+    def test_zero_balance(self):
+        """Test that trader with zero balance cannot place any order."""
+        # Arrange
+        trader = MockTrader(
+            id=str(uuid4()),
+            available_balance=Decimal("0.00"),
+            daily_loss_limit=Decimal("5000.00"),
+            daily_losses=Decimal("0.00"),
+            max_position_size=1000,
+            current_position=0
+        )
+        validator = OrderValidator(
+            exchange_adapter=MockExchangeAdapter(price=Decimal("150.00")),
+            trader_repository=MockTraderRepository(trader=trader)
+        )
+        order = MockOrderRequest(
+            symbol="AAPL",
+            quantity=1,  # Even 1 share
+            order_type=OrderType.MARKET.value
+        )
+
+        # Act
+        result = validator.validate_balance(trader.id, order)
+
+        # Assert
+        assert result.valid is False
+        assert result.error_code == ErrorCode.INSUFFICIENT_BALANCE
+        assert "$0" in result.message or "0" in result.message
 
 
 class TestOrderValidatorRiskLimitsValidation:

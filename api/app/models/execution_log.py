@@ -21,7 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship, validates
 
-from api.app.models.base import BaseModel, GUID
+from .base import BaseModel, GUID
 
 
 class ExecutionAction(str, Enum):

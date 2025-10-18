@@ -25,7 +25,7 @@ from sqlalchemy.types import TypeDecorator, CHAR
 from typing import Any
 import uuid as uuid_lib
 
-from api.app.models.base import BaseModel
+from .base import BaseModel
 
 
 class GUID(TypeDecorator[UUID]):
