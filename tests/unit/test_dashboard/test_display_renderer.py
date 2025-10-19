@@ -95,11 +95,11 @@ class TestPositionsTableRendering:
             console.print(table)
         output = capture.get()
 
-        # Verify green color for positive P&L (will fail if not green)
+        # Verify green color for positive P&L
         assert "AAPL" in output
         assert "175.00" in output
-        # This assertion will fail until we verify green markup is applied
-        assert False, "RED phase: Need to verify green color coding is applied to positive P&L"
+        # Verify green markup is applied to profit values
+        assert "[green]" in output or "\x1b[32m" in output, "Green color coding should be applied to positive P&L"
 
     def test_single_position_with_loss_has_red_pl(self):
         """Test single losing position displays with red P&L.
@@ -132,11 +132,11 @@ class TestPositionsTableRendering:
             console.print(table)
         output = capture.get()
 
-        # Verify red color for negative P&L (will fail if not red)
+        # Verify red color for negative P&L
         assert "MSFT" in output
         assert "87.50" in output or "-87.50" in output
-        # This assertion will fail until we verify red markup is applied
-        assert False, "RED phase: Need to verify red color coding is applied to negative P&L"
+        # Verify red markup is applied to loss values
+        assert "[red]" in output or "\x1b[31m" in output, "Red color coding should be applied to negative P&L"
 
     def test_multiple_positions_maintain_input_order(self):
         """Test multiple positions display in input order (no sorting).
@@ -185,9 +185,20 @@ class TestPositionsTableRendering:
 
         # Assert
         assert isinstance(table, Table)
-        assert len(table.row_count) == 3  # Three positions
-        # This will fail until we validate order (RED phase assumption: not sorted)
-        assert False, "RED phase: Need to verify position ordering behavior"
+        assert table.row_count == 3  # Three positions
+
+        # Verify ordering by rendering and checking output
+        console = Console()
+        with console.capture() as capture:
+            console.print(table)
+        output = capture.get()
+
+        # Positions should appear in input order (no sorting)
+        tsla_pos = output.find("TSLA")
+        aapl_pos = output.find("AAPL")
+        msft_pos = output.find("MSFT")
+
+        assert tsla_pos < aapl_pos < msft_pos, "Positions should maintain input order"
 
     def test_decimal_formatting_currency_and_percentage(self):
         """Test decimal formatting for currency ($150.25) and percentage (1.17%).
@@ -324,14 +335,14 @@ class TestAccountStatusPanelRendering:
             console.print(panel)
         output = capture.get()
 
-        # Verify all fields present (will fail if any missing)
+        # Verify all fields present
         assert "10,250.50" in output, "Buying power should be displayed"
         assert "25,340.75" in output, "Account balance should be displayed"
         assert "5,000.00" in output, "Cash balance should be displayed"
         assert "2" in output, "Day trade count should be displayed"
         assert "OPEN" in output, "Market status should be displayed"
-        # This will fail until we verify timestamp format
-        assert False, "RED phase: Need to verify timestamp formatting"
+        # Verify timestamp is formatted in readable format (HH:MM:SS or similar)
+        assert "14:32" in output or "2:32 PM" in output or "14:32:15" in output, "Timestamp should be displayed in readable format"
 
     def test_market_status_open_has_green_color(self):
         """Test market status OPEN displays with green color.
@@ -363,8 +374,8 @@ class TestAccountStatusPanelRendering:
         output = capture.get()
 
         assert "OPEN" in output
-        # RED phase: need to verify green markup
-        assert False, "RED phase: Need to verify OPEN has green color coding"
+        # Verify green color markup is applied to OPEN status
+        assert "[green]" in output or "\x1b[32m" in output, "Green color coding should be applied to OPEN market status"
 
     def test_market_status_closed_has_yellow_color(self):
         """Test market status CLOSED displays with yellow color.
@@ -398,8 +409,8 @@ class TestAccountStatusPanelRendering:
         output = capture.get()
 
         assert "CLOSED" in output
-        # RED phase: need to verify yellow markup
-        assert False, "RED phase: Need to verify CLOSED has yellow color coding"
+        # Verify yellow color markup is applied to CLOSED status
+        assert "[yellow]" in output or "\x1b[33m" in output, "Yellow color coding should be applied to CLOSED market status"
 
     def test_timestamp_formatted_readable(self):
         """Test timestamp displays in readable format.
@@ -427,10 +438,10 @@ class TestAccountStatusPanelRendering:
             console.print(panel)
         output = capture.get()
 
-        # Verify timestamp includes date and time
+        # Verify timestamp includes date and time in complete format
         assert "2025-10-16" in output, "Date should be formatted as YYYY-MM-DD"
-        # RED phase: need to verify complete format
-        assert False, "RED phase: Need to verify complete timestamp format (HH:MM:SS)"
+        # Verify time component is present (HH:MM or HH:MM:SS format)
+        assert "14:32" in output or "2:32 PM" in output, "Time should be displayed in readable format"
 
     def test_staleness_indicator_shown_when_data_stale(self):
         """Test staleness warning appears when data is old.
@@ -460,8 +471,8 @@ class TestAccountStatusPanelRendering:
 
         # Verify staleness warning displayed
         assert "stale" in output.lower(), "Staleness warning should appear for old data"
-        # RED phase: need to verify warning format
-        assert False, "RED phase: Need to verify staleness warning format and icon"
+        # Verify warning includes age indicator (seconds or time)
+        assert "75" in output or "76" in output, "Data age should be shown in staleness warning"
 
     def test_account_panel_has_descriptive_title(self):
         """Test account status panel has descriptive title.
@@ -536,8 +547,8 @@ class TestPerformanceMetricsPanelRendering:
         # Verify checkmark for meeting win rate target
         assert "65.00%" in output, "Win rate should be displayed"
         assert "60.00%" in output, "Win rate target should be displayed"
-        # RED phase: verify checkmark symbol
-        assert False, "RED phase: Need to verify ✓ indicator for meeting target"
+        # Verify checkmark symbol (✓) for meeting target
+        assert "✓" in output or "✔" in output or "[green]" in output, "Checkmark indicator should show when meeting target"
 
     def test_win_rate_with_target_shows_x_when_not_meeting(self):
         """Test win rate displays X indicator when not meeting target.
@@ -578,8 +589,8 @@ class TestPerformanceMetricsPanelRendering:
         # Verify X for not meeting win rate target
         assert "55.00%" in output
         assert "60.00%" in output
-        # RED phase: verify X symbol
-        assert False, "RED phase: Need to verify ✗ indicator for not meeting target"
+        # Verify X symbol (✗) for not meeting target
+        assert "✗" in output or "✘" in output or "[red]" in output, "X indicator should show when not meeting target"
 
     def test_win_rate_without_target_shows_no_comparison(self):
         """Test win rate displays without comparison when no targets.
@@ -651,8 +662,8 @@ class TestPerformanceMetricsPanelRendering:
         # Verify streak displays correctly
         assert "3" in output, "Streak count should be displayed"
         assert "WIN" in output, "Streak type should be displayed"
-        # RED phase: verify green color
-        assert False, "RED phase: Need to verify green color for WIN streak"
+        # Verify green color for WIN streak
+        assert "[green]" in output or "\x1b[32m" in output, "Green color should be applied to WIN streak"
 
     def test_loss_streak_displays_with_red_color(self):
         """Test current loss streak displays as '2 LOSS' with red color.
@@ -687,8 +698,8 @@ class TestPerformanceMetricsPanelRendering:
         # Verify streak displays correctly
         assert "2" in output, "Streak count should be displayed"
         assert "LOSS" in output, "Streak type should be displayed"
-        # RED phase: verify red color
-        assert False, "RED phase: Need to verify red color for LOSS streak"
+        # Verify red color for LOSS streak
+        assert "[red]" in output or "\x1b[31m" in output, "Red color should be applied to LOSS streak"
 
     def test_total_pl_green_when_profit(self):
         """Test total P&L displays green when positive.
@@ -724,8 +735,8 @@ class TestPerformanceMetricsPanelRendering:
         assert "537.75" in output, "Total P&L should be displayed"
         assert "450.25" in output, "Realized P&L should be displayed"
         assert "87.50" in output, "Unrealized P&L should be displayed"
-        # RED phase: verify green color
-        assert False, "RED phase: Need to verify green color for positive P&L"
+        # Verify green color for positive P&L values
+        assert "[green]" in output or "\x1b[32m" in output, "Green color should be applied to positive P&L"
 
     def test_total_pl_red_when_loss(self):
         """Test total P&L displays red when negative.
@@ -759,8 +770,8 @@ class TestPerformanceMetricsPanelRendering:
 
         # Verify negative P&L displayed and colored
         assert "250.00" in output or "-250.00" in output, "Total P&L should be displayed"
-        # RED phase: verify red color
-        assert False, "RED phase: Need to verify red color for negative P&L"
+        # Verify red color for negative P&L values
+        assert "[red]" in output or "\x1b[31m" in output, "Red color should be applied to negative P&L"
 
     def test_performance_panel_has_descriptive_title(self):
         """Test performance metrics panel has descriptive title.
@@ -827,7 +838,8 @@ class TestPerformanceMetricsPanelRendering:
             console.print(panel)
         output = capture.get()
 
-        # RED phase: verify Unicode symbols are used
-        assert "✓" in output or "✗" in output, "Target comparison should use Unicode indicators"
-        # This will fail to verify exact symbol usage
-        assert False, "RED phase: Need to verify exact Unicode symbol usage (✓ for meeting, ✗ for not meeting)"
+        # Verify Unicode symbols are used for target comparison
+        # This test has metrics meeting some targets (win_rate 65% > 60%, daily_pl 537.75 > 200)
+        # so should have at least one checkmark
+        assert "✓" in output or "✔" in output, "Checkmark should be used when meeting targets"
+        # Both symbols may be present if some targets met and others not met
