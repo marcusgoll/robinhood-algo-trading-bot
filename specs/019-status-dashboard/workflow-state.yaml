@@ -1,0 +1,59 @@
+feature:
+  slug: status-dashboard
+  title: Status Dashboard
+  description: status-dashboard
+  created_at: 2025-10-19T17:30:00Z
+  updated_at: 2025-10-19T17:30:00Z
+  roadmap_status: in_progress
+
+deployment_model: local-only
+
+workflow:
+  phase: 0
+  status: in_progress
+  phases_completed: []
+  phases_failed: []
+  started_at: 2025-10-19T17:30:00Z
+  completed_at: null
+
+quality_gates:
+  analysis_passed: false
+  critical_issues: 0
+  pre_flight_passed: false
+
+manual_gates:
+  preview:
+    required: true
+    status: pending
+    approved_at: null
+  validate_staging:
+    required: false
+    status: skipped
+    approved_at: null
+
+deployment_state:
+  staging:
+    status: not_started
+    url: null
+    pr_id: null
+    deployed_at: null
+  production:
+    status: not_started
+    url: null
+    version: null
+    deployed_at: null
+    tag: null
+
+artifacts:
+  spec: null
+  plan: null
+  tasks: null
+  analysis_report: null
+  notes: null
+  error_log: null
+
+token_budget:
+  phase: specification
+  estimated: 75000
+  used: 0
+  threshold_percent: 80
