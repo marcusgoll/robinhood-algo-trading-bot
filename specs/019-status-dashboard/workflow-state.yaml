@@ -9,15 +9,19 @@ feature:
 deployment_model: local-only
 
 workflow:
-  phase: 0
-  status: in_progress
-  phases_completed: []
+  phase: 3
+  status: completed
+  phases_completed:
+    - spec-flow
+    - plan
+    - tasks
+    - analyze
   phases_failed: []
   started_at: 2025-10-19T17:30:00Z
   completed_at: null
 
 quality_gates:
-  analysis_passed: false
+  analysis_passed: true
   critical_issues: 0
   pre_flight_passed: false
 
@@ -45,12 +49,12 @@ deployment_state:
     tag: null
 
 artifacts:
-  spec: null
-  plan: null
-  tasks: null
-  analysis_report: null
-  notes: null
-  error_log: null
+  spec: specs/019-status-dashboard/spec.md
+  plan: specs/019-status-dashboard/plan.md
+  tasks: specs/019-status-dashboard/tasks.md
+  analysis_report: specs/019-status-dashboard/analysis-report.md
+  notes: specs/019-status-dashboard/NOTES.md
+  error_log: specs/019-status-dashboard/error-log.md
 
 token_budget:
   phase: specification
