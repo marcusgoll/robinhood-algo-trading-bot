@@ -13,8 +13,9 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 from pathlib import Path
+from typing import Literal, cast
 
 import yaml
 
@@ -111,7 +112,9 @@ class DashboardDataProvider:
                 f"{int(data_age_seconds)}s ago (TTL={self._config.staleness_ttl_seconds}s)"
             )
 
-        market_status = "OPEN" if is_market_open(generated_at) else "CLOSED"
+        market_status: Literal["OPEN", "CLOSED"] = (
+            "OPEN" if is_market_open(generated_at) else "CLOSED"
+        )
 
         return DashboardSnapshot(
             account_status=account_status,
@@ -184,8 +187,7 @@ class DashboardDataProvider:
                 max_drawdown_target=Decimal(str(raw_config["max_drawdown_target"])),
                 avg_risk_reward_target=float(avg_rr) if avg_rr is not None else None,
             )
-        except (TypeError, ValueError, DecimalException) as exc:  # type: ignore[name-defined]
-            # DecimalException may not be imported; handle generically below.
+        except (TypeError, ValueError, DecimalException) as exc:
             logger.warning(
                 "Dashboard targets config %s contains invalid numeric values: %s",
                 path,
@@ -296,13 +298,3 @@ class DashboardDataProvider:
         )
 
         return metrics, warnings
-
-
-# Importing DecimalException lazily to avoid typing dependency
-try:  # pragma: no cover - typing guard
-    from decimal import DecimalException  # type: ignore
-except ImportError:  # pragma: no cover
-    class DecimalException(Exception):
-        """Fallback exception when DecimalException is unavailable."""
-
-        pass
