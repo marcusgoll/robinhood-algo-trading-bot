@@ -328,12 +328,15 @@ Story completion order:
   - Expected: 60% win rate
   - Pattern: tests/performance/ metric tests
 
-- [ ] T036 [P] [US3] Write test: Sharpe ratio calculation
+- [X] T036 [P] [US3] Write test: Sharpe ratio calculation
   - File: tests/backtest/test_performance_calculator.py
   - Test: test_sharpe_ratio_calculation() - Verify risk-adjusted return
   - Given: Sample returns, risk-free rate = 2%
   - Expected: Sharpe ratio matches manual calculation
   - From: spec.md FR-013
+  - Notes: Test written with comprehensive equity curve (13 monthly data points, ~19% total return)
+  - Evidence: pytest: ModuleNotFoundError - PerformanceCalculator.calculate_sharpe_ratio() does not exist
+  - Status: TDD RED phase complete - test fails as expected until implementation
 
 - [X] T037 [P] [US3] Write test: Maximum drawdown calculation
   - File: tests/backtest/test_performance_calculator.py
