@@ -483,40 +483,55 @@ Story completion order:
 
 **Goal**: Validate complete feature meets all NFRs and quality gates
 
-- [ ] T070 [P] Write acceptance test: Performance benchmark (NFR-001)
+- [X] T070 [P] Write acceptance test: Performance benchmark (NFR-001)
   - File: tests/backtest/test_acceptance.py
   - Test: test_performance_benchmark() - 1 year backtest in <30 seconds
   - Run: Backtest 252 trading days for single stock
   - Assert: execution_time < 30.0 seconds
   - From: spec.md NFR-001
+  - Notes: Acceptance test validates NFR-001 (1-year backtest in <30s with MomentumStrategy)
+  - Evidence: pytest: test_performance_benchmark PASSED
+  - Committed: fde846e
 
-- [ ] T071 [P] Write acceptance test: Accuracy validation (NFR-003)
+- [X] T071 [P] Write acceptance test: Accuracy validation (NFR-003)
   - File: tests/backtest/test_acceptance.py
   - Test: test_buy_and_hold_accuracy() - Results match manual calculation
   - Strategy: Buy-and-hold AAPL 2023
   - Expected: Total return within 0.01% of manual calculation
   - From: spec.md NFR-003
+  - Notes: Validates NFR-003 (results within 0.01% of manual calculation: $100→$150 = 50% return)
+  - Evidence: pytest: test_buy_and_hold_accuracy PASSED
+  - Committed: fde846e
 
-- [ ] T072 [P] Write acceptance test: Reproducibility (NFR-010)
+- [X] T072 [P] Write acceptance test: Reproducibility (NFR-010)
   - File: tests/backtest/test_acceptance.py
-  - Test: test_reproducibility() - Same inputs â†’ same outputs
+  - Test: test_reproducibility() - Same inputs â†' same outputs
   - Run: Same BacktestConfig twice
   - Assert: result1.metrics == result2.metrics, result1.trades == result2.trades
   - From: spec.md NFR-010
+  - Notes: Validates NFR-010 (deterministic execution - identical results across runs)
+  - Evidence: pytest: test_reproducibility PASSED
+  - Committed: fde846e
 
-- [ ] T073 [P] Write acceptance test: Data fetch performance (NFR-002)
+- [X] T073 [P] Write acceptance test: Data fetch performance (NFR-002)
   - File: tests/backtest/test_acceptance.py
   - Test: test_data_fetch_performance() - 10 stocks in <60 seconds
   - Fetch: Historical data for 10 stocks, 1 year each
   - Assert: Total time < 60 seconds
   - From: spec.md NFR-002
+  - Notes: Integration test marked as 'slow' - auto-skips if ALPACA_API_KEY not set
+  - Evidence: pytest: test created with proper skip logic for missing API credentials
+  - Committed: fde846e
 
-- [ ] T074 Create usage examples in examples/
-  - Files: examples/simple_backtest.py, examples/strategy_comparison.py, examples/custom_strategy_example.py
+- [X] T074 Create usage examples in examples/
+  - Files: examples/simple_backtest.py (existed), examples/strategy_comparison.py, examples/custom_strategy_example.py
   - Purpose: Documentation and developer onboarding
   - Content: Complete end-to-end examples with comments
   - Pattern: Existing examples/ directory
   - From: plan.md [IMPLEMENTATION ROADMAP] Phase 6
+  - Notes: Created 2 new example files (strategy_comparison.py, custom_strategy_example.py with MeanReversionStrategy)
+  - Evidence: 3 complete example files with detailed documentation and usage instructions
+  - Committed: fde846e
 
 - [ ] T075 Update project README with backtest module
   - File: README.md

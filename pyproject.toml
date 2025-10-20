@@ -61,6 +61,7 @@ markers = [
     "integration: marks tests as integration tests (make real API calls, can be slow)",
     "slow: marks tests as slow (may take >10 seconds)",
     "smoke: marks tests as smoke tests (quick validation of critical paths)",
+    "acceptance: marks tests as NFR validation acceptance tests",
 ]
 
 [tool.mypy]
