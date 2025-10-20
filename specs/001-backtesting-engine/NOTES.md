@@ -132,3 +132,9 @@ New components needed:
   - Evidence: 32 tests passing, handles weekends/holidays/edge cases, full type hints
   - Committed: f8b0937
 
+✅ T005: Created 7 backtest data models with comprehensive validation
+  - Models: BacktestConfig, HistoricalDataBar, Trade, PerformanceMetrics, BacktestResult, Position, BacktestState
+  - Evidence: All models use Decimal for money fields, UTC-only timestamps, full __post_init__ validation
+  - Validation: Positive prices/capital, valid date ranges, commission/slippage [0,1], P&L calculations, chronological ordering
+  - Committed: 5301396
+

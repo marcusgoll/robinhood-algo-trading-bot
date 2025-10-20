@@ -71,10 +71,13 @@ Story completion order:
 
 **Goal**: Core data models and infrastructure that blocks all user stories
 
-- [ ] T005 Create backtest data models in src/trading_bot/backtest/models.py
+- [X] T005 Create backtest data models in src/trading_bot/backtest/models.py
   - Dataclasses: BacktestConfig, HistoricalDataBar, Trade, PerformanceMetrics, BacktestResult, Position, BacktestState
   - Fields: Per data-model.md entity definitions
   - Validations: Positive prices/capital, valid date ranges, UTC timestamps
+     Created 7 data models with comprehensive validation and type hints
+     Evidence: All models use Decimal for money, UTC-only timestamps, full __post_init__ validation
+     Committed: 5301396
   - REUSE: Quote dataclass pattern (src/trading_bot/market_data/data_models.py)
   - Pattern: src/trading_bot/performance/models.py
   - From: data-model.md all entities
