@@ -8,9 +8,8 @@ Implements TDD pattern: Tests written before implementation (T021-T024).
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Dict, List, Union
 
 from trading_bot.backtest.models import (
     BacktestConfig,
@@ -58,7 +57,7 @@ class BacktestEngine:
         print(f"Sharpe Ratio: {result.metrics.sharpe_ratio:.2f}")
     """
 
-    def __init__(self, config: BacktestConfig = None):
+    def __init__(self, config: BacktestConfig | None = None):
         """
         Initialize BacktestEngine with optional configuration.
 
@@ -67,13 +66,13 @@ class BacktestEngine:
                    If None, config must be passed to run().
         """
         self.config = config
-        self.state: BacktestState = None
-        self.strategy: IStrategy = None
+        self.state: BacktestState | None = None
+        self.strategy: IStrategy | None = None
 
     def run(
         self,
-        strategy: Union[IStrategy, BacktestConfig] = None,
-        historical_data: Union[List[HistoricalDataBar], Dict[str, List[HistoricalDataBar]]] = None
+        strategy: IStrategy | BacktestConfig | None = None,
+        historical_data: list[HistoricalDataBar] | dict[str, list[HistoricalDataBar]] | None = None
     ) -> BacktestResult:
         """
         Execute backtest for given strategy and historical data.
@@ -92,7 +91,7 @@ class BacktestEngine:
         Raises:
             ValueError: If historical_data format is invalid or config missing
         """
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
 
         # Detect API pattern
         if isinstance(strategy, BacktestConfig):
@@ -114,6 +113,10 @@ class BacktestEngine:
                 raise ValueError("config required in __init__() or run()")
             self.strategy = strategy
 
+        # Type narrowing: ensure config and strategy are set
+        assert self.config is not None, "config must be set"
+        assert self.strategy is not None, "strategy must be set"
+
         # Normalize historical_data to Dict format
         if isinstance(historical_data, list):
             # Single symbol: wrap in dict with first symbol from config
@@ -121,6 +124,7 @@ class BacktestEngine:
             historical_data = {symbol: historical_data}
 
         # Validate we have data for all configured symbols
+        assert historical_data is not None, "historical_data must be set"
         for symbol in self.config.symbols:
             if symbol not in historical_data:
                 logger.warning(
@@ -137,9 +141,12 @@ class BacktestEngine:
             warnings=[]
         )
 
+        # Type narrowing: ensure state is set
+        assert self.state is not None, "state must be initialized"
+
         # Get all bars across all symbols and sort chronologically
-        all_bars = []
-        for symbol, bars in historical_data.items():
+        all_bars: list[HistoricalDataBar] = []
+        for _symbol, bars in historical_data.items():
             all_bars.extend(bars)
 
         # Sort by timestamp to ensure chronological execution
@@ -178,7 +185,7 @@ class BacktestEngine:
         metrics = self._calculate_metrics()
 
         # Calculate execution time
-        end_time = datetime.now(timezone.utc)
+        end_time = datetime.now(UTC)
         execution_time = (end_time - start_time).total_seconds()
 
         # Ensure minimum execution time for validation (avoid 0.0)
@@ -201,8 +208,8 @@ class BacktestEngine:
     def _check_entries(
         self,
         current_bar: HistoricalDataBar,
-        visible_bars: List[HistoricalDataBar],
-        all_bars: List[HistoricalDataBar],
+        visible_bars: list[HistoricalDataBar],
+        all_bars: list[HistoricalDataBar],
         current_index: int
     ) -> None:
         """
@@ -223,6 +230,10 @@ class BacktestEngine:
             - Updates self.state.positions
             - Logs warnings if insufficient capital
         """
+        assert self.strategy is not None, "strategy must be initialized"
+        assert self.state is not None, "state must be initialized"
+        assert self.config is not None, "config must be initialized"
+
         # Call strategy to check entry signal
         should_enter = self.strategy.should_enter(visible_bars)
 
@@ -298,8 +309,8 @@ class BacktestEngine:
     def _check_exits(
         self,
         current_bar: HistoricalDataBar,
-        visible_bars: List[HistoricalDataBar],
-        all_bars: List[HistoricalDataBar],
+        visible_bars: list[HistoricalDataBar],
+        all_bars: list[HistoricalDataBar],
         current_index: int
     ) -> None:
         """
@@ -320,6 +331,10 @@ class BacktestEngine:
             - Removes position from self.state.positions
             - Appends trade to self.state.trades
         """
+        assert self.strategy is not None, "strategy must be initialized"
+        assert self.state is not None, "state must be initialized"
+        assert self.config is not None, "config must be initialized"
+
         # Get current position
         position = self.state.positions[current_bar.symbol]
 
@@ -340,7 +355,7 @@ class BacktestEngine:
     def _close_position(
         self,
         position: Position,
-        all_bars: List[HistoricalDataBar],
+        all_bars: list[HistoricalDataBar],
         current_index: int,
         exit_reason: str
     ) -> None:
@@ -358,6 +373,9 @@ class BacktestEngine:
             - Removes position from self.state.positions
             - Appends trade to self.state.trades
         """
+        assert self.state is not None, "state must be initialized"
+        assert self.config is not None, "config must be initialized"
+
         # Fill at current bar's close price (signal during day, fill at close)
         current_bar = all_bars[current_index]
         fill_price = current_bar.close
@@ -403,7 +421,7 @@ class BacktestEngine:
             f"at ${fill_price} on {fill_date.date()}, P&L: ${pnl:.2f} ({pnl_pct * 100:.2f}%)"
         )
 
-    def _close_all_positions(self, all_bars: List[HistoricalDataBar]) -> None:
+    def _close_all_positions(self, all_bars: list[HistoricalDataBar]) -> None:
         """
         Close all remaining open positions at end of backtest.
 
@@ -414,6 +432,8 @@ class BacktestEngine:
             - Closes all positions in self.state.positions
             - Creates trade records for each
         """
+        assert self.state is not None, "state must be initialized"
+
         # Get symbols with open positions (copy to avoid mutation during iteration)
         symbols_with_positions = list(self.state.positions.keys())
 
@@ -438,6 +458,8 @@ class BacktestEngine:
         Side Effects:
             - Updates Position.current_price for matching symbol
         """
+        assert self.state is not None, "state must be initialized"
+
         if current_bar.symbol in self.state.positions:
             # Get current position
             old_position = self.state.positions[current_bar.symbol]
@@ -463,6 +485,8 @@ class BacktestEngine:
         Side Effects:
             - Appends (timestamp, equity) to self.state.equity_history
         """
+        assert self.state is not None, "state must be initialized"
+
         # Calculate total position value
         position_value = Decimal("0.0")
         for position in self.state.positions.values():
@@ -486,8 +510,9 @@ class BacktestEngine:
             Full implementation in Phase 5 (US3).
         """
         # Placeholder metrics (will implement in Phase 5 - US3)
+        assert self.state is not None, "state must be initialized"
         total_trades = len(self.state.trades)
-        winning_trades = sum(1 for trade in self.state.trades if trade.pnl > 0)
+        winning_trades = sum((1 if trade.pnl > 0 else 0) for trade in self.state.trades)
         losing_trades = total_trades - winning_trades
 
         win_rate = Decimal("0.0")

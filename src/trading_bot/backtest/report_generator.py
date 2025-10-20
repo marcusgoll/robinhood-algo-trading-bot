@@ -12,12 +12,9 @@ Usage:
 """
 
 import json
-from datetime import datetime
-from decimal import Decimal
 from pathlib import Path
-from typing import List, Optional
 
-from src.trading_bot.backtest.models import BacktestResult, Trade
+from .models import BacktestResult, Trade
 
 
 class ReportGenerator:
@@ -36,7 +33,7 @@ class ReportGenerator:
     """
 
     def generate_markdown(
-        self, result: BacktestResult, output_path: Optional[str] = None
+        self, result: BacktestResult, output_path: str | None = None
     ) -> str:
         """
         Generate markdown report from backtest result.
@@ -146,7 +143,7 @@ class ReportGenerator:
         return markdown
 
     def generate_json(
-        self, result: BacktestResult, output_path: Optional[str] = None
+        self, result: BacktestResult, output_path: str | None = None
     ) -> str:
         """
         Generate JSON export from backtest result.
@@ -243,7 +240,7 @@ class ReportGenerator:
 
         return json_str
 
-    def _format_trade_table(self, trades: List[Trade]) -> str:
+    def _format_trade_table(self, trades: list[Trade]) -> str:
         """
         Format trades as markdown table.
 

@@ -641,7 +641,97 @@ class TestYahooFinanceFallback:
         assert "Alpaca API error" in error_msg, f"Error message should mention Alpaca error: {error_msg}"
         assert "Yahoo Finance error" in error_msg, f"Error message should mention Yahoo error: {error_msg}"
 
+    @pytest.mark.integration
+    def test_yahoo_finance_timestamp_conversion_integration(self):
+        """
+        Integration test for Yahoo Finance timestamp conversion.
 
+        This test validates the critical timestamp conversion logic in _fetch_yahoo_data()
+        (lines 521-551) which handles pandas Timestamp to datetime conversion with
+        proper UTC timezone handling.
+
+        Code Review Issue: CR004 - Untested Yahoo Finance Fallback
+        Coverage Gap: 18 untested lines in historical_data_manager.py:521-551
+
+        Scenario:
+        - Given: Real Yahoo Finance API (yfinance library installed)
+        - When: Fetching historical data for a known stable symbol (SPY)
+        - Then: All timestamps are UTC-aware datetime objects
+        - And: Data is chronologically ordered
+        - And: OHLCV values are valid Decimals/ints
+        """
+        from trading_bot.backtest.historical_data_manager import HistoricalDataManager
+
+        # ARRANGE: Test parameters using stable ETF symbol
+        symbol = "SPY"  # Use SPY (S&P 500 ETF) - stable, liquid, always available
+        start_date = datetime(2024, 1, 2, tzinfo=timezone.utc)
+        end_date = datetime(2024, 1, 5, tzinfo=timezone.utc)
+
+        # Create manager instance
+        manager = HistoricalDataManager(cache_enabled=False)
+
+        # ACT: Call Yahoo Finance directly (no mocking)
+        try:
+            result = manager._fetch_yahoo_data(
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date
+            )
+        except Exception as e:
+            pytest.skip(f"Yahoo Finance API unavailable: {e}")
+
+        # ASSERT: Validate timestamp conversion worked correctly
+        assert isinstance(result, list), "Should return list of bars"
+        assert len(result) > 0, "Should return at least one bar"
+
+        # Validate each bar
+        for bar in result:
+            assert isinstance(bar, HistoricalDataBar), "Each item should be HistoricalDataBar"
+
+            # CR004: Validate timestamp is UTC-aware (lines 526-534)
+            assert bar.timestamp.tzinfo is not None, \
+                f"Timestamp should be timezone-aware: {bar.timestamp}"
+            assert bar.timestamp.tzinfo == timezone.utc, \
+                f"Timestamp should be UTC: {bar.timestamp.tzinfo}"
+
+            # Validate OHLCV types (lines 538-545)
+            assert isinstance(bar.open, Decimal), f"Open should be Decimal: {type(bar.open)}"
+            assert isinstance(bar.high, Decimal), f"High should be Decimal: {type(bar.high)}"
+            assert isinstance(bar.low, Decimal), f"Low should be Decimal: {type(bar.low)}"
+            assert isinstance(bar.close, Decimal), f"Close should be Decimal: {type(bar.close)}"
+            assert isinstance(bar.volume, int), f"Volume should be int: {type(bar.volume)}"
+
+            # Validate values are positive
+            assert bar.open > 0, f"Open should be positive: {bar.open}"
+            assert bar.high > 0, f"High should be positive: {bar.high}"
+            assert bar.low > 0, f"Low should be positive: {bar.low}"
+            assert bar.close > 0, f"Close should be positive: {bar.close}"
+            assert bar.volume > 0, f"Volume should be positive: {bar.volume}"
+
+            # Validate OHLC relationships
+            assert bar.high >= bar.low, \
+                f"High ({bar.high}) should be >= Low ({bar.low})"
+            assert bar.high >= bar.open, \
+                f"High ({bar.high}) should be >= Open ({bar.open})"
+            assert bar.high >= bar.close, \
+                f"High ({bar.high}) should be >= Close ({bar.close})"
+            assert bar.low <= bar.open, \
+                f"Low ({bar.low}) should be <= Open ({bar.open})"
+            assert bar.low <= bar.close, \
+                f"Low ({bar.low}) should be <= Close ({bar.close})"
+
+            # Validate adjustment flags (line 546-547)
+            assert bar.split_adjusted is True, "Should be split-adjusted"
+            assert bar.dividend_adjusted is True, "Should be dividend-adjusted"
+
+        # Validate chronological ordering
+        timestamps = [bar.timestamp for bar in result]
+        assert timestamps == sorted(timestamps), \
+            "Bars should be in chronological order"
+
+        # Validate symbol consistency
+        assert all(bar.symbol == symbol for bar in result), \
+            f"All bars should have symbol {symbol}"
 
 
 

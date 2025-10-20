@@ -12,14 +12,11 @@ Constitution v1.0.0:
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import List, Union
 
 import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
 
 from trading_bot.backtest.exceptions import DataQualityError, InsufficientDataError
 from trading_bot.backtest.models import HistoricalDataBar
@@ -59,11 +56,11 @@ class HistoricalDataManager:
 
     def __init__(
         self,
-        api_key: str = None,
-        api_secret: str = None,
+        api_key: str | None = None,
+        api_secret: str | None = None,
         cache_dir: str = ".backtest_cache",
         cache_enabled: bool = True,
-        logger: logging.Logger = None
+        logger: logging.Logger | None = None
     ) -> None:
         """
         Initialize HistoricalDataManager.
@@ -91,7 +88,7 @@ class HistoricalDataManager:
         symbol: str,
         start_date: datetime,
         end_date: datetime
-    ) -> List[HistoricalDataBar]:
+    ) -> list[HistoricalDataBar]:
         """
         Fetch historical data for symbol with automatic caching and fallback.
 
@@ -148,7 +145,7 @@ class HistoricalDataManager:
                 raise InsufficientDataError(
                     f"Failed to fetch data for {symbol} from both Alpaca and Yahoo Finance. "
                     f"Alpaca error: {alpaca_error}. Yahoo error: {yahoo_error}"
-                )
+                ) from yahoo_error
 
         # Validate we got data
         if not bars or len(bars) == 0:
@@ -169,7 +166,7 @@ class HistoricalDataManager:
 
     def validate_data(
         self,
-        data: Union[List[HistoricalDataBar], List[dict]],
+        data: list[HistoricalDataBar] | list[dict],
         symbol: str
     ) -> None:
         """
@@ -224,7 +221,7 @@ class HistoricalDataManager:
                 except (ValueError, KeyError) as e:
                     raise DataQualityError(
                         f"Failed to convert data to HistoricalDataBar for {symbol}: {e}"
-                    )
+                    ) from e
             else:
                 bars.append(item)
 
@@ -312,7 +309,7 @@ class HistoricalDataManager:
 
     def _save_to_cache(
         self,
-        bars: List[HistoricalDataBar],
+        bars: list[HistoricalDataBar],
         cache_path: Path
     ) -> None:
         """
@@ -342,7 +339,7 @@ class HistoricalDataManager:
     def _load_from_cache(
         self,
         cache_path: Path
-    ) -> List[HistoricalDataBar]:
+    ) -> list[HistoricalDataBar]:
         """
         Load historical bars from parquet cache.
 
@@ -379,7 +376,7 @@ class HistoricalDataManager:
         symbol: str,
         start_date: datetime,
         end_date: datetime
-    ) -> List[HistoricalDataBar]:
+    ) -> list[HistoricalDataBar]:
         """
         Fetch data from Alpaca API.
 
@@ -399,6 +396,8 @@ class HistoricalDataManager:
             InsufficientDataError: If API call fails or returns no data
         """
         import os
+
+        from alpaca.data.enums import Adjustment
         from alpaca.data.historical import StockHistoricalDataClient
         from alpaca.data.requests import StockBarsRequest
         from alpaca.data.timeframe import TimeFrame
@@ -428,7 +427,7 @@ class HistoricalDataManager:
                 timeframe=TimeFrame.Day,
                 start=start_date,
                 end=end_date,
-                adjustment='all'  # Request split-adjusted and dividend-adjusted prices
+                adjustment=Adjustment.ALL  # Request split-adjusted and dividend-adjusted prices
             )
 
             # Fetch bars from Alpaca
@@ -476,7 +475,7 @@ class HistoricalDataManager:
         symbol: str,
         start_date: datetime,
         end_date: datetime
-    ) -> List[HistoricalDataBar]:
+    ) -> list[HistoricalDataBar]:
         """
         Fetch data from Yahoo Finance API.
 
@@ -530,7 +529,7 @@ class HistoricalDataManager:
                     bar_timestamp = bar_timestamp.to_pydatetime()
                 elif timestamp.tzinfo is None:
                     # Naive datetime - assume UTC
-                    bar_timestamp = timestamp.replace(tzinfo=timezone.utc)
+                    bar_timestamp = timestamp.replace(tzinfo=UTC)
                 else:
                     bar_timestamp = timestamp
 

@@ -11,14 +11,12 @@ Constitution v1.0.0:
 """
 
 from datetime import datetime, timedelta
-from typing import Set
-
 
 # US Market Holidays (major holidays that close markets)
 # Source: NYSE holiday calendar
 # Note: This is a simplified list for 2024-2025. For production use,
 # consider using pandas_market_calendars or a similar library.
-US_MARKET_HOLIDAYS: Set[str] = {
+US_MARKET_HOLIDAYS: set[str] = {
     # 2024 holidays
     "2024-01-01",  # New Year's Day
     "2024-01-15",  # Martin Luther King Jr. Day
@@ -177,14 +175,14 @@ def validate_date_range(start_date: datetime, end_date: datetime) -> None:
     # Check timezone awareness FIRST (before comparison)
     if start_date.tzinfo is None:
         raise ValueError(
-            f"start_date is timezone-naive. Use UTC-aware datetime: "
-            f"datetime(..., tzinfo=timezone.utc)"
+            "start_date is timezone-naive. Use UTC-aware datetime: "
+            "datetime(..., tzinfo=timezone.utc)"
         )
 
     if end_date.tzinfo is None:
         raise ValueError(
-            f"end_date is timezone-naive. Use UTC-aware datetime: "
-            f"datetime(..., tzinfo=timezone.utc)"
+            "end_date is timezone-naive. Use UTC-aware datetime: "
+            "datetime(..., tzinfo=timezone.utc)"
         )
 
     # Check chronological order (after ensuring both are timezone-aware)

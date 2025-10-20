@@ -9,7 +9,7 @@ Constitution v1.0.0:
 - §Testing_Requirements: Enables strategy validation before live deployment
 """
 
-from typing import List, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from trading_bot.backtest.models import HistoricalDataBar, Position
 
@@ -54,7 +54,7 @@ class IStrategy(Protocol):
         - Strategies are stateless: all state passed via parameters
     """
 
-    def should_enter(self, bars: List[HistoricalDataBar]) -> bool:
+    def should_enter(self, bars: list[HistoricalDataBar]) -> bool:
         """
         Determine whether to enter a new position.
 
@@ -91,7 +91,7 @@ class IStrategy(Protocol):
     def should_exit(
         self,
         position: Position,
-        bars: List[HistoricalDataBar]
+        bars: list[HistoricalDataBar]
     ) -> bool:
         """
         Determine whether to exit an open position.

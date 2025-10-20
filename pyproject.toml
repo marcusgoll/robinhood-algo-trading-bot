@@ -66,8 +66,9 @@ markers = [
 
 [tool.mypy]
 python_version = "3.11"
+mypy_path = "src"
 exclude = [
-    'src',  # Exclude src directory to avoid duplicate module detection with editable install
+    'tests',  # Tests are checked separately with ignore_errors
 ]
 warn_return_any = true
 warn_unused_configs = true
@@ -83,6 +84,14 @@ strict_equality = true
 [[tool.mypy.overrides]]
 module = "tests.*"
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "yfinance.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "robin_stocks.*"
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100

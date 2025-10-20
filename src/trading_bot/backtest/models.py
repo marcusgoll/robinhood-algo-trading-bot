@@ -11,7 +11,6 @@ to ensure data integrity throughout the backtesting process.
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, List, Tuple, Type
 
 
 @dataclass(frozen=True)
@@ -36,8 +35,8 @@ class BacktestConfig:
     Raises:
         ValueError: If validation fails (empty symbols, invalid dates, negative capital, etc.)
     """
-    strategy_class: Type
-    symbols: List[str]
+    strategy_class: type
+    symbols: list[str]
     start_date: datetime
     end_date: datetime
     initial_capital: Decimal = Decimal("100000.0")
@@ -441,10 +440,10 @@ class BacktestState:
     """
     current_date: datetime
     cash: Decimal
-    positions: Dict[str, Position] = field(default_factory=dict)
-    equity_history: List[Tuple[datetime, Decimal]] = field(default_factory=list)
-    trades: List[Trade] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    positions: dict[str, Position] = field(default_factory=dict)
+    equity_history: list[tuple[datetime, Decimal]] = field(default_factory=list)
+    trades: list[Trade] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Validate backtest state after initialization."""
@@ -478,10 +477,10 @@ class BacktestResult:
         ValueError: If validation fails (unsorted trades, negative execution time, etc.)
     """
     config: BacktestConfig
-    trades: List[Trade]
-    equity_curve: List[Tuple[datetime, Decimal]]
+    trades: list[Trade]
+    equity_curve: list[tuple[datetime, Decimal]]
     metrics: PerformanceMetrics
-    data_warnings: List[str]
+    data_warnings: list[str]
     execution_time_seconds: float
     completed_at: datetime
 

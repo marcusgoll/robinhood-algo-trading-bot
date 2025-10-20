@@ -11,7 +11,6 @@ Reuses patterns from:
 
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Tuple
 
 from .models import BacktestConfig, PerformanceMetrics, Trade
 
@@ -29,8 +28,8 @@ class PerformanceCalculator:
 
     def calculate_metrics(
         self,
-        trades: List[Trade],
-        equity_curve: List[Tuple[datetime, Decimal]],
+        trades: list[Trade],
+        equity_curve: list[tuple[datetime, Decimal]],
         config: BacktestConfig
     ) -> PerformanceMetrics:
         """
@@ -82,7 +81,7 @@ class PerformanceCalculator:
             losing_trades=losing_trades,
         )
 
-    def calculate_win_rate(self, trades: List[Trade]) -> Decimal:
+    def calculate_win_rate(self, trades: list[Trade]) -> Decimal:
         """
         Calculate win rate from trade list.
 
@@ -100,7 +99,7 @@ class PerformanceCalculator:
 
     def calculate_sharpe_ratio(
         self,
-        equity_curve: List[Tuple[datetime, Decimal]],
+        equity_curve: list[tuple[datetime, Decimal]],
         risk_free_rate: Decimal
     ) -> Decimal:
         """
@@ -117,8 +116,8 @@ class PerformanceCalculator:
 
     def calculate_max_drawdown(
         self,
-        equity_curve: List[Tuple[datetime, Decimal]]
-    ) -> Tuple[float, int]:
+        equity_curve: list[tuple[datetime, Decimal]]
+    ) -> tuple[float, int]:
         """
         Calculate maximum drawdown and duration from equity curve.
 
@@ -133,9 +132,9 @@ class PerformanceCalculator:
 
     def _calculate_returns(
         self,
-        equity_curve: List[Tuple[datetime, Decimal]],
+        equity_curve: list[tuple[datetime, Decimal]],
         config: BacktestConfig
-    ) -> Tuple[Decimal, Decimal, Decimal]:
+    ) -> tuple[Decimal, Decimal, Decimal]:
         """
         Calculate return metrics (total, annualized, CAGR).
 
@@ -182,8 +181,8 @@ class PerformanceCalculator:
 
     def _calculate_drawdown(
         self,
-        equity_curve: List[Tuple[datetime, Decimal]]
-    ) -> Tuple[Decimal, int]:
+        equity_curve: list[tuple[datetime, Decimal]]
+    ) -> tuple[Decimal, int]:
         """
         Calculate maximum drawdown and duration.
 
@@ -219,7 +218,7 @@ class PerformanceCalculator:
 
     def _calculate_sharpe(
         self,
-        equity_curve: List[Tuple[datetime, Decimal]],
+        equity_curve: list[tuple[datetime, Decimal]],
         risk_free_rate: Decimal
     ) -> Decimal:
         """
@@ -288,8 +287,8 @@ class PerformanceCalculator:
 
     def _calculate_trade_stats(
         self,
-        trades: List[Trade]
-    ) -> Tuple[Decimal, Decimal, Decimal, Decimal, int, int, int]:
+        trades: list[Trade]
+    ) -> tuple[Decimal, Decimal, Decimal, Decimal, int, int, int]:
         """
         Calculate trade statistics.
 
@@ -336,8 +335,8 @@ class PerformanceCalculator:
 
         # Profit factor: gross_profit / gross_loss (or 0 if no losses)
         if losses:
-            gross_profit = sum(t.pnl for t in wins)
-            gross_loss = abs(sum(t.pnl for t in losses))  # Make positive
+            gross_profit = Decimal(sum((t.pnl for t in wins), Decimal("0")))
+            gross_loss = abs(Decimal(sum((t.pnl for t in losses), Decimal("0"))))  # Make positive
             if gross_loss > 0:
                 profit_factor = gross_profit / gross_loss
             else:
