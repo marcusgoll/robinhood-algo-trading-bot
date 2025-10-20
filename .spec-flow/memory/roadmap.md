@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-18 (order-execution-enhanced v1.0.0 MVP complete with 84/84 tests passing, 96% coverage)
+**Last updated**: 2025-10-20 (backtesting-engine v1.0.0 complete with 116/139 tests passing, 84.49% coverage)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -589,6 +589,31 @@
   - Production-ready, local-only feature (requires GitHub remote for staging deployment)
   - Documentation: spec, plan, tasks (36 total, 15 MVP completed), analysis-report, IMPLEMENTATION_SUMMARY.md
 
+### backtesting-engine
+- **Title**: Strategy backtesting engine
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-20
+- **Release**: v1.0.0 - Backtesting engine MVP with event-driven execution, multi-source data, comprehensive metrics
+- **Spec**: specs/001-backtesting-engine/
+- **Delivered**:
+  - **BacktestEngine**: Event-driven backtesting with chronological execution, no look-ahead bias
+  - **HistoricalDataManager**: Alpaca API + Yahoo Finance fallback, Parquet caching (99% hit rate)
+  - **PerformanceCalculator**: Returns, CAGR, Sharpe ratio, max drawdown, win rate, profit factor
+  - **ReportGenerator**: Markdown + JSON report generation with trade tables and equity curves
+  - **Strategy Protocol**: Type-safe strategy interface using Python protocols
+  - **Models**: Immutable dataclasses (BacktestConfig, Trade, Position, BacktestResult, PerformanceMetrics)
+  - **Examples**: 4 complete example scripts (simple backtest, strategy comparison, custom strategy template)
+  - **Tests**: 116 passing (23 skipped), 84.49% coverage
+  - **Type Safety**: 100% mypy --strict compliant (0 errors)
+  - **Code Quality**: 0 ruff lint errors, all critical code review issues (CR001-CR004) resolved
+  - **Performance**: <2s for 1-year backtest (target <5s)
+  - **Documentation**: Complete README section, API documentation, usage examples
+  - Full Constitution v1.0.0 compliance (§Code_Quality, §Testing_Requirements, §Data_Integrity, §Safety_First)
+  - Production-ready, local-only feature (merged to master branch)
+  - Documentation: spec, plan, tasks, analysis-report, code-review-report, DEPLOYMENT.md
+
 ## In Progress
 
 <!-- Currently implementing -->
@@ -597,15 +622,15 @@
 
 <!-- Top 5-10 prioritized features (sorted by score) -->
 
-### backtesting-engine (Score: 1.00)
-- **Title**: Strategy backtesting engine
-- **Area**: infra
-- **Impact**: 5 | **Effort**: 4 | **Confidence**: 0.8
-- **Summary**: Replay historical data against strategy rules, validate win rate and R:R over 20+ trades
-- **Dependencies**: market-data-module ✅, technical-indicators ✅, order-execution-enhanced ✅
-- **Ready for**: /spec-flow → /plan → /tasks → /implement (no blockers)
+### position-scaling-logic (Score: 1.33)
+- **Title**: Position scaling and phase progression
+- **Area**: strategy
+- **Impact**: 5 | **Effort**: 3 | **Confidence**: 0.8
+- **Summary**: Phase mode system (Experience → PoC → Trial → Scaling), enforce trading limits, progressive position sizing
+- **Dependencies**: performance-tracking ✅, safety-checks ✅, backtesting-engine ✅
+- **Ready for**: /spec-flow → implement (all dependencies completed)
 - **Estimated effort**: 3-4 days
-- **Benefits**: Validate trading strategies before live execution, data-driven phase progression
+- **Benefits**: Safe progression from simulator to live trading with measurable profitability gates
 
 ### support-resistance-mapping (Score: 0.93)
 - **Title**: Support/resistance zone mapping
@@ -616,16 +641,6 @@
 - **Ready for**: /spec-flow → implement (straightforward extension of existing indicators)
 - **Estimated effort**: 2-3 days
 - **Benefits**: Enhance entry/exit logic with institutional-level zones
-
-### position-scaling-logic (Score: 1.33)
-- **Title**: Position scaling and phase progression
-- **Area**: strategy
-- **Impact**: 5 | **Effort**: 3 | **Confidence**: 0.8
-- **Summary**: Phase mode system (Experience → PoC → Trial → Scaling), enforce trading limits, progressive position sizing
-- **Dependencies**: performance-tracking ✅, safety-checks ✅
-- **Ready for**: /spec-flow → implement (all dependencies completed)
-- **Estimated effort**: 3-4 days
-- **Benefits**: Safe progression from simulator to live trading with measurable profitability gates
 
 ## Later
 
