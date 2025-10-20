@@ -151,7 +151,7 @@ Story completion order:
   - Pattern: src/trading_bot/market_data/market_data_service.py
   - From: plan.md [NEW INFRASTRUCTURE - CREATE]
 
-- [ ] T016 [US1] Add Alpaca historical data API integration
+- [X] T016 [US1] Add Alpaca historical data API integration
   - Method: _fetch_alpaca_data() in HistoricalDataManager
   - API: Alpaca Bars API with date range parameters
   - Adjustments: Split-adjusted, dividend-adjusted prices
