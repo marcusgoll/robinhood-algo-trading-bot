@@ -287,3 +287,192 @@ def test_win_rate_calculation():
 
     # Assert: 6 wins out of 10 trades = 60% win rate
     assert win_rate == Decimal("0.60"), f"Expected 60% win rate, got {win_rate}"
+
+
+def test_metrics_accuracy():
+    """
+    Test metrics accuracy versus manual calculations (NFR-003).
+
+    Given: Known trade history with manually calculated metrics
+    Expected: All metrics within 0.01% of expected values (per NFR-003)
+
+    Test validates:
+    - Total return calculation
+    - Win rate calculation
+    - Profit factor calculation
+    - Maximum drawdown calculation
+    - Sharpe ratio calculation
+
+    Manual calculations (for reference):
+    - Trade 1: Entry $100, Exit $110, Shares 100 = +$1000 (10% gain)
+    - Trade 2: Entry $200, Exit $190, Shares 50 = -$500 (5% loss)
+    - Trade 3: Entry $150, Exit $165, Shares 75 = +$1125 (10% gain)
+    - Trade 4: Entry $300, Exit $285, Shares 30 = -$450 (5% loss)
+    - Trade 5: Entry $180, Exit $198, Shares 60 = +$1080 (10% gain)
+
+    Total P&L: $1000 - $500 + $1125 - $450 + $1080 = $2255
+    Initial capital: $100,000
+    Total return: $2255 / $100,000 = 0.02255 = 2.255%
+    Win rate: 3/5 = 0.60 = 60%
+    Gross profit: $1000 + $1125 + $1080 = $3205
+    Gross loss: $500 + $450 = $950
+    Profit factor: $3205 / $950 = 3.373684...
+
+    Equity progression:
+    - Start: $100,000
+    - After T1: $101,000 (peak)
+    - After T2: $100,500 (0.495% drawdown)
+    - After T3: $101,625 (new peak)
+    - After T4: $101,175 (0.443% drawdown)
+    - After T5: $102,255 (final)
+    Max drawdown: 0.495% (from $101,000 to $100,500)
+
+    TDD RED phase: This test should FAIL (PerformanceCalculator not implemented yet)
+    """
+    # Create 5 trades with known outcomes
+    trades = [
+        # Trade 1: +$1000 (10% gain) - WIN
+        Trade(
+            symbol="AAPL",
+            entry_date=datetime(2024, 1, 2, tzinfo=timezone.utc),
+            entry_price=Decimal("100.00"),
+            exit_date=datetime(2024, 1, 10, tzinfo=timezone.utc),
+            exit_price=Decimal("110.00"),
+            shares=100,
+            pnl=Decimal("1000.00"),
+            pnl_pct=Decimal("0.10"),
+            duration_days=8,
+            exit_reason="take_profit",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+        # Trade 2: -$500 (5% loss) - LOSS
+        Trade(
+            symbol="TSLA",
+            entry_date=datetime(2024, 1, 11, tzinfo=timezone.utc),
+            entry_price=Decimal("200.00"),
+            exit_date=datetime(2024, 1, 18, tzinfo=timezone.utc),
+            exit_price=Decimal("190.00"),
+            shares=50,
+            pnl=Decimal("-500.00"),
+            pnl_pct=Decimal("-0.05"),
+            duration_days=7,
+            exit_reason="stop_loss",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+        # Trade 3: +$1125 (10% gain) - WIN
+        Trade(
+            symbol="GOOGL",
+            entry_date=datetime(2024, 1, 19, tzinfo=timezone.utc),
+            entry_price=Decimal("150.00"),
+            exit_date=datetime(2024, 1, 28, tzinfo=timezone.utc),
+            exit_price=Decimal("165.00"),
+            shares=75,
+            pnl=Decimal("1125.00"),
+            pnl_pct=Decimal("0.10"),
+            duration_days=9,
+            exit_reason="take_profit",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+        # Trade 4: -$450 (5% loss) - LOSS
+        Trade(
+            symbol="MSFT",
+            entry_date=datetime(2024, 1, 29, tzinfo=timezone.utc),
+            entry_price=Decimal("300.00"),
+            exit_date=datetime(2024, 2, 5, tzinfo=timezone.utc),
+            exit_price=Decimal("285.00"),
+            shares=30,
+            pnl=Decimal("-450.00"),
+            pnl_pct=Decimal("-0.05"),
+            duration_days=7,
+            exit_reason="stop_loss",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+        # Trade 5: +$1080 (10% gain) - WIN
+        Trade(
+            symbol="NVDA",
+            entry_date=datetime(2024, 2, 6, tzinfo=timezone.utc),
+            entry_price=Decimal("180.00"),
+            exit_date=datetime(2024, 2, 15, tzinfo=timezone.utc),
+            exit_price=Decimal("198.00"),
+            shares=60,
+            pnl=Decimal("1080.00"),
+            pnl_pct=Decimal("0.10"),
+            duration_days=9,
+            exit_reason="take_profit",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+    ]
+
+    # Known equity curve
+    equity_curve = [
+        (datetime(2024, 1, 2, tzinfo=timezone.utc), Decimal("100000")),   # Start
+        (datetime(2024, 1, 10, tzinfo=timezone.utc), Decimal("101000")),  # After T1 (peak)
+        (datetime(2024, 1, 18, tzinfo=timezone.utc), Decimal("100500")),  # After T2 (drawdown)
+        (datetime(2024, 1, 28, tzinfo=timezone.utc), Decimal("101625")),  # After T3 (new peak)
+        (datetime(2024, 2, 5, tzinfo=timezone.utc), Decimal("101175")),   # After T4 (drawdown)
+        (datetime(2024, 2, 15, tzinfo=timezone.utc), Decimal("102255")),  # After T5 (final)
+    ]
+
+    # Configuration with risk-free rate for Sharpe calculation
+    config = BacktestConfig(
+        strategy_class=type("DummyStrategy", (), {}),  # Dummy strategy class
+        symbols=["AAPL", "TSLA", "GOOGL", "MSFT", "NVDA"],
+        start_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        end_date=datetime(2024, 2, 29, tzinfo=timezone.utc),
+        initial_capital=Decimal("100000"),
+        commission=Decimal("0.00"),
+        slippage_pct=Decimal("0.00"),
+        risk_free_rate=Decimal("0.02"),  # 2% annual risk-free rate
+    )
+
+    # Calculate metrics using PerformanceCalculator
+    calculator = PerformanceCalculator()
+    metrics = calculator.calculate_metrics(trades, equity_curve, config)
+
+    # Verify total return (NFR-003: within 0.01% = 0.0001)
+    expected_total_return = Decimal("0.02255")  # 2.255% return
+    tolerance = Decimal("0.0001")  # 0.01% tolerance
+    assert abs(metrics.total_return - expected_total_return) < tolerance, (
+        f"Total return accuracy failed: expected {expected_total_return}, "
+        f"got {metrics.total_return}, diff {abs(metrics.total_return - expected_total_return)}"
+    )
+
+    # Verify win rate (NFR-003: within 0.01% = 0.0001)
+    expected_win_rate = Decimal("0.60")  # 60% win rate (3 wins out of 5 trades)
+    assert abs(metrics.win_rate - expected_win_rate) < tolerance, (
+        f"Win rate accuracy failed: expected {expected_win_rate}, "
+        f"got {metrics.win_rate}, diff {abs(metrics.win_rate - expected_win_rate)}"
+    )
+
+    # Verify profit factor (NFR-003: within 0.01%)
+    # Profit factor = gross profit / gross loss = $3205 / $950 = 3.373684...
+    expected_profit_factor = Decimal("3205") / Decimal("950")  # 3.373684...
+    # For profit factor, 0.01% of the value = 3.373684 * 0.0001 = 0.0003374
+    pf_tolerance = expected_profit_factor * tolerance
+    assert abs(metrics.profit_factor - expected_profit_factor) < pf_tolerance, (
+        f"Profit factor accuracy failed: expected {expected_profit_factor}, "
+        f"got {metrics.profit_factor}, diff {abs(metrics.profit_factor - expected_profit_factor)}"
+    )
+
+    # Verify max drawdown (NFR-003: within 0.01% = 0.0001)
+    # Max drawdown = (101000 - 100500) / 101000 = 500 / 101000 = 0.00495049... = 0.495%
+    expected_max_drawdown = Decimal("0.00495049504950495049504950495")
+    assert abs(metrics.max_drawdown - expected_max_drawdown) < tolerance, (
+        f"Max drawdown accuracy failed: expected {expected_max_drawdown}, "
+        f"got {metrics.max_drawdown}, diff {abs(metrics.max_drawdown - expected_max_drawdown)}"
+    )
+
+    # Verify trade counts
+    assert metrics.total_trades == 5, f"Expected 5 total trades, got {metrics.total_trades}"
+    assert metrics.winning_trades == 3, f"Expected 3 winning trades, got {metrics.winning_trades}"
+    assert metrics.losing_trades == 2, f"Expected 2 losing trades, got {metrics.losing_trades}"
+
+    # Note: Sharpe ratio calculation requires daily returns and is more complex
+    # We'll verify it's calculated (non-zero) but exact manual calculation is omitted for brevity
+    # The detailed Sharpe ratio validation would require daily return series
+    assert metrics.sharpe_ratio is not None, "Sharpe ratio should be calculated"

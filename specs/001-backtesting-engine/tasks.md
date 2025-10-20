@@ -347,12 +347,15 @@ Story completion order:
   - Notes: Test written (TDD RED phase - failing as expected)
   - Evidence: pytest: ModuleNotFoundError - performance_calculator module does not exist
 
-- [ ] T038 [P] [US3] Write test: Metrics accuracy vs manual calculations
+- [X] T038 [P] [US3] Write test: Metrics accuracy vs manual calculations
   - File: tests/backtest/test_performance_calculator.py
   - Test: test_metrics_accuracy() - Verify all metrics
   - Given: Known trade history with pre-calculated metrics
   - Expected: All metrics within 0.01% of expected (NFR-003)
   - From: spec.md NFR-003
+  - Notes: Test written (TDD RED phase - failing as expected)
+  - Evidence: pytest: ModuleNotFoundError - performance_calculator module does not exist
+  - Manual calculations documented: 5 trades, 60% win rate, 2.255% return, profit factor 3.37, max DD 0.495%
 
 ### Implementation
 
