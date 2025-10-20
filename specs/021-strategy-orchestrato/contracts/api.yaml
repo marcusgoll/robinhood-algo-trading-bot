@@ -1,0 +1,195 @@
+# Strategy Orchestrator API Contracts
+
+## Note
+This feature is a local Python library with no REST API endpoints.
+API contracts are defined as Python type signatures in the code.
+
+## Python API Signatures
+
+### StrategyOrchestrator
+
+```python
+class StrategyOrchestrator:
+    """Multi-strategy backtest coordinator."""
+
+    def __init__(
+        self,
+        strategies: list[tuple[IStrategy, Decimal]] | list[IStrategy],
+        config: OrchestratorConfig | None = None,
+        equal_weights: bool = False
+    ) -> None:
+        """
+        Initialize orchestrator with strategies and configuration.
+
+        Args:
+            strategies: List of (strategy, weight) tuples or strategy instances
+            config: Orchestrator configuration (optional)
+            equal_weights: If True, distribute weights equally (default: False)
+
+        Raises:
+            ValueError: If weights sum >1.0 or any weight ≤0
+        """
+
+    def run(
+        self,
+        historical_data: dict[str, list[HistoricalDataBar]],
+        initial_capital: Decimal
+    ) -> OrchestratorResult:
+        """
+        Execute multi-strategy backtest.
+
+        Args:
+            historical_data: Historical bars by symbol
+            initial_capital: Starting portfolio capital
+
+        Returns:
+            OrchestratorResult with per-strategy and aggregate metrics
+
+        Raises:
+            ValueError: If historical_data empty or invalid
+        """
+```
+
+### OrchestratorConfig
+
+```python
+@dataclass(frozen=True)
+class OrchestratorConfig:
+    """Configuration for orchestrator behavior."""
+    logging_level: str = "INFO"
+    conflict_resolution_mode: str = "FIRST_WINS"  # P2 feature
+    rebalance_threshold: Decimal = Decimal("0.10")  # P2 feature
+
+    # Validation
+    def __post_init__(self) -> None:
+        """Validate configuration parameters."""
+```
+
+### OrchestratorResult
+
+```python
+@dataclass(frozen=True)
+class OrchestratorResult:
+    """Multi-strategy backtest results."""
+    config: OrchestratorConfig
+    strategy_results: dict[str, BacktestResult]
+    aggregate_metrics: PerformanceMetrics
+    aggregate_equity_curve: list[tuple[datetime, Decimal]]
+    comparison_table: dict[str, dict[str, Decimal]]
+    conflicts_detected: int
+    capital_limit_blocks: int
+    execution_time_seconds: Decimal
+    completed_at: datetime
+```
+
+### StrategyAllocation
+
+```python
+@dataclass
+class StrategyAllocation:
+    """Capital allocation tracker for single strategy."""
+    strategy_id: str
+    allocated_capital: Decimal
+    used_capital: Decimal = Decimal("0.0")
+
+    @property
+    def available_capital(self) -> Decimal:
+        """Calculate remaining capital for new positions."""
+        return self.allocated_capital - self.used_capital
+
+    def allocate(self, amount: Decimal) -> None:
+        """
+        Allocate capital for new position.
+
+        Raises:
+            ValueError: If amount exceeds available_capital
+        """
+
+    def release(self, amount: Decimal) -> None:
+        """Release capital from closed position."""
+```
+
+## Event Schema (Structured Logs)
+
+### orchestrator.backtest_started
+```json
+{
+  "event": "orchestrator.backtest_started",
+  "timestamp": "2025-10-20T15:30:00Z",
+  "strategy_count": 3,
+  "total_capital": "100000.00",
+  "weights": {"MomentumStrategy_0": 0.33, "RSIStrategy_0": 0.33, "BuyAndHoldStrategy_0": 0.34},
+  "symbols": ["AAPL", "TSLA"],
+  "date_range": {"start": "2023-01-01", "end": "2023-12-31"}
+}
+```
+
+### orchestrator.strategy_signal
+```json
+{
+  "event": "orchestrator.strategy_signal",
+  "timestamp": "2025-10-20T15:30:05Z",
+  "strategy_id": "MomentumStrategy_0",
+  "signal_type": "ENTRY",
+  "symbol": "AAPL",
+  "bar_date": "2023-03-15",
+  "capital_available": "30000.00"
+}
+```
+
+### orchestrator.capital_limit_hit
+```json
+{
+  "event": "orchestrator.capital_limit_hit",
+  "timestamp": "2025-10-20T15:30:10Z",
+  "strategy_id": "MomentumStrategy_0",
+  "used_capital": "33000.00",
+  "allocation_limit": "33000.00",
+  "rejected_signal": {"symbol": "TSLA", "type": "ENTRY"}
+}
+```
+
+### orchestrator.conflict_detected
+```json
+{
+  "event": "orchestrator.conflict_detected",
+  "timestamp": "2025-10-20T15:30:15Z",
+  "symbol": "AAPL",
+  "strategies": ["MomentumStrategy_0", "RSIStrategy_0"],
+  "resolution_mode": "FIRST_WINS",
+  "outcome": "MomentumStrategy_0 signal executed"
+}
+```
+
+### orchestrator.backtest_completed
+```json
+{
+  "event": "orchestrator.backtest_completed",
+  "timestamp": "2025-10-20T15:32:00Z",
+  "duration_seconds": 120.5,
+  "trade_count": 45,
+  "final_equity": "112500.00",
+  "error_count": 0
+}
+```
+
+### orchestrator.backtest_failed
+```json
+{
+  "event": "orchestrator.backtest_failed",
+  "timestamp": "2025-10-20T15:31:00Z",
+  "error_type": "ValueError",
+  "error_message": "Historical data empty for symbol AAPL",
+  "strategy_id": "MomentumStrategy_0",
+  "bar_date": "2023-06-15"
+}
+```
+
+## Type Compatibility
+
+All types are backward-compatible with existing backtest module:
+- IStrategy protocol unchanged
+- BacktestResult reused (contained in OrchestratorResult)
+- PerformanceMetrics reused (for aggregate and per-strategy metrics)
+- HistoricalDataBar unchanged
+- Trade, Position models unchanged
