@@ -109,26 +109,29 @@ Story completion order:
 
 ### Tests
 
-- [ ] T010 [P] [US1] Write test: HistoricalDataManager fetches from Alpaca
+- [X] T010 [P] [US1] Write test: HistoricalDataManager fetches from Alpaca
   - File: tests/backtest/test_historical_data_manager.py
   - Test: test_fetch_alpaca_data() - Verify Alpaca API integration
   - Mock: Alpaca API responses
   - Pattern: tests/market_data/ test patterns
   - Coverage: â‰¥90% (new code must be 100%)
 
-- [ ] T011 [P] [US1] Write test: Yahoo Finance fallback when Alpaca fails
+- [X] T011 [P] [US1] Write test: Yahoo Finance fallback when Alpaca fails
+  - Notes: Test for Yahoo Finance fallback written (RED phase - failing as expected)
+  - Evidence: pytest: FAILED (AttributeError - historical_data_manager module does not exist)
+  - Committed: 2ceafe9
   - File: tests/backtest/test_historical_data_manager.py
   - Test: test_fetch_yahoo_fallback() - Verify fallback mechanism
   - Simulate: Alpaca API failure, Yahoo Finance success
   - Pattern: tests/error_handling/ retry patterns
 
-- [ ] T012 [P] [US1] Write test: Data validation detects gaps and invalid prices
+- [X] T012 [P] [US1] Write test: Data validation detects gaps and invalid prices
   - File: tests/backtest/test_historical_data_manager.py
   - Test: test_data_validation() - Check gap detection logic
   - Cases: Missing dates, negative prices, zero volume
   - Pattern: tests/market_data/test_validators.py
 
-- [ ] T013 [P] [US1] Write test: Parquet caching persists and loads data
+- [X] T013 [P] [US1] Write test: Parquet caching persists and loads data
   - File: tests/backtest/test_historical_data_manager.py
   - Test: test_cache_persistence() - Verify parquet I/O
   - Verify: Cache hit on second request, no redundant API call
