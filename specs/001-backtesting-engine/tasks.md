@@ -1,23 +1,23 @@
-# Tasks: Backtesting Engine
+﻿# Tasks: Backtesting Engine
 
 ## [CODEBASE REUSE ANALYSIS]
 Scanned: D:/Coding/Stocks/src/trading_bot/
 
 [EXISTING - REUSE]
-- ✅ MarketDataService (src/trading_bot/market_data/market_data_service.py) - Extend for historical data
-- ✅ validators.py (src/trading_bot/market_data/validators.py) - Data validation patterns
-- ✅ PerformanceTracker (src/trading_bot/performance/tracker.py) - Performance tracking patterns
-- ✅ @with_retry decorator (src/trading_bot/error_handling/retry.py) - Exponential backoff for API calls
-- ✅ TradingLogger (src/trading_bot/logger.py) - Structured logging
-- ✅ Quote dataclass (src/trading_bot/market_data/data_models.py) - Template for HistoricalDataBar
-- ✅ Environment variable patterns (src/trading_bot/utils/security.py) - API key loading
+- âœ… MarketDataService (src/trading_bot/market_data/market_data_service.py) - Extend for historical data
+- âœ… validators.py (src/trading_bot/market_data/validators.py) - Data validation patterns
+- âœ… PerformanceTracker (src/trading_bot/performance/tracker.py) - Performance tracking patterns
+- âœ… @with_retry decorator (src/trading_bot/error_handling/retry.py) - Exponential backoff for API calls
+- âœ… TradingLogger (src/trading_bot/logger.py) - Structured logging
+- âœ… Quote dataclass (src/trading_bot/market_data/data_models.py) - Template for HistoricalDataBar
+- âœ… Environment variable patterns (src/trading_bot/utils/security.py) - API key loading
 
 [NEW - CREATE]
-- 🆕 BacktestEngine (no existing backtest execution pattern)
-- 🆕 HistoricalDataManager (no historical data fetching pattern)
-- 🆕 IStrategy Protocol (no strategy interface pattern)
-- 🆕 PerformanceCalculator (extend existing performance tracking)
-- 🆕 ReportGenerator (no markdown/JSON report pattern)
+- ðŸ†• BacktestEngine (no existing backtest execution pattern)
+- ðŸ†• HistoricalDataManager (no historical data fetching pattern)
+- ðŸ†• IStrategy Protocol (no strategy interface pattern)
+- ðŸ†• PerformanceCalculator (extend existing performance tracking)
+- ðŸ†• ReportGenerator (no markdown/JSON report pattern)
 
 ## [DEPENDENCY GRAPH]
 Story completion order:
@@ -38,7 +38,7 @@ Story completion order:
 
 ## [IMPLEMENTATION STRATEGY]
 **MVP Scope**: Phases 3-6 (US1-US4 only)
-**Incremental delivery**: US1 → US2 → US3 → US4 → staging validation → US5-US7
+**Incremental delivery**: US1 â†’ US2 â†’ US3 â†’ US4 â†’ staging validation â†’ US5-US7
 **Testing approach**: TDD required - 90% coverage per constitution
 
 ---
@@ -51,13 +51,13 @@ Story completion order:
   - Pattern: src/trading_bot/performance/ structure
   - From: plan.md [STRUCTURE]
 
-- [ ] T002 [P] Add new dependencies to requirements.txt
+- [X] T002 [P] Add new dependencies to requirements.txt
   - Libraries: yfinance@0.2.36, pyarrow@15.0.0
   - Optional: matplotlib@3.8.0 (P3 feature, commented out)
   - Pattern: existing requirements.txt
   - From: plan.md [ARCHITECTURE DECISIONS]
 
-- [ ] T003 [P] Add .backtest_cache/ to .gitignore
+- [X] T003 [P] Add .backtest_cache/ to .gitignore
   - Entry: .backtest_cache/ (cache directory for historical data)
   - Pattern: existing .gitignore entries
   - From: plan.md [SECURITY]
@@ -96,10 +96,10 @@ Story completion order:
 **Story Goal**: Fetch, cache, and validate historical OHLCV data from multiple sources
 
 **Independent Test Criteria**:
-- [ ] User requests AAPL daily data for 2023 → fetches 252 bars from Alpaca
-- [ ] Alpaca API fails → automatically falls back to Yahoo Finance
-- [ ] Data has gaps or invalid prices → validation detects and reports warnings
-- [ ] Repeat backtest with same symbols → loads from cache (no redundant API calls)
+- [ ] User requests AAPL daily data for 2023 â†’ fetches 252 bars from Alpaca
+- [ ] Alpaca API fails â†’ automatically falls back to Yahoo Finance
+- [ ] Data has gaps or invalid prices â†’ validation detects and reports warnings
+- [ ] Repeat backtest with same symbols â†’ loads from cache (no redundant API calls)
 
 ### Tests
 
@@ -108,7 +108,7 @@ Story completion order:
   - Test: test_fetch_alpaca_data() - Verify Alpaca API integration
   - Mock: Alpaca API responses
   - Pattern: tests/market_data/ test patterns
-  - Coverage: ≥90% (new code must be 100%)
+  - Coverage: â‰¥90% (new code must be 100%)
 
 - [ ] T011 [P] [US1] Write test: Yahoo Finance fallback when Alpaca fails
   - File: tests/backtest/test_historical_data_manager.py
@@ -173,9 +173,9 @@ Story completion order:
 **Story Goal**: Chronological execution of strategy logic with position tracking
 
 **Independent Test Criteria**:
-- [ ] Run buy-and-hold strategy on AAPL 2023 → enters once, holds to end
-- [ ] Strategy tries to buy with insufficient capital → trade rejected
-- [ ] Iterate through 252 bars in order → no look-ahead bias (can't see future data)
+- [ ] Run buy-and-hold strategy on AAPL 2023 â†’ enters once, holds to end
+- [ ] Strategy tries to buy with insufficient capital â†’ trade rejected
+- [ ] Iterate through 252 bars in order â†’ no look-ahead bias (can't see future data)
 
 ### Tests
 
@@ -208,7 +208,7 @@ Story completion order:
 
 - [ ] T024 [P] [US2] Write test: Reproducibility (deterministic execution)
   - File: tests/backtest/test_engine.py
-  - Test: test_reproducibility() - Same inputs → same outputs
+  - Test: test_reproducibility() - Same inputs â†’ same outputs
   - Run: Same BacktestConfig twice
   - Assert: Identical metrics, trades, equity curve
   - From: spec.md NFR-010
@@ -263,7 +263,7 @@ Story completion order:
 
 - [ ] T031 [US2] Write integration test: Complete backtest flow
   - File: tests/backtest/test_integration_engine.py
-  - Test: test_complete_backtest_flow() - Config → run → result
+  - Test: test_complete_backtest_flow() - Config â†’ run â†’ result
   - Strategy: Simple momentum strategy
   - Data: Real historical data (1 year AAPL)
   - Verify: All trades recorded, equity curve generated
@@ -276,9 +276,9 @@ Story completion order:
 **Story Goal**: Compute standard performance statistics from trade history
 
 **Independent Test Criteria**:
-- [ ] Sample trade history (10 trades, 6 wins, 4 losses) → win rate = 60%
-- [ ] Equity curve with peak-to-trough decline → max drawdown calculated correctly
-- [ ] Return series with volatility → Sharpe ratio matches manual calculation
+- [ ] Sample trade history (10 trades, 6 wins, 4 losses) â†’ win rate = 60%
+- [ ] Equity curve with peak-to-trough decline â†’ max drawdown calculated correctly
+- [ ] Return series with volatility â†’ Sharpe ratio matches manual calculation
 
 ### Tests
 
@@ -359,7 +359,7 @@ Story completion order:
 **Story Goal**: Create human-readable markdown and machine-readable JSON reports
 
 **Independent Test Criteria**:
-- [ ] BacktestResult provided → generates markdown with all required sections
+- [ ] BacktestResult provided â†’ generates markdown with all required sections
 - [ ] Report includes performance metrics, trade table, equity curve data
 - [ ] JSON export contains same data in structured format
 
@@ -421,7 +421,7 @@ Story completion order:
 
 - [ ] T059 [US4] Write integration test: Full report workflow
   - File: tests/backtest/test_integration_reports.py
-  - Test: test_full_report_workflow() - Backtest → report generation
+  - Test: test_full_report_workflow() - Backtest â†’ report generation
   - Run: Complete backtest, generate both markdown and JSON
   - Verify: Files created, content matches expected format
   - Pattern: End-to-end file generation test
@@ -448,7 +448,7 @@ Story completion order:
 
 - [ ] T072 [P] Write acceptance test: Reproducibility (NFR-010)
   - File: tests/backtest/test_acceptance.py
-  - Test: test_reproducibility() - Same inputs → same outputs
+  - Test: test_reproducibility() - Same inputs â†’ same outputs
   - Run: Same BacktestConfig twice
   - Assert: result1.metrics == result2.metrics, result1.trades == result2.trades
   - From: spec.md NFR-010
@@ -501,13 +501,13 @@ Story completion order:
 
 - [ ] T085 Run test coverage validation
   - Command: pytest --cov=src/trading_bot/backtest --cov-fail-under=90
-  - Requirement: ≥90% coverage (constitution §Pre_Deploy)
+  - Requirement: â‰¥90% coverage (constitution Â§Pre_Deploy)
   - Fix: Add tests for uncovered code paths
   - From: plan.md [DEPLOYMENT ACCEPTANCE]
 
 - [ ] T086 [P] Run type checking with mypy
   - Command: mypy src/trading_bot/backtest/ --strict
-  - Requirement: No type errors (constitution §Code_Quality)
+  - Requirement: No type errors (constitution Â§Code_Quality)
   - Fix: Add type hints to all functions and methods
   - From: plan.md [DEPLOYMENT ACCEPTANCE]
 

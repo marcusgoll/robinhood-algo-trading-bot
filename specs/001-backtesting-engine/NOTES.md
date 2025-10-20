@@ -112,3 +112,11 @@ New components needed:
 - Phase 6 (US4 - Report Generation): T050-T059 (10 tasks)
 - Phase 7 (Integration): T070-T075 (6 tasks)
 - Phase 8 (Polish): T080-T092 (13 tasks)
+✅ T003 [P]: Added .backtest_cache/ to .gitignore for historical data caching
+  - Evidence: .gitignore updated with comment explaining cache purpose
+  - Committed: 9d077eb
+
+✅ T002 [P]: Added yfinance==0.2.36 and pyarrow==15.0.0 to requirements.txt with explanatory comments
+  - Evidence: Dependencies added following existing format in Data analysis section
+  - Committed: 9d077eb
+
