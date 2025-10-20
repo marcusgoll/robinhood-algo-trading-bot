@@ -93,6 +93,7 @@ logs/orders.jsonl
 !config/*.json  # Allow config files
 backtests/results/
 backtests/logs/
+.backtest_cache/  # Historical market data cache for backtesting
 
 # ============================================
 # IDEs and Editors

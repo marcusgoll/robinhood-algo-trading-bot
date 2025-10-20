@@ -18,6 +18,57 @@ This project follows strict development principles defined in [`.specify/memory/
 
 ---
 
+## 📊 Backtesting Engine
+
+Validate trading strategies against historical market data before deploying to paper or live trading. The backtesting engine simulates strategy execution chronologically to ensure realistic performance evaluation.
+
+### Quick Start
+
+```python
+from src.trading_bot.backtest import BacktestEngine, BacktestConfig, HistoricalDataManager
+from examples.sample_strategies import MomentumStrategy
+from datetime import datetime, timezone
+from decimal import Decimal
+
+# Configure backtest
+config = BacktestConfig(
+    symbol="AAPL",
+    start_date=datetime(2023, 1, 1, tzinfo=timezone.utc),
+    end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
+    initial_capital=Decimal("100000")
+)
+
+# Fetch historical data
+data_manager = HistoricalDataManager()
+historical_data = data_manager.fetch_data(
+    config.symbol, config.start_date, config.end_date
+)
+
+# Run backtest
+strategy = MomentumStrategy(short_window=10, long_window=30)
+engine = BacktestEngine(config)
+result = engine.run(strategy, historical_data)
+
+# View results
+print(f"Total Return: {result.metrics.total_return:.2%}")
+print(f"Win Rate: {result.metrics.win_rate:.2%}")
+print(f"Sharpe Ratio: {result.metrics.sharpe_ratio:.2f}")
+```
+
+### Documentation
+
+- [Feature Specification](specs/001-backtesting-engine/spec.md)
+- [Implementation Plan](specs/001-backtesting-engine/plan.md)
+- [Usage Examples](examples/)
+
+### Example Strategies
+
+- [Simple Backtest](examples/simple_backtest.py)
+- [Strategy Comparison](examples/strategy_comparison.py)
+- [Custom Strategy](examples/custom_strategy_example.py)
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
