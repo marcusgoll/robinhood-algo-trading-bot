@@ -18,18 +18,42 @@ Public API exports:
         - IStrategy: Strategy protocol for type-safe strategy contracts
 """
 
+from trading_bot.backtest.engine import BacktestEngine
 from trading_bot.backtest.exceptions import (
     BacktestException,
     DataQualityError,
     InsufficientDataError,
     StrategyError,
 )
+from trading_bot.backtest.historical_data_manager import HistoricalDataManager
+from trading_bot.backtest.models import (
+    BacktestConfig,
+    BacktestResult,
+    BacktestState,
+    HistoricalDataBar,
+    PerformanceMetrics,
+    Position,
+    Trade,
+)
+from trading_bot.backtest.performance_calculator import PerformanceCalculator
+from trading_bot.backtest.report_generator import ReportGenerator
 from trading_bot.backtest.strategy_protocol import IStrategy
 
 __all__ = [
+    "BacktestEngine",
+    "BacktestConfig",
     "BacktestException",
+    "BacktestResult",
+    "BacktestState",
     "DataQualityError",
+    "HistoricalDataBar",
+    "HistoricalDataManager",
     "InsufficientDataError",
-    "StrategyError",
     "IStrategy",
+    "PerformanceCalculator",
+    "PerformanceMetrics",
+    "Position",
+    "ReportGenerator",
+    "StrategyError",
+    "Trade",
 ]
