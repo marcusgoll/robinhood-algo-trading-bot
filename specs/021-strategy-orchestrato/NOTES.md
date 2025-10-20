@@ -225,3 +225,45 @@ Standard (backend feature with measurable outcomes)
   - Coverage: 100% for both OrchestratorConfig and OrchestratorResult
   - Test run: 14 passed in 52.96s
 
+✅ T008 [P]: Write unit tests for StrategyAllocation
+  - Evidence: pytest 27/27 passed - 100% coverage for StrategyAllocation
+  - Files:
+    - src/trading_bot/backtest/models.py (StrategyAllocation dataclass implemented in T005)
+    - tests/backtest/test_models.py (27 comprehensive unit tests added)
+  - Tests implemented (Given-When-Then structure):
+    - Validation tests (7):
+      - test_valid_allocation: Valid parameters create allocation successfully
+      - test_valid_allocation_with_used_capital: available_capital correctly calculated
+      - test_zero_allocated_capital_raises_error: Reject zero allocated capital
+      - test_negative_allocated_capital_raises_error: Reject negative allocated capital
+      - test_negative_used_capital_raises_error: Reject negative used capital
+      - test_used_exceeds_allocated_raises_error: Reject used > allocated
+      - test_available_capital_calculation: Multiple calculation scenarios verified
+    - Allocate method tests (6):
+      - test_allocate_increases_used_capital: used_capital increases correctly
+      - test_allocate_multiple_times: Accumulation across multiple calls
+      - test_allocate_zero_raises_error: Reject zero amount
+      - test_allocate_negative_raises_error: Reject negative amount
+      - test_allocate_exceeds_available_raises_error: Reject amount > available
+      - test_allocate_exactly_available_capital: Allow exact available amount
+    - Release method tests (6):
+      - test_release_decreases_used_capital: used_capital decreases correctly
+      - test_release_multiple_times: Multiple releases handled correctly
+      - test_release_zero_raises_error: Reject zero amount
+      - test_release_negative_raises_error: Reject negative amount
+      - test_release_exceeds_used_raises_error: Reject amount > used
+      - test_release_exactly_used_capital: Allow exact used amount
+    - Can_allocate method tests (5):
+      - test_can_allocate_respects_limits: Correct boolean for various amounts
+      - test_can_allocate_zero_raises_error: Reject zero amount
+      - test_can_allocate_negative_raises_error: Reject negative amount
+      - test_can_allocate_with_no_available_capital: False when capital exhausted
+      - test_can_allocate_with_full_available_capital: True when fully available
+    - Integration tests (3):
+      - test_allocate_and_release_cycle: Full lifecycle verification
+      - test_multiple_positions_lifecycle: Complex multi-position tracking
+      - test_can_allocate_before_and_after_operations: State consistency
+  - Coverage: 100% for StrategyAllocation class (all methods and edge cases)
+  - Test run: 27 passed in 68.04s
+  - Pattern followed: tests/backtest/test_models.py existing model tests
+
