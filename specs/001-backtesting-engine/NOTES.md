@@ -124,3 +124,11 @@ New components needed:
   - Evidence: Directories created successfully
   - Committed: 35617ae
 
+✅ T006 [P]: Created 4 backtest exception classes following established patterns
+  - Evidence: Exception hierarchy: BacktestException, DataQualityError, InsufficientDataError, StrategyError
+  - Committed: 5301396
+
+✅ T007 [P]: Created 3 date/validation utility functions with 100% test coverage
+  - Evidence: 32 tests passing, handles weekends/holidays/edge cases, full type hints
+  - Committed: f8b0937
+

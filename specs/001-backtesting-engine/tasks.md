@@ -79,14 +79,14 @@ Story completion order:
   - Pattern: src/trading_bot/performance/models.py
   - From: data-model.md all entities
 
-- [ ] T006 [P] Create backtest exceptions in src/trading_bot/backtest/exceptions.py
+- [X] T006 [P] Create backtest exceptions in src/trading_bot/backtest/exceptions.py
   - Classes: BacktestException, DataQualityError, InsufficientDataError, StrategyError
   - Inheritance: Inherit from base exception classes
   - REUSE: Exception patterns (src/trading_bot/error_handling/exceptions.py)
   - Pattern: src/trading_bot/market_data/exceptions.py
   - From: plan.md [STRUCTURE]
 
-- [ ] T007 [P] Create backtest utilities in src/trading_bot/backtest/utils.py
+- [X] T007 [P] Create backtest utilities in src/trading_bot/backtest/utils.py
   - Functions: trading_days_between(), is_market_day(), validate_date_range()
   - Validations: UTC timestamps, market hours, chronological ordering
   - Pattern: src/trading_bot/utils/ modules
