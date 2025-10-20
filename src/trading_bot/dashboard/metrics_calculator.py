@@ -116,8 +116,12 @@ class MetricsCalculator:
         risk_reward_ratios = []
         for trade in valid_trades:
             entry = trade.price
-            target = trade.target  # type: ignore
-            stop_loss = trade.stop_loss  # type: ignore
+            target = trade.target
+            stop_loss = trade.stop_loss
+
+            # Skip trades with missing target or stop_loss
+            if target is None or stop_loss is None:
+                continue
 
             risk = entry - stop_loss
             reward = target - entry
@@ -265,7 +269,12 @@ class MetricsCalculator:
         )
 
         for trade in sorted_trades:
-            cumulative += trade.net_profit_loss  # type: ignore[arg-type]
+            # trade.net_profit_loss is guaranteed non-None due to filter above
+            profit_loss = trade.net_profit_loss
+            if profit_loss is None:
+                continue
+
+            cumulative += profit_loss
             if cumulative > peak:
                 peak = cumulative
             drawdown = cumulative - peak

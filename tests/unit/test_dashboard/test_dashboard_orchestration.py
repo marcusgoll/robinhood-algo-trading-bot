@@ -392,7 +392,7 @@ class TestExportGenerator:
 
         json_data = json.loads(json_path.read_text())
         assert json_data["market_status"] == "OPEN"
-        assert json_data["performance_metrics"]["total_pl"] == float(snapshot.performance_metrics.total_pl)
+        assert json_data["performance_metrics"]["total_pl"] == str(snapshot.performance_metrics.total_pl)
 
         md_content = md_path.read_text()
         assert "Trading Dashboard Export" in md_content
@@ -414,11 +414,10 @@ class TestExportGenerator:
         assert json.loads(json_path.read_text())["market_status"] == "OPEN"
 
 
-def test_log_dashboard_event(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_log_dashboard_event(tmp_path: Path) -> None:
     log_path = tmp_path / "usage.jsonl"
-    monkeypatch.setattr("trading_bot.dashboard.dashboard.USAGE_LOG_PATH", log_path)
 
-    log_dashboard_event("dashboard.test", foo="bar")
+    log_dashboard_event("dashboard.test", log_path=log_path, foo="bar")
     contents = log_path.read_text().strip().splitlines()
     assert contents
     record = json.loads(contents[0])

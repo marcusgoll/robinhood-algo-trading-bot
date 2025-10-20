@@ -1,0 +1,72 @@
+feature:
+  slug: status-dashboard
+  title: Status Dashboard
+  description: status-dashboard
+  created_at: 2025-10-19T17:30:00Z
+  updated_at: 2025-10-19T17:30:00Z
+  roadmap_status: in_progress
+
+deployment_model: local-only
+
+workflow:
+  phase: ship:local-integration
+  status: in_progress
+  phases_completed:
+    - spec-flow
+    - plan
+    - tasks
+    - analyze
+    - implement
+    - optimize
+    - preflight
+  phases_failed: []
+  started_at: 2025-10-19T17:30:00Z
+  completed_at: null
+  blocker_reason: null
+
+quality_gates:
+  analysis_passed: true
+  critical_issues: 0
+  pre_flight_passed: true
+  optimization_passed: true
+  test_pass_rate: 100.0
+  type_check_errors: 0
+  coverage_verified: true
+
+manual_gates:
+  preview:
+    required: true
+    status: pending
+    approved_at: null
+  validate_staging:
+    required: false
+    status: skipped
+    approved_at: null
+
+deployment_state:
+  staging:
+    status: not_started
+    url: null
+    pr_id: null
+    deployed_at: null
+  production:
+    status: not_started
+    url: null
+    version: null
+    deployed_at: null
+    tag: null
+
+artifacts:
+  spec: specs/019-status-dashboard/spec.md
+  plan: specs/019-status-dashboard/plan.md
+  tasks: specs/019-status-dashboard/tasks.md
+  analysis_report: specs/019-status-dashboard/analysis-report.md
+  optimization_report: specs/019-status-dashboard/optimization-report.md
+  notes: specs/019-status-dashboard/NOTES.md
+  error_log: specs/019-status-dashboard/error-log.md
+
+token_budget:
+  phase: specification
+  estimated: 75000
+  used: 0
+  threshold_percent: 80
