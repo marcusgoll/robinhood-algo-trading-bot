@@ -174,14 +174,7 @@ def validate_date_range(start_date: datetime, end_date: datetime) -> None:
         §Data Quality: Validate inputs to prevent silent failures
         §Type Safety: Enforce UTC timezone for consistency
     """
-    # Check chronological order
-    if start_date >= end_date:
-        raise ValueError(
-            f"start_date ({start_date.isoformat()}) must be < "
-            f"end_date ({end_date.isoformat()}). Dates must be in chronological order."
-        )
-
-    # Check timezone awareness (warn if naive datetime)
+    # Check timezone awareness FIRST (before comparison)
     if start_date.tzinfo is None:
         raise ValueError(
             f"start_date is timezone-naive. Use UTC-aware datetime: "
@@ -192,4 +185,11 @@ def validate_date_range(start_date: datetime, end_date: datetime) -> None:
         raise ValueError(
             f"end_date is timezone-naive. Use UTC-aware datetime: "
             f"datetime(..., tzinfo=timezone.utc)"
+        )
+
+    # Check chronological order (after ensuring both are timezone-aware)
+    if start_date >= end_date:
+        raise ValueError(
+            f"start_date ({start_date.isoformat()}) must be < "
+            f"end_date ({end_date.isoformat()}). Dates must be in chronological order."
         )
