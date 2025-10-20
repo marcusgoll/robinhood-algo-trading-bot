@@ -173,3 +173,9 @@ Standard (backend feature with measurable outcomes)
   - Evidence: File created at specs/021-strategy-orchestrato/error-log.md
   - Committed: ea99dbf (design:plan: complete architecture with reuse analysis)
 
+✅ T002 [P]: Created test fixtures for orchestrator
+  - Evidence: pytest 7/7 passed - fixtures loaded successfully
+  - Files: tests/backtest/conftest.py (2 fixtures), test_conftest_fixtures.py (7 validation tests)
+  - Fixtures: sample_strategies (3 mock strategies), sample_weights (valid allocations)
+  - Committed: 906e2e3
+
