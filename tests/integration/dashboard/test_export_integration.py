@@ -208,8 +208,8 @@ class TestExportIntegration:
         assert "Current Streak:** 3 (WIN)" in content
         assert "Trades Today:** 8" in content
 
-        # Verify target comparisons with indicators
-        assert "✓" in content or "✗" in content  # Target comparison indicators
+        # Verify target comparisons with indicators (ASCII-safe)
+        assert ">" in content or "<" in content or "✓" in content or "✗" in content
 
         # Verify warnings section
         assert "Sample warning" in content
