@@ -267,3 +267,101 @@ Standard (backend feature with measurable outcomes)
   - Test run: 27 passed in 68.04s
   - Pattern followed: tests/backtest/test_models.py existing model tests
 
+✅ T010 [P] [US1]: Write test for orchestrator initialization weight validation
+  - Evidence: Test file created with 2 comprehensive tests (RED phase - expected failures)
+  - Files:
+    - tests/backtest/test_orchestrator.py (NEW FILE - 150 lines)
+  - Tests implemented (Given-When-Then structure):
+    - test_init_valid_weights_passes:
+      - Scenario 1: Weights sum to exactly 1.0 (100% allocation)
+      - Scenario 2: Weights sum to <1.0 (partial allocation, e.g., 70%)
+      - Validates orchestrator accepts valid weight configurations
+    - test_init_invalid_weights_raises_value_error:
+      - Scenario 1: Obvious over-allocation (weights sum to 1.5 / 150%)
+      - Scenario 2: Edge case over-allocation (weights sum to 1.01 / 101%)
+      - Validates ValueError raised with descriptive error message
+      - Validates fail-fast principle (NFR-003)
+  - Test structure follows test_engine.py initialization test patterns
+  - Expected result: ModuleNotFoundError (orchestrator.py doesn't exist yet)
+  - This is TDD RED phase - tests written before implementation
+  - Tests will pass after T016 implements StrategyOrchestrator class
+  - From: spec.md FR-002 (weight validation), spec.md US1 (multi-strategy execution)
+  - Pattern: tests/backtest/test_engine.py initialization and validation tests
+  - Status: ✅ Complete (RED phase successful - expected import failure confirmed)
+
+✅ T011 [P] [US1]: Write test for proportional capital allocation
+  - Evidence: Test added to tests/backtest/test_orchestrator.py - TDD RED phase confirmed
+  - Files:
+    - tests/backtest/test_orchestrator.py (TestStrategyOrchestratorCapitalAllocation class added)
+  - Test implemented: test_capital_allocation_proportional
+    - GIVEN: 3 strategies with weights [0.5, 0.3, 0.2]
+    - AND: Initial capital of $100,000
+    - WHEN: StrategyOrchestrator is initialized with strategies_with_weights and initial_capital
+    - THEN: 3 StrategyAllocation objects created with correct allocations:
+      - Strategy 0: $50,000 (100k × 0.5)
+      - Strategy 1: $30,000 (100k × 0.3)
+      - Strategy 2: $20,000 (100k × 0.2)
+    - AND: used_capital initialized to $0 for all strategies
+    - AND: available_capital equals allocated_capital initially
+    - AND: Total allocated capital equals initial capital ($100,000)
+    - AND: Strategy IDs are unique
+    - AND: Each allocation is a StrategyAllocation instance
+  - Test structure:
+    - 5 comprehensive assertions covering FR-003 requirements
+    - Verifies StrategyAllocation object creation and field initialization
+    - Validates proportional capital allocation formula (allocated = initial × weight)
+    - Checks invariants (total allocated = initial capital, unique IDs)
+  - Expected result: ModuleNotFoundError (orchestrator.py doesn't exist yet)
+  - Test run result: ✅ FAILED as expected (TDD RED phase)
+    - Error: "ModuleNotFoundError: No module named 'src.trading_bot.backtest.orchestrator'"
+    - This is the expected behavior in TDD RED phase
+  - This is TDD RED phase - test written before implementation
+  - Test will pass after T016 implements StrategyOrchestrator.__init__ with capital allocation
+  - From: spec.md FR-003 (proportional allocation), tasks.md T011
+  - Pattern: tests/backtest/test_engine.py state verification tests
+  - Committed: 887a7f8
+  - Status: ✅ Complete (RED phase successful - test fails as expected)
+
+✅ T012 [P] [US1]: Write test for chronological execution across all strategies
+  - Evidence: Comprehensive test added to tests/backtest/test_orchestrator.py - TDD RED phase confirmed
+  - Files:
+    - tests/backtest/test_orchestrator.py (TestStrategyOrchestratorChronologicalExecution class added - 217 lines)
+  - Test implemented: test_chronological_execution_all_strategies
+    - GIVEN: 2 TrackingStrategy instances that record every should_enter() call
+    - AND: 10 bars of historical data with sequential timestamps (2024-01-02 through 2024-01-11)
+    - WHEN: orchestrator.run() is called with historical_data={"TEST": mock_historical_data}
+    - THEN: Each strategy called exactly 10 times (once per bar)
+    - AND: Both strategies see bars in chronological order (timestamps match expected sequence)
+    - AND: At bar[i], strategies only see bars[0:i+1] (no look-ahead bias verification)
+    - AND: First bar sees only itself (1 bar), last bar sees all 10 bars
+    - AND: Both strategies see identical data at each step (data consistency check)
+  - Test design features:
+    - TrackingStrategy dataclass with:
+      - strategy_name (str): Identifier for debugging
+      - call_timestamps (List[datetime]): Records when should_enter() called
+      - call_count (int): Tracks total number of calls
+      - visible_bars_history (List[List[HistoricalDataBar]]): What bars visible at each call
+    - Comprehensive look-ahead bias verification:
+      - At bar index 5: Only bars 0-5 visible, bars 6-9 NOT visible
+      - Future timestamps explicitly checked for absence in visible data
+    - 5 major assertion groups:
+      1. Call count verification (10 calls per strategy)
+      2. Chronological order verification (timestamps match expected sequence)
+      3. Look-ahead bias prevention (no future bars visible at any step)
+      4. Progressive data visibility (first bar = 1, last bar = 10)
+      5. Data consistency (both strategies see identical data)
+  - Mock data specifications:
+    - 10 bars with sequential dates (Jan 2-11, 2024)
+    - Unique prices: bar[i] has close price = $101+i (e.g., bar[0]=$101, bar[9]=$110)
+    - Symbol: "TEST"
+    - All bars split_adjusted and dividend_adjusted
+  - TDD RED phase confirmed:
+    - Test execution result: ModuleNotFoundError: No module named 'src.trading_bot.backtest.orchestrator'
+    - Expected failure - orchestrator.py module doesn't exist yet
+    - Ready for GREEN phase implementation (tasks T015-T018)
+  - Pattern followed: tests/backtest/test_engine.py chronological execution tests (TestBacktestEngineChronologicalExecution)
+  - From:
+    - spec.md FR-004: System MUST execute all strategies chronologically on every historical bar
+    - spec.md FR-015: System MUST maintain chronological order guarantee (no look-ahead bias)
+    - tasks.md T012: Write test for chronological execution across all strategies
+  - Status: ✅ Complete (RED phase successful - expected import failure confirmed)
