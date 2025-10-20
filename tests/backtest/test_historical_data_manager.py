@@ -510,3 +510,335 @@ class TestYahooFallback:
 
 
 
+
+
+# T012: Data validation tests
+class TestDataValidation:
+    """
+    Test suite for data quality validation in HistoricalDataManager.
+
+    Tests verify that validate_data() correctly detects and handles:
+    - Missing dates (gaps in trading days)
+    - Negative prices
+    - Zero volume
+    - Invalid OHLC relationships (high < low)
+    - Non-chronological data
+
+    Following pattern from tests/unit/test_market_data/test_validators.py
+    """
+
+    def test_validation_detects_missing_dates(self):
+        """
+        Test that validate_data() raises DataQualityError for gaps in trading days.
+
+        GIVEN: Historical data with significant gap (5+ trading days missing)
+        WHEN: validate_data() is called
+        THEN: Raises DataQualityError with "gap" in message
+
+        This is RED phase - method doesn't exist yet, test will fail.
+        """
+        # Import will fail because HistoricalDataManager doesn't exist yet
+        # This is intentional for TDD RED phase
+        from src.trading_bot.backtest.historical_data_manager import HistoricalDataManager
+        from src.trading_bot.backtest.exceptions import DataQualityError
+
+        # Given: Data with 10-day gap (2025-01-02 to 2025-01-15)
+        data_with_gaps = [
+            HistoricalDataBar(
+                symbol="AAPL",
+                timestamp=datetime(2025, 1, 2, tzinfo=timezone.utc),
+                open=Decimal("150.0"),
+                high=Decimal("155.0"),
+                low=Decimal("149.0"),
+                close=Decimal("154.0"),
+                volume=1000000,
+            ),
+            # Missing ~10 trading days here (gap)
+            HistoricalDataBar(
+                symbol="AAPL",
+                timestamp=datetime(2025, 1, 15, tzinfo=timezone.utc),
+                open=Decimal("151.0"),
+                high=Decimal("156.0"),
+                low=Decimal("150.0"),
+                close=Decimal("155.0"),
+                volume=1100000,
+            ),
+        ]
+
+        manager = HistoricalDataManager()
+
+        # When/Then: validate_data() raises DataQualityError
+        with pytest.raises(DataQualityError, match="gap"):
+            manager.validate_data(data_with_gaps, symbol="AAPL")
+
+    def test_validation_detects_negative_prices(self):
+        """
+        Test that validate_data() raises DataQualityError for negative prices.
+
+        GIVEN: Historical data with negative price in any OHLC field
+        WHEN: validate_data() is called
+        THEN: Raises DataQualityError with "negative price" in message
+
+        This is RED phase - method doesn't exist yet, test will fail.
+        """
+        from src.trading_bot.backtest.historical_data_manager import HistoricalDataManager
+        from src.trading_bot.backtest.exceptions import DataQualityError
+
+        # Given: Raw data with negative price (simulating bad API data)
+        raw_data = [
+            {
+                'symbol': 'AAPL',
+                'timestamp': datetime(2025, 1, 2, tzinfo=timezone.utc),
+                'open': 150.0,
+                'high': 155.0,
+                'low': 149.0,
+                'close': 154.0,
+                'volume': 1000000,
+            },
+            {
+                'symbol': 'AAPL',
+                'timestamp': datetime(2025, 1, 3, tzinfo=timezone.utc),
+                'open': 155.0,
+                'high': 160.0,
+                'low': 154.0,
+                'close': -5.0,  # Negative price (data error)
+                'volume': 1100000,
+            },
+        ]
+
+        manager = HistoricalDataManager()
+
+        # When/Then: validate_data() raises DataQualityError
+        with pytest.raises(DataQualityError, match="negative|invalid price"):
+            manager.validate_data(raw_data, symbol="AAPL")
+
+    def test_validation_warns_on_zero_volume(self, caplog):
+        """
+        Test that validate_data() logs warning for zero volume but doesn't fail.
+
+        GIVEN: Historical data with zero volume on some bars
+        WHEN: validate_data() is called
+        THEN: Logs warning message but does NOT raise exception
+
+        Zero volume is suspicious but not necessarily invalid (halted stocks, holidays).
+        This is RED phase - method doesn't exist yet, test will fail.
+        """
+        import logging
+        from src.trading_bot.backtest.historical_data_manager import HistoricalDataManager
+
+        # Given: Data with zero volume on second bar
+        data_with_zero_volume = [
+            HistoricalDataBar(
+                symbol="AAPL",
+                timestamp=datetime(2025, 1, 2, tzinfo=timezone.utc),
+                open=Decimal("150.0"),
+                high=Decimal("155.0"),
+                low=Decimal("149.0"),
+                close=Decimal("154.0"),
+                volume=1000000,
+            ),
+            HistoricalDataBar(
+                symbol="AAPL",
+                timestamp=datetime(2025, 1, 3, tzinfo=timezone.utc),
+                open=Decimal("154.0"),
+                high=Decimal("156.0"),
+                low=Decimal("153.0"),
+                close=Decimal("155.0"),
+                volume=0,  # Zero volume - warning but not error
+            ),
+        ]
+
+        manager = HistoricalDataManager()
+
+        # When: validate_data() is called
+        with caplog.at_level(logging.WARNING):
+            # Should not raise, just warn
+            manager.validate_data(data_with_zero_volume, symbol="AAPL")
+
+        # Then: Warning was logged
+        assert any("zero volume" in record.message.lower() for record in caplog.records)
+
+    def test_validation_detects_high_less_than_low(self):
+        """
+        Test that validate_data() raises DataQualityError when high < low.
+
+        GIVEN: Historical data where high price < low price (impossible)
+        WHEN: validate_data() is called
+        THEN: Raises DataQualityError with "high" and "low" in message
+
+        This is RED phase - method doesn't exist yet, test will fail.
+        """
+        from src.trading_bot.backtest.historical_data_manager import HistoricalDataManager
+        from src.trading_bot.backtest.exceptions import DataQualityError
+
+        # Given: Raw data with high < low (bypassing HistoricalDataBar validation)
+        raw_data = [
+            {
+                'symbol': 'AAPL',
+                'timestamp': datetime(2025, 1, 2, tzinfo=timezone.utc),
+                'open': 150.0,
+                'high': 155.0,
+                'low': 149.0,
+                'close': 154.0,
+                'volume': 1000000,
+            },
+            {
+                'symbol': 'AAPL',
+                'timestamp': datetime(2025, 1, 3, tzinfo=timezone.utc),
+                'open': 155.0,
+                'high': 154.0,  # High < low (impossible)
+                'low': 160.0,
+                'close': 156.0,
+                'volume': 1100000,
+            },
+        ]
+
+        manager = HistoricalDataManager()
+
+        # When/Then: validate_data() raises DataQualityError
+        with pytest.raises(DataQualityError, match="high.*low|invalid.*OHLC"):
+            manager.validate_data(raw_data, symbol="AAPL")
+
+    def test_validation_detects_non_chronological_data(self):
+        """
+        Test that validate_data() raises DataQualityError for out-of-order timestamps.
+
+        GIVEN: Historical data with timestamps not in chronological order
+        WHEN: validate_data() is called
+        THEN: Raises DataQualityError with "chronological" or "order" in message
+
+        This is RED phase - method doesn't exist yet, test will fail.
+        """
+        from src.trading_bot.backtest.historical_data_manager import HistoricalDataManager
+        from src.trading_bot.backtest.exceptions import DataQualityError
+
+        # Given: Data with timestamps out of order (2025-01-05 before 2025-01-03)
+        non_chronological_data = [
+            HistoricalDataBar(
+                symbol="AAPL",
+                timestamp=datetime(2025, 1, 2, tzinfo=timezone.utc),
+                open=Decimal("150.0"),
+                high=Decimal("155.0"),
+                low=Decimal("149.0"),
+                close=Decimal("154.0"),
+                volume=1000000,
+            ),
+            HistoricalDataBar(
+                symbol="AAPL",
+                timestamp=datetime(2025, 1, 5, tzinfo=timezone.utc),  # Out of order (should be after 1/3)
+                open=Decimal("156.0"),
+                high=Decimal("158.0"),
+                low=Decimal("155.0"),
+                close=Decimal("157.0"),
+                volume=1200000,
+            ),
+            HistoricalDataBar(
+                symbol="AAPL",
+                timestamp=datetime(2025, 1, 3, tzinfo=timezone.utc),  # Goes back in time
+                open=Decimal("154.0"),
+                high=Decimal("156.0"),
+                low=Decimal("153.0"),
+                close=Decimal("155.0"),
+                volume=1100000,
+            ),
+        ]
+
+        manager = HistoricalDataManager()
+
+        # When/Then: validate_data() raises DataQualityError
+        with pytest.raises(DataQualityError, match="chronological|order"):
+            manager.validate_data(non_chronological_data, symbol="AAPL")
+
+    def test_validation_passes_clean_data(self):
+        """
+        Test that validate_data() succeeds with clean, valid data.
+
+        GIVEN: Historical data with no quality issues (consecutive days, valid prices)
+        WHEN: validate_data() is called
+        THEN: Returns None (no exception raised)
+
+        This is RED phase - method doesn't exist yet, test will fail.
+        """
+        from src.trading_bot.backtest.historical_data_manager import HistoricalDataManager
+
+        # Given: Clean data - consecutive trading days (Mon-Fri)
+        clean_data = [
+            HistoricalDataBar(
+                symbol="AAPL",
+                timestamp=datetime(2025, 1, 2, tzinfo=timezone.utc),  # Thursday
+                open=Decimal("150.0"),
+                high=Decimal("155.0"),
+                low=Decimal("149.0"),
+                close=Decimal("154.0"),
+                volume=1000000,
+            ),
+            HistoricalDataBar(
+                symbol="AAPL",
+                timestamp=datetime(2025, 1, 3, tzinfo=timezone.utc),  # Friday
+                open=Decimal("154.0"),
+                high=Decimal("156.0"),
+                low=Decimal("153.0"),
+                close=Decimal("155.0"),
+                volume=1100000,
+            ),
+            # Weekend skipped (normal)
+            HistoricalDataBar(
+                symbol="AAPL",
+                timestamp=datetime(2025, 1, 6, tzinfo=timezone.utc),  # Monday
+                open=Decimal("155.0"),
+                high=Decimal("157.0"),
+                low=Decimal("154.0"),
+                close=Decimal("156.0"),
+                volume=1200000,
+            ),
+        ]
+
+        manager = HistoricalDataManager()
+
+        # When: validate_data() is called
+        result = manager.validate_data(clean_data, symbol="AAPL")
+
+        # Then: Returns None (no exception)
+        assert result is None
+
+    def test_validation_detects_multiple_issues(self):
+        """
+        Test that validate_data() reports first critical issue found.
+
+        GIVEN: Historical data with multiple quality issues (gaps + negative price)
+        WHEN: validate_data() is called
+        THEN: Raises DataQualityError (doesn't need to report all issues, just fail fast)
+
+        This is RED phase - method doesn't exist yet, test will fail.
+        """
+        from src.trading_bot.backtest.historical_data_manager import HistoricalDataManager
+        from src.trading_bot.backtest.exceptions import DataQualityError
+
+        # Given: Data with both gap and negative price
+        raw_data_with_multiple_issues = [
+            {
+                'symbol': 'AAPL',
+                'timestamp': datetime(2025, 1, 2, tzinfo=timezone.utc),
+                'open': 150.0,
+                'high': 155.0,
+                'low': 149.0,
+                'close': 154.0,
+                'volume': 1000000,
+            },
+            # Missing ~10 trading days (gap)
+            {
+                'symbol': 'AAPL',
+                'timestamp': datetime(2025, 1, 15, tzinfo=timezone.utc),
+                'open': 155.0,
+                'high': 160.0,
+                'low': 154.0,
+                'close': -5.0,  # Also negative price
+                'volume': 1100000,
+            },
+        ]
+
+        manager = HistoricalDataManager()
+
+        # When/Then: Raises DataQualityError (for either issue)
+        with pytest.raises(DataQualityError):
+            manager.validate_data(raw_data_with_multiple_issues, symbol="AAPL")
