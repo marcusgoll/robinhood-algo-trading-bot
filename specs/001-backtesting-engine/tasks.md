@@ -470,7 +470,7 @@ Story completion order:
 
 ### Integration
 
-- [ ] T059 [US4] Write integration test: Full report workflow
+- [X] T059 [US4] Write integration test: Full report workflow
   - File: tests/backtest/test_integration_reports.py
   - Test: test_full_report_workflow() - Backtest â†’ report generation
   - Run: Complete backtest, generate both markdown and JSON

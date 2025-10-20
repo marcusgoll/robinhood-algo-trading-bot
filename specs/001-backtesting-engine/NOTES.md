@@ -246,3 +246,7 @@ New components needed:
   - Evidence: pytest: test_trade_table_formatting passing
   - Committed: df174a4
 
+✅ T059 [US4]: Integration test for full report workflow (backtest -> markdown/JSON reports)
+  - Evidence: pytest: test_full_report_workflow and test_full_report_workflow_no_trades passing
+  - Committed: 25c0a7a
+
