@@ -1,0 +1,297 @@
+openapi: 3.0.0
+info:
+  title: Backtesting Engine API
+  version: 1.0.0
+  description: Internal Python API for backtesting trading strategies (not REST API)
+
+components:
+  schemas:
+    BacktestConfig:
+      type: object
+      required:
+        - strategy_class
+        - symbols
+        - start_date
+        - end_date
+      properties:
+        strategy_class:
+          type: object
+          description: Strategy class implementing IStrategy protocol
+        symbols:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          example: ["AAPL", "TSLA"]
+        start_date:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00Z"
+        end_date:
+          type: string
+          format: date-time
+          example: "2024-01-01T00:00:00Z"
+        initial_capital:
+          type: number
+          format: float
+          default: 100000.0
+          minimum: 0
+          exclusiveMinimum: true
+        commission:
+          type: number
+          format: float
+          default: 0.0
+          minimum: 0
+        slippage_pct:
+          type: number
+          format: float
+          default: 0.001
+          minimum: 0
+          maximum: 1
+          exclusiveMaximum: true
+        risk_free_rate:
+          type: number
+          format: float
+          default: 0.02
+        cache_enabled:
+          type: boolean
+          default: true
+
+    HistoricalDataBar:
+      type: object
+      required:
+        - symbol
+        - timestamp
+        - open
+        - high
+        - low
+        - close
+        - volume
+      properties:
+        symbol:
+          type: string
+          example: "AAPL"
+        timestamp:
+          type: string
+          format: date-time
+          description: Bar timestamp in UTC
+        open:
+          type: number
+          format: decimal
+        high:
+          type: number
+          format: decimal
+        low:
+          type: number
+          format: decimal
+        close:
+          type: number
+          format: decimal
+        volume:
+          type: integer
+          minimum: 0
+        split_adjusted:
+          type: boolean
+          default: true
+        dividend_adjusted:
+          type: boolean
+          default: true
+
+    Trade:
+      type: object
+      required:
+        - symbol
+        - entry_date
+        - entry_price
+        - exit_date
+        - exit_price
+        - shares
+        - pnl
+        - pnl_pct
+        - duration_days
+        - exit_reason
+      properties:
+        symbol:
+          type: string
+        entry_date:
+          type: string
+          format: date-time
+        entry_price:
+          type: number
+          format: decimal
+        exit_date:
+          type: string
+          format: date-time
+        exit_price:
+          type: number
+          format: decimal
+        shares:
+          type: integer
+          minimum: 1
+        pnl:
+          type: number
+          format: decimal
+          description: Profit/loss in dollars
+        pnl_pct:
+          type: number
+          format: decimal
+          description: Return percentage
+        duration_days:
+          type: integer
+          minimum: 0
+        exit_reason:
+          type: string
+          enum:
+            - stop_loss
+            - take_profit
+            - strategy_signal
+            - end_of_data
+        commission:
+          type: number
+          format: decimal
+          default: 0
+        slippage:
+          type: number
+          format: decimal
+          default: 0
+
+    PerformanceMetrics:
+      type: object
+      required:
+        - total_return
+        - annualized_return
+        - cagr
+        - win_rate
+        - profit_factor
+        - average_win
+        - average_loss
+        - max_drawdown
+        - max_drawdown_duration_days
+        - sharpe_ratio
+        - total_trades
+        - winning_trades
+        - losing_trades
+      properties:
+        total_return:
+          type: number
+          format: decimal
+        annualized_return:
+          type: number
+          format: decimal
+        cagr:
+          type: number
+          format: decimal
+        win_rate:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 1
+        profit_factor:
+          type: number
+          format: decimal
+        average_win:
+          type: number
+          format: decimal
+        average_loss:
+          type: number
+          format: decimal
+        max_drawdown:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 1
+        max_drawdown_duration_days:
+          type: integer
+          minimum: 0
+        sharpe_ratio:
+          type: number
+          format: decimal
+        total_trades:
+          type: integer
+          minimum: 0
+        winning_trades:
+          type: integer
+          minimum: 0
+        losing_trades:
+          type: integer
+          minimum: 0
+
+    BacktestResult:
+      type: object
+      required:
+        - config
+        - trades
+        - equity_curve
+        - metrics
+        - data_warnings
+        - execution_time_seconds
+        - completed_at
+      properties:
+        config:
+          $ref: '#/components/schemas/BacktestConfig'
+        trades:
+          type: array
+          items:
+            $ref: '#/components/schemas/Trade'
+        equity_curve:
+          type: array
+          items:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              equity:
+                type: number
+                format: decimal
+        metrics:
+          $ref: '#/components/schemas/PerformanceMetrics'
+        data_warnings:
+          type: array
+          items:
+            type: string
+          description: Data quality issues encountered
+        execution_time_seconds:
+          type: number
+          format: float
+          minimum: 0
+          exclusiveMinimum: true
+        completed_at:
+          type: string
+          format: date-time
+
+# Python API Usage Examples (not REST endpoints)
+paths:
+  /example-usage:
+    description: |
+      This is a Python library, not a REST API. Usage pattern:
+
+      ```python
+      from trading_bot.backtest import BacktestEngine, BacktestConfig
+      from trading_bot.strategies import MyStrategy
+      from datetime import datetime, UTC
+
+      # Configure backtest
+      config = BacktestConfig(
+          strategy_class=MyStrategy,
+          symbols=["AAPL"],
+          start_date=datetime(2023, 1, 1, tzinfo=UTC),
+          end_date=datetime(2024, 1, 1, tzinfo=UTC),
+          initial_capital=100000.0
+      )
+
+      # Run backtest
+      engine = BacktestEngine(config)
+      result = engine.run()
+
+      # Access results
+      print(f"Total Return: {result.metrics.total_return:.2%}")
+      print(f"Win Rate: {result.metrics.win_rate:.2%}")
+      print(f"Sharpe Ratio: {result.metrics.sharpe_ratio:.2f}")
+      print(f"Max Drawdown: {result.metrics.max_drawdown:.2%}")
+
+      # Generate report
+      from trading_bot.backtest import ReportGenerator
+      generator = ReportGenerator()
+      generator.generate_markdown(result, "specs/001-backtesting-engine/backtest-report.md")
+      ```
