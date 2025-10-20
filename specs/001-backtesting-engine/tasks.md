@@ -416,25 +416,25 @@ Story completion order:
 
 ### Tests
 
-- [ ] T050 [P] [US4] Write test: Markdown report format validation
+- [X] T050 [P] [US4] Write test: Markdown report format validation
   - File: tests/backtest/test_report_generator.py
   - Test: test_markdown_format() - Verify markdown structure
   - Check: All required sections present (metrics, trades, warnings)
   - Pattern: Markdown template matching
 
-- [ ] T051 [P] [US4] Write test: JSON export schema validation
+- [X] T051 [P] [US4] Write test: JSON export schema validation
   - File: tests/backtest/test_report_generator.py
   - Test: test_json_export() - Check JSON structure
   - Verify: All fields present, correct types, valid JSON
   - Pattern: JSON schema validation
 
-- [ ] T052 [P] [US4] Write test: Trade table formatting
+- [X] T052 [P] [US4] Write test: Trade table formatting
   - File: tests/backtest/test_report_generator.py
   - Test: test_trade_table_formatting() - Verify table rendering
   - Check: Columns aligned, dates formatted, P&L with signs
   - Pattern: Table formatting tests
 
-- [ ] T053 [P] [US4] Write test: Complete report generation
+- [X] T053 [P] [US4] Write test: Complete report generation
   - File: tests/backtest/test_report_generator.py
   - Test: test_complete_report() - End-to-end report creation
   - Given: Sample BacktestResult

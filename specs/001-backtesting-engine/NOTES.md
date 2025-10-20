@@ -214,3 +214,19 @@ New components needed:
   - Evidence: pytest: test_win_rate_calculation passing (60% win rate)
   - Committed: 51fdc06
 
+✅ T050 [P]: Test for markdown format validation (TDD RED)
+  - Evidence: pytest: ModuleNotFoundError - ReportGenerator not implemented
+  - Committed: 6cc2158
+
+✅ T051 [P]: Test for JSON export schema validation (TDD RED)
+  - Evidence: pytest: ModuleNotFoundError - ReportGenerator not implemented
+  - Committed: 6cc2158
+
+✅ T052 [P]: Test for trade table formatting (TDD RED)
+  - Evidence: pytest: ModuleNotFoundError - ReportGenerator not implemented
+  - Committed: 6cc2158
+
+✅ T053 [P]: Test for complete report generation (TDD RED)
+  - Evidence: pytest: ModuleNotFoundError - ReportGenerator not implemented
+  - Committed: 6cc2158
+
