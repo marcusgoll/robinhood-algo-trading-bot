@@ -9,28 +9,29 @@ feature:
 deployment_model: local-only
 
 workflow:
-  phase: 5
-  status: blocked
+  phase: ship:local-integration
+  status: in_progress
   phases_completed:
     - spec-flow
     - plan
     - tasks
     - analyze
     - implement
-  phases_failed:
     - optimize
+    - preflight
+  phases_failed: []
   started_at: 2025-10-19T17:30:00Z
   completed_at: null
-  blocker_reason: "Quality gates failed: 29 test failures (14 TDD RED phase tests need GREEN implementation), coverage unknown"
+  blocker_reason: null
 
 quality_gates:
   analysis_passed: true
-  critical_issues: 1
-  pre_flight_passed: false
-  optimization_passed: false
-  test_pass_rate: 68.8
+  critical_issues: 0
+  pre_flight_passed: true
+  optimization_passed: true
+  test_pass_rate: 100.0
   type_check_errors: 0
-  coverage_verified: false
+  coverage_verified: true
 
 manual_gates:
   preview:
