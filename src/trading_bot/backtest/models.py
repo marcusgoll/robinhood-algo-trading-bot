@@ -375,30 +375,30 @@ class Position:
     Open position during backtest execution.
 
     Represents a currently held position with entry price, current price,
-    and unrealized P&L tracking.
+    entry date, and auto-calculated unrealized P&L.
 
     Attributes:
         symbol: Stock ticker symbol
-        quantity: Number of shares held (positive integer)
+        shares: Number of shares held (positive integer)
         entry_price: Average entry price (Decimal for precision)
+        entry_date: When position was opened (UTC)
         current_price: Current market price (Decimal for precision)
-        unrealized_pnl: Current unrealized profit/loss (Decimal)
 
     Raises:
-        ValueError: If validation fails (non-positive quantity/prices)
+        ValueError: If validation fails (non-positive shares/prices, invalid dates)
     """
     symbol: str
-    quantity: int
+    shares: int
     entry_price: Decimal
+    entry_date: datetime
     current_price: Decimal
-    unrealized_pnl: Decimal
 
     def __post_init__(self) -> None:
         """Validate position consistency after initialization."""
-        # Validate positive quantity
-        if self.quantity <= 0:
+        # Validate positive shares
+        if self.shares <= 0:
             raise ValueError(
-                f"Position for {self.symbol}: quantity ({self.quantity}) must be positive"
+                f"Position for {self.symbol}: shares ({self.shares}) must be positive"
             )
 
         # Validate positive entry price
@@ -413,13 +413,10 @@ class Position:
                 f"Position for {self.symbol}: current_price ({self.current_price}) must be positive"
             )
 
-        # Validate unrealized_pnl calculation
-        expected_unrealized_pnl = (self.current_price - self.entry_price) * self.quantity
-        # Allow small floating point error (1 cent)
-        if abs(self.unrealized_pnl - expected_unrealized_pnl) > Decimal("0.01"):
+        # Validate UTC timestamp
+        if self.entry_date.tzinfo is None:
             raise ValueError(
-                f"Position for {self.symbol}: unrealized_pnl ({self.unrealized_pnl}) does not match "
-                f"calculated unrealized_pnl ({expected_unrealized_pnl})"
+                f"Position for {self.symbol}: entry_date must be timezone-aware (UTC)"
             )
 
 

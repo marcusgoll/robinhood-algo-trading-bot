@@ -14,6 +14,8 @@ Public API exports:
         - DataQualityError: Data validation failures
         - InsufficientDataError: Not enough historical data
         - StrategyError: Strategy execution errors
+    Protocols:
+        - IStrategy: Strategy protocol for type-safe strategy contracts
 """
 
 from trading_bot.backtest.exceptions import (
@@ -22,10 +24,12 @@ from trading_bot.backtest.exceptions import (
     InsufficientDataError,
     StrategyError,
 )
+from trading_bot.backtest.strategy_protocol import IStrategy
 
 __all__ = [
     "BacktestException",
     "DataQualityError",
     "InsufficientDataError",
     "StrategyError",
+    "IStrategy",
 ]
