@@ -31,8 +31,11 @@ from trading_bot.backtest.models import (
     BacktestResult,
     BacktestState,
     HistoricalDataBar,
+    OrchestratorConfig,
+    OrchestratorResult,
     PerformanceMetrics,
     Position,
+    StrategyAllocation,
     Trade,
 )
 from trading_bot.backtest.performance_calculator import PerformanceCalculator
@@ -50,10 +53,13 @@ __all__ = [
     "HistoricalDataManager",
     "InsufficientDataError",
     "IStrategy",
+    "OrchestratorConfig",
+    "OrchestratorResult",
     "PerformanceCalculator",
     "PerformanceMetrics",
     "Position",
     "ReportGenerator",
+    "StrategyAllocation",
     "StrategyError",
     "Trade",
 ]

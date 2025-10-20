@@ -2,7 +2,8 @@
 Backtest Data Models
 
 Dataclasses for backtesting engine: BacktestConfig, HistoricalDataBar, Trade,
-PerformanceMetrics, BacktestResult, Position, BacktestState.
+PerformanceMetrics, BacktestResult, Position, BacktestState, OrchestratorConfig,
+OrchestratorResult.
 
 All models use Decimal for money fields, UTC timestamps, and comprehensive validation
 to ensure data integrity throughout the backtesting process.
@@ -457,6 +458,164 @@ class BacktestState:
 
 
 @dataclass(frozen=True)
+class OrchestratorConfig:
+    """
+    Configuration parameters for strategy orchestrator.
+
+    Defines orchestrator behavior for managing multiple strategies,
+    including logging level and weight validation settings.
+
+    Attributes:
+        logging_level: Logging verbosity level (default: "INFO")
+        validate_weights: Whether to validate strategy weight sum (default: True)
+
+    Raises:
+        ValueError: If validation fails (invalid logging_level)
+    """
+    logging_level: str = "INFO"
+    validate_weights: bool = True
+
+    def __post_init__(self) -> None:
+        """Validate configuration after initialization."""
+        # Validate logging_level is one of the allowed values
+        allowed_levels = ["DEBUG", "INFO", "WARNING", "ERROR"]
+        if self.logging_level not in allowed_levels:
+            raise ValueError(
+                f"OrchestratorConfig: logging_level ('{self.logging_level}') must be one of "
+                f"{allowed_levels}"
+            )
+
+
+
+@dataclass
+class StrategyAllocation:
+    """
+    Capital allocation tracking for a single strategy in orchestrator.
+
+    Mutable dataclass that tracks allocated capital, used capital, and
+    available capital for a strategy. Provides methods to allocate and
+    release capital with validation.
+
+    Attributes:
+        strategy_id: Unique identifier for the strategy
+        allocated_capital: Total capital allocated to this strategy (Decimal)
+        used_capital: Capital currently in use by open positions (Decimal)
+        available_capital: Capital available for new positions (Decimal)
+
+    Raises:
+        ValueError: If validation fails (negative capital, invariant violations)
+    """
+    strategy_id: str
+    allocated_capital: Decimal
+    used_capital: Decimal = Decimal("0.0")
+    available_capital: Decimal = field(init=False)
+
+    def __post_init__(self) -> None:
+        """Validate allocation state and calculate available capital."""
+        # Validate allocated_capital > 0
+        if self.allocated_capital <= 0:
+            raise ValueError(
+                f"StrategyAllocation for {self.strategy_id}: allocated_capital "
+                f"({self.allocated_capital}) must be positive"
+            )
+
+        # Validate used_capital >= 0
+        if self.used_capital < 0:
+            raise ValueError(
+                f"StrategyAllocation for {self.strategy_id}: used_capital "
+                f"({self.used_capital}) must be non-negative"
+            )
+
+        # Validate used_capital <= allocated_capital
+        if self.used_capital > self.allocated_capital:
+            raise ValueError(
+                f"StrategyAllocation for {self.strategy_id}: used_capital "
+                f"({self.used_capital}) cannot exceed allocated_capital ({self.allocated_capital})"
+            )
+
+        # Calculate available_capital = allocated - used
+        object.__setattr__(self, 'available_capital', self.allocated_capital - self.used_capital)
+
+    def allocate(self, amount: Decimal) -> None:
+        """
+        Allocate capital for a new position.
+
+        Increases used_capital and decreases available_capital by the specified amount.
+        Validates that sufficient capital is available before allocation.
+
+        Args:
+            amount: Amount of capital to allocate (must be positive)
+
+        Raises:
+            ValueError: If amount is non-positive or exceeds available capital
+        """
+        if amount <= 0:
+            raise ValueError(
+                f"StrategyAllocation.allocate for {self.strategy_id}: amount "
+                f"({amount}) must be positive"
+            )
+
+        if amount > self.available_capital:
+            raise ValueError(
+                f"StrategyAllocation.allocate for {self.strategy_id}: amount "
+                f"({amount}) exceeds available_capital ({self.available_capital})"
+            )
+
+        self.used_capital += amount
+        self.available_capital -= amount
+
+    def release(self, amount: Decimal) -> None:
+        """
+        Release capital from a closed position.
+
+        Decreases used_capital and increases available_capital by the specified amount.
+        Validates that sufficient capital is currently in use.
+
+        Args:
+            amount: Amount of capital to release (must be positive)
+
+        Raises:
+            ValueError: If amount is non-positive or exceeds used capital
+        """
+        if amount <= 0:
+            raise ValueError(
+                f"StrategyAllocation.release for {self.strategy_id}: amount "
+                f"({amount}) must be positive"
+            )
+
+        if amount > self.used_capital:
+            raise ValueError(
+                f"StrategyAllocation.release for {self.strategy_id}: amount "
+                f"({amount}) exceeds used_capital ({self.used_capital})"
+            )
+
+        self.used_capital -= amount
+        self.available_capital += amount
+
+    def can_allocate(self, amount: Decimal) -> bool:
+        """
+        Check if sufficient capital is available for allocation.
+
+        Args:
+            amount: Amount of capital to check (must be positive)
+
+        Returns:
+            True if amount <= available_capital, False otherwise
+
+        Raises:
+            ValueError: If amount is non-positive
+        """
+        if amount <= 0:
+            raise ValueError(
+                f"StrategyAllocation.can_allocate for {self.strategy_id}: amount "
+                f"({amount}) must be positive"
+            )
+
+        return amount <= self.available_capital
+
+
+
+@dataclass(frozen=True)
 class BacktestResult:
     """
     Complete output of backtest run with all data and metrics.
@@ -529,3 +688,136 @@ class BacktestResult:
         if not self.equity_curve:
             return self.config.initial_capital
         return self.equity_curve[-1][1]
+
+
+@dataclass(frozen=True)
+class OrchestratorConfig:
+    """
+    Configuration parameters for strategy orchestrator.
+
+    Defines orchestrator-level settings for logging and validation
+    when coordinating multiple strategies in a single backtest.
+
+    Attributes:
+        logging_level: Logging verbosity level (default: "INFO")
+        validate_weights: Whether to validate strategy weight sum (default: True)
+
+    Raises:
+        ValueError: If logging_level is not one of ["DEBUG", "INFO", "WARNING", "ERROR"]
+    """
+    logging_level: str = "INFO"
+    validate_weights: bool = True
+
+    def __post_init__(self) -> None:
+        """Validate orchestrator configuration after initialization."""
+        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR"]
+        if self.logging_level not in valid_levels:
+            raise ValueError(
+                f"OrchestratorConfig: logging_level ({self.logging_level}) must be one of {valid_levels}"
+            )
+
+
+@dataclass(frozen=True)
+class OrchestratorResult:
+    """
+    Aggregated results from multi-strategy orchestrator run.
+
+    Contains aggregate portfolio metrics, individual strategy results,
+    and comparison data for multi-strategy backtesting analysis.
+
+    Attributes:
+        aggregate_metrics: Combined performance metrics for entire portfolio
+        strategy_results: Individual BacktestResult for each strategy by strategy_id
+        comparison_table: Comparative metrics across strategies (e.g., returns, Sharpe ratios)
+
+    Raises:
+        ValueError: If validation fails (empty results, missing strategy data, etc.)
+    """
+    aggregate_metrics: PerformanceMetrics
+    strategy_results: dict[str, BacktestResult]
+    comparison_table: dict[str, dict]
+
+    def __post_init__(self) -> None:
+        """Validate orchestrator result after initialization."""
+        # Validate non-empty strategy_results
+        if not self.strategy_results:
+            raise ValueError(
+                "OrchestratorResult: strategy_results dictionary cannot be empty"
+            )
+
+        # Validate all values are BacktestResult instances
+        for strategy_id, result in self.strategy_results.items():
+            if not isinstance(result, BacktestResult):
+                raise ValueError(
+                    f"OrchestratorResult: strategy_results['{strategy_id}'] must be "
+                    f"BacktestResult instance, got {type(result).__name__}"
+                )
+
+        # Validate comparison_table keys match strategy_results keys
+        if self.comparison_table:
+            for strategy_id in self.comparison_table.keys():
+                if strategy_id not in self.strategy_results:
+                    raise ValueError(
+                        f"OrchestratorResult: comparison_table contains strategy_id "
+                        f"'{strategy_id}' not found in strategy_results"
+                    )
+
+    def to_dict(self) -> dict:
+        """
+        Convert orchestrator result to dictionary for serialization.
+
+        Returns dictionary with aggregate metrics, per-strategy results,
+        and comparison data suitable for JSON/YAML export.
+
+        Returns:
+            Dictionary representation of orchestrator result
+        """
+        return {
+            "aggregate_metrics": {
+                "total_return": float(self.aggregate_metrics.total_return),
+                "annualized_return": float(self.aggregate_metrics.annualized_return),
+                "cagr": float(self.aggregate_metrics.cagr),
+                "win_rate": float(self.aggregate_metrics.win_rate),
+                "profit_factor": float(self.aggregate_metrics.profit_factor),
+                "average_win": float(self.aggregate_metrics.average_win),
+                "average_loss": float(self.aggregate_metrics.average_loss),
+                "max_drawdown": float(self.aggregate_metrics.max_drawdown),
+                "max_drawdown_duration_days": self.aggregate_metrics.max_drawdown_duration_days,
+                "sharpe_ratio": float(self.aggregate_metrics.sharpe_ratio),
+                "total_trades": self.aggregate_metrics.total_trades,
+                "winning_trades": self.aggregate_metrics.winning_trades,
+                "losing_trades": self.aggregate_metrics.losing_trades,
+            },
+            "strategy_results": {
+                strategy_id: {
+                    "final_equity": float(result.final_equity),
+                    "total_trades": result.metrics.total_trades,
+                    "win_rate": float(result.metrics.win_rate),
+                    "total_return": float(result.metrics.total_return),
+                    "sharpe_ratio": float(result.metrics.sharpe_ratio),
+                    "max_drawdown": float(result.metrics.max_drawdown),
+                }
+                for strategy_id, result in self.strategy_results.items()
+            },
+            "comparison_table": self.comparison_table,
+        }
+
+    def get_strategy_result(self, strategy_id: str) -> BacktestResult:
+        """
+        Retrieve BacktestResult for specific strategy by ID.
+
+        Args:
+            strategy_id: Strategy identifier (must exist in strategy_results)
+
+        Returns:
+            BacktestResult for the requested strategy
+
+        Raises:
+            KeyError: If strategy_id not found in results
+        """
+        if strategy_id not in self.strategy_results:
+            raise KeyError(
+                f"Strategy ID '{strategy_id}' not found in results. "
+                f"Available strategies: {list(self.strategy_results.keys())}"
+            )
+        return self.strategy_results[strategy_id]
