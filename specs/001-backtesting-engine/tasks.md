@@ -296,13 +296,17 @@ Story completion order:
 
 ### Integration
 
-- [ ] T031 [US2] Write integration test: Complete backtest flow
+- [x] T031 [US2] Write integration test: Complete backtest flow
   - File: tests/backtest/test_integration_engine.py
   - Test: test_complete_backtest_flow() - Config â†’ run â†’ result
   - Strategy: Simple momentum strategy
   - Data: Real historical data (1 year AAPL)
   - Verify: All trades recorded, equity curve generated
   - Pattern: End-to-end integration test
+  - **Status**: DONE
+  - **Commit**: 98da98d
+  - **Notes**: Two test scenarios: (1) Full backtest with 2 trades generating 42.57% return, (2) No-trade scenario with insufficient data. All validations passing.
+  - **Evidence**: pytest: test_complete_backtest_flow and test_complete_backtest_flow_no_trades passing (2 tests)
 
 ---
 
