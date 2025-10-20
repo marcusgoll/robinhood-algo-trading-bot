@@ -154,3 +154,35 @@ New components needed:
   - Evidence: pytest: TestAlpacaFetch all 6 tests passing
   - Committed: 207ad34
 
+✅ T020 [P]: Test for IStrategy protocol compliance written (RED phase)
+  - Evidence: pytest: FAILED (ModuleNotFoundError - strategy_protocol module does not exist)
+  - Committed: e24f924
+
+✅ T021 [P]: Test for chronological execution written (RED phase)
+  - Evidence: pytest: FAILED (ModuleNotFoundError - BacktestEngine not implemented)
+  - Committed: b268119
+
+✅ T024 [P]: Test for reproducibility written (TDD RED phase)
+  - Evidence: pytest: FAILED (ModuleNotFoundError - BacktestEngine not implemented)
+  - Committed: 25ca8fa
+
+✅ T023 [P]: Test for insufficient capital validation written (TDD RED phase). Two tests added: test_insufficient_capital() and test_insufficient_capital_with_logging(). Both verify that BacktestEngine rejects trades when capital is too low.
+  - Evidence: pytest: ModuleNotFoundError - src.trading_bot.backtest.engine doesn't exist yet (expected in RED phase)
+  - Committed: 99e0a00
+
+✅ T022 [P]: Test for buy-and-hold strategy written (TDD RED phase). Test fails with ModuleNotFoundError as expected because BacktestEngine.run() doesn't exist yet.
+  - Evidence: pytest: FAILED - ImportError: ModuleNotFoundError: No module named 'src.trading_bot.backtest.engine'
+  - Committed: d9548b9
+
+✅ T025 [US2]: Implemented IStrategy protocol with runtime checking and updated Position model
+  - Evidence: pytest: tests/backtest/test_strategy_protocol.py ALL PASSING (9/9 tests)
+  - Committed: 600998b
+
+✅ T026 [P]: Created BuyAndHoldStrategy and MomentumStrategy examples with full protocol compliance
+  - Evidence: Examples created in examples/, protocol compliance verified via tests, all strategies implement IStrategy correctly
+  - Committed: f2fb645
+
+✅ T015 [US1]: HistoricalDataManager implemented with Alpaca/Yahoo sources and Parquet caching
+  - Evidence: pytest: tests/backtest/test_historical_data_manager.py - 18/18 tests passing
+  - Committed: f2fb645
+

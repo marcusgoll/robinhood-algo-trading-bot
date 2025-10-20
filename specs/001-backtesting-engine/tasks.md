@@ -139,7 +139,7 @@ Story completion order:
 
 ### Implementation
 
-- [ ] T015 [US1] Implement HistoricalDataManager in src/trading_bot/backtest/historical_data_manager.py
+- [X] T015 [US1] Implement HistoricalDataManager in src/trading_bot/backtest/historical_data_manager.py
   - Methods: fetch_data(), cache_data(), load_cached_data(), validate_data(), _get_cache_path()
   - Data sources: Alpaca API (primary), yfinance (fallback)
   - Caching: Parquet files in .backtest_cache/{symbol}_{start}_{end}.parquet
@@ -201,34 +201,34 @@ Story completion order:
 
 ### Tests
 
-- [ ] T020 [P] [US2] Write test: IStrategy protocol runtime checking
+- [X] T020 [P] [US2] Write test: IStrategy protocol runtime checking
   - File: tests/backtest/test_strategy_protocol.py
   - Test: test_protocol_compliance() - Verify should_enter/should_exit methods exist
   - Cases: Valid strategy, missing methods, incorrect signatures
   - Pattern: Python Protocol runtime checking patterns
 
-- [ ] T021 [P] [US2] Write test: BacktestEngine chronological execution
+- [X] T021 [P] [US2] Write test: BacktestEngine chronological execution
   - File: tests/backtest/test_engine.py
   - Test: test_chronological_execution() - Verify no look-ahead bias
   - Strategy: Track what data is visible at each bar
   - Assert: Can only see past data, not future
   - Pattern: tests/order_management/ execution patterns
 
-- [ ] T022 [P] [US2] Write test: Buy-and-hold strategy executes correctly
+- [X] T022 [P] [US2] Write test: Buy-and-hold strategy executes correctly
   - File: tests/backtest/test_engine.py
   - Test: test_buy_and_hold_strategy() - End-to-end simple strategy
   - Expected: One buy at start, one sell at end
   - Verify: P&L matches (end_price - start_price) / start_price
   - From: spec.md Success Criteria #2
 
-- [ ] T023 [P] [US2] Write test: Insufficient capital prevents trades
+- [X] T023 [P] [US2] Write test: Insufficient capital prevents trades
   - File: tests/backtest/test_engine.py
   - Test: test_insufficient_capital() - Verify cash validation
   - Scenario: Initial capital too low for position
   - Expected: Trade rejected, warning logged
   - Pattern: tests/risk_management/ capital validation tests
 
-- [ ] T024 [P] [US2] Write test: Reproducibility (deterministic execution)
+- [X] T024 [P] [US2] Write test: Reproducibility (deterministic execution)
   - File: tests/backtest/test_engine.py
   - Test: test_reproducibility() - Same inputs â†’ same outputs
   - Run: Same BacktestConfig twice
@@ -237,14 +237,14 @@ Story completion order:
 
 ### Implementation
 
-- [ ] T025 [US2] Define IStrategy protocol in src/trading_bot/backtest/strategy_protocol.py
+- [X] T025 [US2] Define IStrategy protocol in src/trading_bot/backtest/strategy_protocol.py
   - Methods: should_enter(bars: List[HistoricalDataBar]) -> bool, should_exit(position: Position, bars: List[HistoricalDataBar]) -> bool
   - Optional: position_size(capital: float, price: float) -> int
   - Docstrings: Clear documentation of parameters and return values
   - Type hints: Full type annotations with generics if needed
   - From: plan.md [NEW INFRASTRUCTURE - CREATE]
 
-- [ ] T026 [P] [US2] Create example strategies in examples/
+- [X] T026 [P] [US2] Create example strategies in examples/
   - Files: examples/simple_backtest.py, examples/sample_strategies.py
   - Strategies: BuyAndHoldStrategy (always buy once), MomentumStrategy (MA crossover)
   - Purpose: Test cases and documentation examples
