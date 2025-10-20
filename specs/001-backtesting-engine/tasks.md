@@ -159,12 +159,15 @@ Story completion order:
   - REUSE: API key patterns (src/trading_bot/utils/security.py)
   - Pattern: src/trading_bot/market_data/market_data_service.py
 
-- [ ] T017 [US1] Add Yahoo Finance fallback integration
+- [x] T017 [US1] Add Yahoo Finance fallback integration (✓ da4eaeb)
   - Method: _fetch_yahoo_data() in HistoricalDataManager
   - Library: yfinance.download()
   - Fallback logic: Try Alpaca first, Yahoo Finance on failure
   - Data mapping: Convert Yahoo format to HistoricalDataBar
   - From: plan.md [EXISTING INFRASTRUCTURE - REUSE]
+  - **Status**: DONE
+  - **Evidence**: pytest: TestYahooFinanceFallback - 2/2 passing, all 50 backtest tests passing
+  - **Notes**: Implemented Yahoo Finance fallback with yfinance.download(). Auto-adjust=True for split/dividend corrections. Converted DataFrame to HistoricalDataBar list with proper UTC timezone handling. Fixed test suite to use manual exception handling for InsufficientDataError verification.
 
 ### Integration
 
