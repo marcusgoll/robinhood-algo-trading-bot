@@ -789,3 +789,258 @@ class TestBacktestEngineCapitalValidation:
         assert "tsla" in warning_message, "Warning should mention symbol (TSLA)"
         assert "150" in warning_message, "Warning should mention stock price ($150)"
         assert "100" in warning_message, "Warning should mention available capital ($100)"
+
+
+class BuyAndHoldStrategy:
+    """
+    Simple buy-and-hold strategy for testing BacktestEngine execution.
+
+    **Strategy Behavior**:
+    - Enter position on first bar with all available capital
+    - Never exit position (hold until end of backtest)
+    - Exit forced at end_of_data
+
+    **Purpose**: Test basic backtest engine execution and P&L calculation accuracy.
+    From spec.md Success Criteria #2 (Execution Accuracy)
+    """
+
+    def __init__(self):
+        self.has_entered = False
+
+    def should_enter(self, bars: List[HistoricalDataBar]) -> bool:
+        """
+        Enter on first bar only.
+
+        Args:
+            bars: Historical data available up to current bar
+
+        Returns:
+            True on first call, False thereafter
+        """
+        if not self.has_entered:
+            self.has_entered = True
+            return True
+        return False
+
+    def should_exit(self, position: Position, bars: List[HistoricalDataBar]) -> bool:
+        """
+        Never exit voluntarily - hold until end.
+
+        Args:
+            position: Current open position
+            bars: Historical data available up to current bar
+
+        Returns:
+            False (never exit, backtest engine will close at end_of_data)
+        """
+        return False
+
+    def position_size(self, capital: float, price: float) -> int:
+        """
+        Use all available capital to buy maximum shares.
+
+        Args:
+            capital: Available cash in portfolio
+            price: Current stock price
+
+        Returns:
+            Maximum number of shares affordable
+        """
+        if price <= 0:
+            return 0
+        return int(capital / price)
+
+
+class TestBacktestEngineBuyAndHold:
+    """
+    T022 [RED]: Test buy-and-hold strategy execution correctness.
+
+    **From spec.md**:
+    - User Story US2: Execute strategy against historical data chronologically
+    - Success Criteria #2: Backtest matches manual calculations within 0.01% error
+    - NFR-003: Results must match manual calculations within 0.01%
+    - FR-007: Simulate order fills using next bar's open price
+
+    **TDD Phase**: RED - BacktestEngine.run() doesn't exist yet
+    """
+
+    @pytest.fixture
+    def mock_year_data(self) -> List[HistoricalDataBar]:
+        """
+        Create 252 trading days (one year) with 10% total return.
+
+        Start price: $150.00
+        End price: $165.00
+        Return: 10% (linear progression)
+
+        Returns:
+            List of 252 HistoricalDataBar objects
+        """
+        bars = []
+        symbol = "AAPL"
+        start_date = datetime(2023, 1, 3, 9, 30, tzinfo=timezone.utc)
+        start_price = Decimal("150.00")
+        end_price = Decimal("165.00")
+        num_bars = 252
+
+        # Calculate linear price increment per bar
+        price_increment = (end_price - start_price) / Decimal(str(num_bars - 1))
+
+        for i in range(num_bars):
+            # Base price for this bar (linear interpolation)
+            base_price = start_price + (price_increment * Decimal(str(i)))
+
+            # Realistic OHLC relationships
+            open_price = base_price - Decimal("0.25")
+            high_price = base_price + Decimal("0.50")
+            low_price = base_price - Decimal("0.50")
+            close_price = base_price
+
+            # Timestamp (simple daily increment for testing)
+            from datetime import timedelta
+            bar_timestamp = start_date + timedelta(days=i)
+
+            bar = HistoricalDataBar(
+                symbol=symbol,
+                timestamp=bar_timestamp,
+                open=open_price,
+                high=high_price,
+                low=low_price,
+                close=close_price,
+                volume=1000000 + (i * 5000),  # Varying volume
+                split_adjusted=True,
+                dividend_adjusted=True
+            )
+            bars.append(bar)
+
+        return bars
+
+    def test_buy_and_hold_strategy(self, mock_year_data: List[HistoricalDataBar]):
+        """
+        T022 [RED]: Test BacktestEngine.run() executes buy-and-hold correctly.
+
+        **Test Scenario**:
+        GIVEN: BuyAndHoldStrategy (enter first bar, never exit)
+        AND: 252 bars of historical data (one year, $150 to $165, 10% gain)
+        AND: Initial capital $100,000
+        WHEN: BacktestEngine.run(config) is called
+        THEN: Exactly one trade is created
+        AND: Entry at first bar open price (~$149.75)
+        AND: Exit at last bar close price ($165.00)
+        AND: P&L matches manual calculation within 0.01% (spec NFR-003)
+
+        **Expected Manual Calculation**:
+        - Entry price: $149.75 (first bar open)
+        - Shares bought: floor($100,000 / $149.75) = 667 shares
+        - Cost: 667 * $149.75 = $99,823.25
+        - Exit value: 667 * $165.00 = $110,055.00
+        - P&L: $110,055.00 - $99,823.25 = $10,231.75
+        - Return: $10,231.75 / $99,823.25 = 10.25%
+
+        **TDD RED PHASE**: This test WILL FAIL because:
+        - BacktestEngine class doesn't exist yet
+        - Expected ImportError or AttributeError
+        """
+        # ARRANGE: Setup test configuration
+        config = BacktestConfig(
+            strategy_class=BuyAndHoldStrategy,
+            symbols=["AAPL"],
+            start_date=datetime(2023, 1, 3, 9, 30, tzinfo=timezone.utc),
+            end_date=datetime(2023, 12, 29, 23, 59, 59, tzinfo=timezone.utc),
+            initial_capital=Decimal("100000.00"),
+            commission=Decimal("0.0"),  # No commission for simple test
+            slippage_pct=Decimal("0.0"),  # No slippage for simple test
+            risk_free_rate=Decimal("0.02"),
+            cache_enabled=False
+        )
+
+        # Calculate expected results manually
+        first_bar = mock_year_data[0]
+        last_bar = mock_year_data[-1]
+        initial_capital = config.initial_capital
+
+        entry_price = first_bar.open  # $149.75
+        exit_price = last_bar.close   # $165.00
+        expected_shares = int(initial_capital / entry_price)  # 667
+        expected_cost = expected_shares * entry_price
+        expected_exit_value = expected_shares * exit_price
+        expected_pnl = expected_exit_value - expected_cost
+        expected_return_pct = expected_pnl / expected_cost
+
+        # ACT: Run backtest
+        # This will FAIL in RED phase with ImportError
+        engine = BacktestEngine(config=config)
+        result = engine.run(strategy=BuyAndHoldStrategy(), historical_data={"AAPL": mock_year_data})
+
+        # ASSERT: Verify results (GREEN phase assertions)
+        # 1. Verify exactly one trade
+        assert len(result.trades) == 1, \
+            f"Buy-and-hold should create exactly 1 trade, got {len(result.trades)}"
+
+        trade = result.trades[0]
+
+        # 2. Verify trade symbol
+        assert trade.symbol == "AAPL", \
+            f"Trade symbol should be AAPL, got {trade.symbol}"
+
+        # 3. Verify entry price (allow small variance for fill simulation)
+        entry_tolerance = Decimal("1.0")
+        assert abs(trade.entry_price - entry_price) < entry_tolerance, \
+            f"Entry price should be ~${entry_price} (first bar open), got ${trade.entry_price}"
+
+        # 4. Verify exit price
+        exit_tolerance = Decimal("1.0")
+        assert abs(trade.exit_price - exit_price) < exit_tolerance, \
+            f"Exit price should be ~${exit_price} (last bar close), got ${trade.exit_price}"
+
+        # 5. Verify shares bought
+        share_tolerance = 10  # Allow small variance
+        assert abs(trade.shares - expected_shares) < share_tolerance, \
+            f"Should buy ~{expected_shares} shares, got {trade.shares}"
+
+        # 6. Verify P&L calculation accuracy (spec NFR-003: within 0.01%)
+        assert trade.pnl > 0, \
+            f"P&L should be positive for 10% gain, got ${trade.pnl}"
+
+        pnl_error_pct = abs(trade.pnl - expected_pnl) / abs(expected_pnl)
+        assert pnl_error_pct < Decimal("0.0001"), \
+            f"P&L must be within 0.01% of manual calculation (NFR-003).\n" \
+            f"Expected: ${expected_pnl:,.2f}\n" \
+            f"Actual: ${trade.pnl:,.2f}\n" \
+            f"Error: {pnl_error_pct * 100:.4f}% (max allowed: 0.01%)"
+
+        # 7. Verify return percentage
+        return_error_pct = abs(trade.pnl_pct - expected_return_pct) / abs(expected_return_pct)
+        assert return_error_pct < Decimal("0.0001"), \
+            f"Return % must be within 0.01% of expected.\n" \
+            f"Expected: {expected_return_pct * 100:.2f}%\n" \
+            f"Actual: {trade.pnl_pct * 100:.2f}%\n" \
+            f"Error: {return_error_pct * 100:.4f}%"
+
+        # 8. Verify exit reason
+        assert trade.exit_reason == "end_of_data", \
+            f"Exit reason should be 'end_of_data', got '{trade.exit_reason}'"
+
+        # 9. Verify equity curve exists
+        assert len(result.equity_curve) > 0, \
+            "Equity curve should have data points"
+
+        # 10. Verify final equity
+        final_equity = result.equity_curve[-1][1]
+        expected_final_equity = initial_capital + expected_pnl
+        equity_error_pct = abs(final_equity - expected_final_equity) / expected_final_equity
+        assert equity_error_pct < Decimal("0.0001"), \
+            f"Final equity must match expected within 0.01%.\n" \
+            f"Expected: ${expected_final_equity:,.2f}\n" \
+            f"Actual: ${final_equity:,.2f}\n" \
+            f"Error: {equity_error_pct * 100:.4f}%"
+
+        # 11. Verify performance metrics
+        assert result.metrics.total_trades == 1, \
+            f"Should have 1 trade, got {result.metrics.total_trades}"
+        assert result.metrics.winning_trades == 1, \
+            f"Trade should be profitable, got {result.metrics.winning_trades} winners"
+        assert result.metrics.losing_trades == 0, \
+            f"Should have 0 losses, got {result.metrics.losing_trades}"
+        assert result.metrics.win_rate == Decimal("1.0"), \
+            f"Win rate should be 100%, got {result.metrics.win_rate * 100:.1f}%"
