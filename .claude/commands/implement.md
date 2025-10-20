@@ -288,10 +288,10 @@ for batch in "${BATCHES[@]}"; do
     # Determine agent
     AGENT=""
     case "$DOMAIN" in
-      backend) AGENT="backend-dev" ;;
-      frontend) AGENT="frontend-shipper" ;;
-      database) AGENT="database-architect" ;;
-      tests) AGENT="qa-test" ;;
+      backend) AGENT="implementation/backend" ;;
+      frontend) AGENT="implementation/frontend" ;;
+      database) AGENT="implementation/database" ;;
+      tests) AGENT="quality/qa-tester" ;;
       *) AGENT="general-purpose" ;;
     esac
 
@@ -407,11 +407,20 @@ if [ "$TASK_FORMAT" = "user-story" ]; then
       echo "USER PROMPT: Ship MVP now or continue to P2? (ship/continue)"
       echo ""
       echo "Claude Code: Wait for user response"
-      echo "  • If 'ship' or 'A': Echo 'Run /preview to validate MVP' and exit"
+      echo "  • If 'ship' or 'A':"
+      echo "    1. Call roadmap-manager to capture P2/P3 tasks"
+      echo "    2. Echo 'Run /preview to validate MVP' and exit"
       echo "  • If 'continue' or 'B': Continue to remaining batches (P2 tasks)"
       echo ""
       # Note: In actual implementation, Claude Code will pause here
       # This is a manual gate - execution stops until user responds
+      #
+      # When user chooses 'ship', execute:
+      # source .spec-flow/scripts/bash/roadmap-manager.sh
+      # add_future_enhancements_to_roadmap "$FEATURE_DIR" "$SLUG"
+      # echo ""
+      # echo "Next: /preview to validate MVP"
+      # exit 0
     fi
   fi
 fi
@@ -441,13 +450,33 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 
 1. **Parse batches** from bash logic above
 2. **For each batch**: Launch parallel Task() calls in single message
-3. **Task parameters per agent**:
+3. **MVP Gate Handling** (User Story Format Only):
+   - After P1 tasks complete, check if P2+ tasks exist
+   - If P2/P3 tasks exist:
+     - Display MVP gate message to user
+     - Ask: "Ship MVP now or continue to P2? (ship/continue)"
+     - Wait for user response
+     - If user says "ship" or "A":
+       ```bash
+       # Load roadmap manager functions
+       source .spec-flow/scripts/bash/roadmap-manager.sh
+
+       # Add future enhancements to roadmap
+       add_future_enhancements_to_roadmap "$FEATURE_DIR" "$SLUG"
+
+       # Exit with next step
+       echo ""
+       echo "Next: /preview to validate MVP"
+       exit 0
+       ```
+     - If user says "continue" or "B": Continue executing remaining P2/P3 batches
+4. **Task parameters per agent**:
 
 ```python
 # Example: 3 tasks in parallel batch (backend, frontend, database)
 
 Task(
-  subagent_type="backend-dev",
+  subagent_type="implementation/backend",
   description="T001: Create Message model",
   prompt=f"""
 Task T001: Create Message model in api/app/models/message.py
@@ -480,7 +509,7 @@ Return: Files changed, test results, task-tracker confirmation
 )
 
 Task(
-  subagent_type="frontend-shipper",
+  subagent_type="implementation/frontend",
   description="T002: Create MessageForm component",
   prompt=f"""
 Task T002: Create MessageForm component in apps/app/components/MessageForm.tsx
@@ -514,7 +543,7 @@ Return: Files changed, test results, task-tracker confirmation
 )
 
 Task(
-  subagent_type="database-architect",
+  subagent_type="implementation/database",
   description="T003: Add messages table migration",
   prompt=f"""
 Task T003: Generate Alembic migration for messages table
@@ -555,19 +584,43 @@ Return: Migration file, test results, task-tracker confirmation
 - Test must fail for right reason
 - Provide test output as evidence
 - Auto-rollback if test passes (wrong!)
-- Commit: `test(red): TXXX write failing test`
+- **Commit immediately after test written:**
+  ```bash
+  git add .
+  git commit -m "test(red): TXXX write failing test
+
+Test: $TEST_NAME
+Expected: FAILED (ImportError/NotImplementedError)
+Evidence: $(pytest output showing failure)"
+  ```
 
 **GREEN Phase** [GREEN→TXXX]:
 - Minimal implementation to pass RED test
 - Run tests, must pass
 - Auto-rollback on failure → log to error-log.md
-- Commit: `feat(green): TXXX implement to pass test`
+- **Commit when tests pass:**
+  ```bash
+  git add .
+  git commit -m "feat(green): TXXX implement to pass test
+
+Implementation: $SUMMARY
+Tests: All passing ($PASS/$TOTAL)
+Coverage: $COV% (+$DELTA%)"
+  ```
 
 **REFACTOR Phase** [REFACTOR]:
 - Clean up code (DRY, KISS)
 - Tests must stay green
 - Auto-rollback if tests break
-- Commit: `refactor: TXXX clean up implementation`
+- **Commit after refactoring:**
+  ```bash
+  git add .
+  git commit -m "refactor: TXXX clean up implementation
+
+Improvements: $IMPROVEMENTS
+Tests: Still passing ($PASS/$TOTAL)
+Coverage: Maintained at $COV%"
+  ```
 
 ### Auto-Rollback (NO prompts)
 
@@ -654,6 +707,58 @@ echo "⚠️  TXXX: Auto-rolled back (test failure)" >> error-log.md
 - **Auto-rollback**: No prompts, log failures to error-log.md
 - **REUSE enforcement**: Verify imports, fail if pattern file missing
 - **Commit per task**: Include evidence in commit message
+
+## COMMIT FINAL IMPLEMENTATION
+
+**After all tasks complete, final commit:**
+
+```bash
+# Check task completion
+COMPLETED=$(grep -c "^✅ T[0-9]\{3\}" "$NOTES_FILE" 2>/dev/null || echo 0)
+TOTAL=$(grep -c "^- \[ \] T[0-9]\{3\}" "$TASKS_FILE" 2>/dev/null || echo 0)
+
+# Count by priority if user story format
+if [ "$TASK_FORMAT" = "user-story" ]; then
+  P1_TOTAL=$(grep -c "\[P1\]" "$TASKS_FILE" 2>/dev/null || echo 0)
+  P1_COMPLETE=$(grep -c "✅.*\[P1\]" "$NOTES_FILE" 2>/dev/null || echo 0)
+  P2_COUNT=$(grep -c "\[P2\]" "$TASKS_FILE" 2>/dev/null || echo 0)
+  P3_COUNT=$(grep -c "\[P3\]" "$TASKS_FILE" 2>/dev/null || echo 0)
+  MVP_SHIPPED=$([ "$P1_COMPLETE" -eq "$P1_TOTAL" ] && echo "true" || echo "false")
+fi
+
+# Stage all implementation artifacts
+git add .
+
+# Commit with implementation summary
+if [ "$TASK_FORMAT" = "user-story" ] && [ "$MVP_SHIPPED" = "true" ]; then
+  # MVP commit (P1 only)
+  git commit -m "feat(mvp): complete P1 (MVP) implementation for $(basename "$FEATURE_DIR")
+
+MVP tasks: $P1_COMPLETE/$P1_TOTAL ✅
+Tests: All passing
+Deferred to roadmap: P2 ($P2_COUNT), P3 ($P3_COUNT)
+
+🤖 Generated with Claude Code
+Co-Authored-By: Claude <noreply@anthropic.com>"
+else
+  # Full implementation commit
+  git commit -m "feat(implement): complete implementation for $(basename "$FEATURE_DIR")
+
+Tasks: $COMPLETED/$TOTAL ✅
+Tests: All passing
+
+🤖 Generated with Claude Code
+Co-Authored-By: Claude <noreply@anthropic.com>"
+fi
+
+# Verify commit succeeded
+COMMIT_HASH=$(git rev-parse --short HEAD)
+echo ""
+echo "✅ Implementation committed: $COMMIT_HASH"
+echo ""
+git log -1 --oneline
+echo ""
+```
 
 ## RETURN
 

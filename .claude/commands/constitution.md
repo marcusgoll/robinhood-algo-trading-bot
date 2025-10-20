@@ -1,5 +1,15 @@
 # Constitution: Update Project Constitution
 
+> **⚠️  DEPRECATED**: This command has been renamed to `/setup-constitution` for clarity.
+>
+> **Reason**: More explicit that it's a setup/configuration command
+>
+> **Migration**: Replace `/constitution` with `/setup-constitution` in your workflow
+>
+> **Removal**: This alias will be removed in v2.0.0
+>
+> **For now**: Both commands work identically
+
 **Command**: `/constitution`
 
 **Purpose**: Update project constitution and sync dependent templates. Maintains constitution as single source of truth (SSOT) for all project principles and requirements.

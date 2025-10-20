@@ -2,6 +2,16 @@
 description: Test deployment configuration without actually deploying
 ---
 
+> **⚠️  DEPRECATED**: This command has been renamed to `/test-deploy` for clarity.
+>
+> **Reason**: Clearer what it tests (deployment without actually deploying)
+>
+> **Migration**: Replace `/dry-run` with `/test-deploy` in your workflow
+>
+> **Removal**: This alias will be removed in v2.0.0
+>
+> **For now**: Both commands work identically
+
 # Dry-Run: Deployment Config Validator
 
 **Command**: `/dry-run`

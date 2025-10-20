@@ -1,3 +1,13 @@
+> **⚠️  DEPRECATED**: This command has been renamed to `/deploy-status` for clarity.
+>
+> **Reason**: Broader term, matches other deploy-* commands
+>
+> **Migration**: Replace `/ship-status` with `/deploy-status` in your workflow
+>
+> **Removal**: This alias will be removed in v2.0.0
+>
+> **For now**: Both commands work identically
+
 # /ship-status - Deployment Status Visualization
 
 **Purpose**: Display comprehensive deployment workflow status, showing current phase, completed tasks, quality gates, and deployment information.
