@@ -230,3 +230,19 @@ New components needed:
   - Evidence: pytest: ModuleNotFoundError - ReportGenerator not implemented
   - Committed: 6cc2158
 
+✅ T055 [US4]: ReportGenerator core class with markdown and JSON generation methods
+  - Evidence: pytest: test_report_generator.py all 4 tests passing
+  - Committed: df174a4
+
+✅ T056 [P]: Markdown report generation with all sections (config, metrics, trades, equity curve, warnings)
+  - Evidence: pytest: test_markdown_format passing
+  - Committed: df174a4
+
+✅ T057 [P]: JSON export with complete data serialization (Decimal to float, datetime to ISO)
+  - Evidence: pytest: test_json_export passing
+  - Committed: df174a4
+
+✅ T058 [P]: Trade table formatting with all columns and proper number formatting (currency, percentages)
+  - Evidence: pytest: test_trade_table_formatting passing
+  - Committed: df174a4
+

@@ -443,26 +443,26 @@ Story completion order:
 
 ### Implementation
 
-- [ ] T055 [US4] Implement ReportGenerator in src/trading_bot/backtest/report_generator.py
+- [X] T055 [US4] Implement ReportGenerator in src/trading_bot/backtest/report_generator.py
   - Class: ReportGenerator with generate_markdown(), generate_json()
   - Methods: _format_trade_table(), _format_equity_curve(), _format_metrics()
   - Output: Save to specs/001-backtesting-engine/backtest-reports/
   - REUSE: TradingLogger patterns for file I/O (src/trading_bot/logger.py)
   - From: plan.md [NEW INFRASTRUCTURE - CREATE]
 
-- [ ] T056 [P] [US4] Implement markdown report generation
+- [X] T056 [P] [US4] Implement markdown report generation
   - Method: generate_markdown(result: BacktestResult, output_path: str)
   - Template: Use backtest-report-template.md structure
   - Sections: Configuration, Performance Metrics, Trades, Equity Curve, Data Warnings
   - From: spec.md FR-015
 
-- [ ] T057 [P] [US4] Implement JSON report export
+- [X] T057 [P] [US4] Implement JSON report export
   - Method: generate_json(result: BacktestResult, output_path: str)
   - Format: Structured JSON with same data as markdown
   - Purpose: Programmatic access for comparisons, dashboards
   - From: plan.md [NEW INFRASTRUCTURE - CREATE]
 
-- [ ] T058 [P] [US4] Implement trade table formatting
+- [X] T058 [P] [US4] Implement trade table formatting
   - Method: _format_trade_table(trades: List[Trade]) -> str
   - Columns: Symbol, Entry Date, Entry Price, Exit Date, Exit Price, Shares, P&L, P&L %, Duration, Exit Reason
   - Format: Markdown table with aligned columns
