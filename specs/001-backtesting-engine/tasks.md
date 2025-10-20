@@ -392,12 +392,16 @@ Story completion order:
 
 ### Integration
 
-- [ ] T045 [US3] Write integration test: Metrics from real backtest
+- [x] T045 [US3] Write integration test: Metrics from real backtest
   - File: tests/backtest/test_integration_metrics.py
   - Test: test_metrics_from_real_backtest() - End-to-end metric calculation
   - Run: Complete backtest with known strategy
   - Verify: All metrics calculated, values reasonable
   - Pattern: Integration test with real data
+  - Status: DONE (2025-10-20)
+  - Evidence: pytest passing, 2 tests (test_metrics_from_real_backtest, test_metrics_calculation_consistency)
+  - Notes: Integration test validates complete backtest with MomentumStrategy. Results: 2 trades, 40.44% return, 100% win rate, 1.21% max drawdown, 11.64 Sharpe ratio. All metrics reasonable and valid.
+  - Commit: 8086e53
 
 ---
 
