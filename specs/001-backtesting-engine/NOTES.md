@@ -194,3 +194,23 @@ New components needed:
   - Evidence: pytest: ModuleNotFoundError - PerformanceCalculator not implemented
   - Committed: 2fbd501
 
+✅ T040 [US3]: PerformanceCalculator core class with calculate_metrics() method
+  - Evidence: pytest: test_performance_calculator.py all 4 tests passing
+  - Committed: 51fdc06
+
+✅ T041 [P]: Return calculations (total, annualized, CAGR) in _calculate_returns()
+  - Evidence: pytest: test_metrics_accuracy passing with correct total_return
+  - Committed: 51fdc06
+
+✅ T042 [P]: Drawdown calculations (max DD, duration) in _calculate_drawdown()
+  - Evidence: pytest: test_drawdown_calculation passing (15% DD, 42 days)
+  - Committed: 51fdc06
+
+✅ T043 [P]: Sharpe ratio calculation in _calculate_sharpe() with 252 trading days annualization
+  - Evidence: pytest: test_sharpe_ratio_calculation passing (Sharpe > 1.0)
+  - Committed: 51fdc06
+
+✅ T044 [P]: Trade statistics (win rate, profit factor, avg win/loss) in _calculate_trade_stats()
+  - Evidence: pytest: test_win_rate_calculation passing (60% win rate)
+  - Committed: 51fdc06
+

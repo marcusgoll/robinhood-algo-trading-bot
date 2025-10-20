@@ -359,32 +359,32 @@ Story completion order:
 
 ### Implementation
 
-- [ ] T040 [US3] Implement PerformanceCalculator in src/trading_bot/backtest/performance_calculator.py
+- [X] T040 [US3] Implement PerformanceCalculator in src/trading_bot/backtest/performance_calculator.py
   - Class: PerformanceCalculator with calculate_metrics(trades, equity_curve, config) -> PerformanceMetrics
   - Methods: _calculate_returns(), _calculate_drawdown(), _calculate_sharpe(), _calculate_trade_stats()
   - REUSE: PerformanceTracker patterns (src/trading_bot/performance/tracker.py)
   - Pattern: src/trading_bot/performance/models.py for PerformanceMetrics structure
   - From: plan.md [NEW INFRASTRUCTURE - CREATE]
 
-- [ ] T041 [P] [US3] Implement return calculations
+- [X] T041 [P] [US3] Implement return calculations
   - Method: _calculate_returns() in PerformanceCalculator
   - Metrics: Total return, annualized return, CAGR
   - Formula: CAGR = (end_value / start_value) ^ (1 / years) - 1
   - From: spec.md FR-010
 
-- [ ] T042 [P] [US3] Implement drawdown calculations
+- [X] T042 [P] [US3] Implement drawdown calculations
   - Method: _calculate_drawdown() in PerformanceCalculator
   - Metrics: Maximum drawdown (peak-to-trough), max drawdown duration (days)
   - Algorithm: Running max equity, calculate all drawdowns, find maximum
   - From: spec.md FR-012
 
-- [ ] T043 [P] [US3] Implement Sharpe ratio calculation
+- [X] T043 [P] [US3] Implement Sharpe ratio calculation
   - Method: _calculate_sharpe() in PerformanceCalculator
   - Formula: (annualized_return - risk_free_rate) / annualized_volatility
   - Risk-free rate: From BacktestConfig (default 0.02)
   - From: spec.md FR-013
 
-- [ ] T044 [P] [US3] Implement trade statistics calculations
+- [X] T044 [P] [US3] Implement trade statistics calculations
   - Method: _calculate_trade_stats() in PerformanceCalculator
   - Metrics: Win rate, profit factor, average win, average loss
   - Profit factor: Gross profit / gross loss
