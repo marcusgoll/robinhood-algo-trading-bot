@@ -120,3 +120,7 @@ New components needed:
   - Evidence: Dependencies added following existing format in Data analysis section
   - Committed: 9d077eb
 
+✅ T001: Created backtest project structure (backtest/, tests/backtest/, examples/)
+  - Evidence: Directories created successfully
+  - Committed: 35617ae
+

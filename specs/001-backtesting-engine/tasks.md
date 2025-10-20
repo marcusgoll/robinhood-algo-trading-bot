@@ -45,9 +45,12 @@ Story completion order:
 
 ## Phase 1: Setup
 
-- [ ] T001 Create project structure per plan.md
+- [X] T001 Create project structure per plan.md
   - Directories: src/trading_bot/backtest/, tests/backtest/, examples/
   - Files: __init__.py in each directory
+     Created backtest project structure (backtest/, tests/backtest/, examples/)
+     Evidence: Directories created successfully
+     Committed: 35617ae
   - Pattern: src/trading_bot/performance/ structure
   - From: plan.md [STRUCTURE]
 
