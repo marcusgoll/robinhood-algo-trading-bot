@@ -1263,7 +1263,7 @@ class TestStrategyAllocationAllocateMethod:
             allocated_capital=Decimal("10000.00"),
         )
 
-        with pytest.raises(ValueError, match="exceeds available capital"):
+        with pytest.raises(ValueError, match="exceeds available_capital"):
             allocation.allocate(Decimal("15000.00"))
 
     def test_allocate_exactly_available_capital(self):
@@ -1364,7 +1364,7 @@ class TestStrategyAllocationReleaseMethod:
             used_capital=Decimal("3000.00"),
         )
 
-        with pytest.raises(ValueError, match="exceeds used capital"):
+        with pytest.raises(ValueError, match="exceeds used_capital"):
             allocation.release(Decimal("5000.00"))
 
     def test_release_exactly_used_capital(self):

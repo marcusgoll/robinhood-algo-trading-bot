@@ -74,7 +74,7 @@ Story completion order:
   - Pattern: src/trading_bot/backtest/models.py BacktestConfig dataclass
   - From: plan.md [DATA MODEL] StrategyAllocation entity
 
-- [ ] T006 [P] Create OrchestratorConfig dataclass in src/trading_bot/backtest/models.py
+- [x] T006 [P] Create OrchestratorConfig dataclass in src/trading_bot/backtest/models.py
   - Fields: logging_level (str, default="INFO"), validate_weights (bool, default=True)
   - Validation: logging_level in ["DEBUG", "INFO", "WARNING", "ERROR"]
   - REUSE: BaseModel patterns from models.py

@@ -179,3 +179,49 @@ Standard (backend feature with measurable outcomes)
   - Fixtures: sample_strategies (3 mock strategies), sample_weights (valid allocations)
   - Committed: 906e2e3
 
+✅ T005 [P]: Created StrategyAllocation dataclass
+  - Evidence: Dataclass added with allocate/release/can_allocate methods
+  - Files: src/trading_bot/backtest/models.py (StrategyAllocation class), src/trading_bot/backtest/__init__.py (export added)
+  - Methods implemented: allocate(), release(), can_allocate()
+  - Validation: allocated_capital > 0, used_capital >= 0, available_capital = allocated - used
+  - Manual tests: All 6 test scenarios passing (creation, allocation, release, checks, error handling)
+  - Committed: fc38018
+
+✅ T006 [P]: Created OrchestratorConfig dataclass
+  - Evidence: Dataclass added to models.py with validation in __post_init__
+  - Files:
+    - src/trading_bot/backtest/models.py (OrchestratorConfig dataclass added)
+    - src/trading_bot/backtest/__init__.py (OrchestratorConfig added to imports and __all__)
+  - Fields implemented:
+    - logging_level (str, default="INFO")
+    - validate_weights (bool, default=True)
+  - Validation: logging_level must be in ["DEBUG", "INFO", "WARNING", "ERROR"]
+  - Pattern followed: BacktestConfig dataclass structure
+  - Manual validation: All 4 valid logging levels tested, invalid level properly rejected
+  - Status: Ready for commit
+
+✅ T009 [P]: Write unit tests for OrchestratorConfig and OrchestratorResult
+  - Evidence: pytest 14/14 passed - 100% coverage for new dataclasses
+  - Files:
+    - src/trading_bot/backtest/models.py (OrchestratorConfig, OrchestratorResult dataclasses)
+    - tests/backtest/test_models.py (14 comprehensive tests)
+  - Tests implemented:
+    - OrchestratorConfig (5 tests):
+      - test_orchestrator_config_defaults: Verify default values (INFO, True)
+      - test_orchestrator_config_valid_logging_levels: All valid levels accepted
+      - test_orchestrator_config_validates_logging_level: Invalid level raises error
+      - test_orchestrator_config_validates_logging_level_case_sensitive: Case-sensitive validation
+      - test_orchestrator_config_custom_values: Custom values can be set
+    - OrchestratorResult (9 tests):
+      - test_valid_orchestrator_result: Valid result passes validation
+      - test_empty_strategy_results_raises_error: Empty dict validation
+      - test_comparison_table_extra_strategy_raises_error: Keys match validation
+      - test_invalid_backtest_result_type_raises_error: Type checking
+      - test_orchestrator_result_aggregates_correctly: Aggregate metrics verification
+      - test_get_strategy_result_returns_correct_result: Method returns correct result
+      - test_get_strategy_result_raises_key_error_for_missing_strategy: KeyError on missing ID
+      - test_to_dict_serialization: Proper dict structure
+      - test_to_dict_converts_decimals_to_floats: JSON compatibility
+  - Coverage: 100% for both OrchestratorConfig and OrchestratorResult
+  - Test run: 14 passed in 52.96s
+
