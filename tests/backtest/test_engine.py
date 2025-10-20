@@ -567,3 +567,225 @@ class TestBacktestEngineReproducibility:
 
         assert result_cache_populate.metrics == result_cache_load.metrics
         assert result_cache_populate.metrics == result_no_cache.metrics
+
+
+class TestBacktestEngineCapitalValidation:
+    """Test BacktestEngine capital management and trade rejection logic."""
+
+    def test_insufficient_capital(self) -> None:
+        """
+        Test that BacktestEngine prevents trades when capital is insufficient.
+
+        This is a critical capital validation test ensuring we don't attempt to buy
+        positions we cannot afford. The engine must check available cash before
+        executing any trade signal.
+
+        Given:
+            - Initial capital: $100 (very low, can't afford 1 share)
+            - Stock price: $150 per share
+            - Strategy signals BUY
+            - Required capital for 1 share: $150 (plus commission if applicable)
+
+        When:
+            BacktestEngine.run(config) executes the backtest
+
+        Then:
+            - Trade is rejected due to insufficient capital
+            - Warning logged: "Insufficient capital: cannot buy..."
+            - No position opened (result.trades is empty)
+            - Cash remains at $100 (no change)
+            - Final equity = $100 (no trades executed)
+
+        Rationale:
+            Capital validation is fundamental risk management. Without this check,
+            the backtest could simulate unrealistic scenarios (buying with no money),
+            leading to invalid performance metrics and false confidence in strategies.
+
+        Pattern: tests/risk_management/ capital validation tests
+        From: specs/001-backtesting-engine/tasks.md T023
+        Phase: TDD RED - test MUST FAIL until BacktestEngine capital validation implemented
+        """
+        # Arrange: Create a simple BUY strategy that signals entry on first bar
+        @dataclass
+        class AlwaysBuyStrategy:
+            """Test strategy that always signals to buy on first bar."""
+
+            def should_enter(self, bars: List[HistoricalDataBar]) -> bool:
+                """Signal BUY on first bar only."""
+                return len(bars) == 1
+
+            def should_exit(
+                self, position: Position, bars: List[HistoricalDataBar]
+            ) -> bool:
+                """Never signal exit."""
+                return False
+
+            def position_size(self, capital: float, price: float) -> int:
+                """Request 1 share (will be rejected due to insufficient capital)."""
+                return 1
+
+        # Create BacktestConfig with VERY LOW capital
+        # Stock price = $150, so $100 capital cannot afford even 1 share
+        config = BacktestConfig(
+            strategy_class=AlwaysBuyStrategy,
+            symbols=["TSLA"],
+            start_date=datetime(2023, 1, 1, tzinfo=timezone.utc),
+            end_date=datetime(2023, 1, 10, tzinfo=timezone.utc),
+            initial_capital=Decimal("100.0"),  # Too low for $150/share stock
+            commission=Decimal("0.0"),  # Zero commission for simpler math
+            slippage_pct=Decimal("0.0"),  # Zero slippage for simpler math
+        )
+
+        # Create historical data with stock price at $150
+        historical_data = [
+            HistoricalDataBar(
+                symbol="TSLA",
+                timestamp=datetime(2023, 1, 3, 9, 30, tzinfo=timezone.utc),
+                open=Decimal("150.00"),
+                high=Decimal("152.00"),
+                low=Decimal("149.00"),
+                close=Decimal("151.00"),
+                volume=1000000,
+            ),
+            HistoricalDataBar(
+                symbol="TSLA",
+                timestamp=datetime(2023, 1, 4, 9, 30, tzinfo=timezone.utc),
+                open=Decimal("151.00"),
+                high=Decimal("153.00"),
+                low=Decimal("150.00"),
+                close=Decimal("152.00"),
+                volume=1100000,
+            ),
+        ]
+
+        # Create engine instance
+        # This will FAIL in RED phase because BacktestEngine class doesn't exist yet
+        # or capital validation is not implemented yet (will be added in GREEN phase - T027)
+        engine = BacktestEngine(config=config)
+
+        # Act: Run backtest with insufficient capital
+        # This will FAIL because run() method doesn't exist OR
+        # capital validation is not implemented yet
+        result = engine.run(
+            strategy=AlwaysBuyStrategy(),
+            historical_data={"TSLA": historical_data}
+        )
+
+        # Assert: Verify trade was REJECTED due to insufficient capital
+        # These assertions define the expected behavior that must be implemented
+
+        # 1. No trades executed (insufficient capital prevents entry)
+        assert len(result.trades) == 0, (
+            f"Expected no trades due to insufficient capital, "
+            f"but found {len(result.trades)} trades"
+        )
+
+        # 2. Final equity equals initial capital (no position changes)
+        assert result.final_equity == Decimal("100.0"), (
+            f"Expected final_equity=$100.0 (no trades), "
+            f"got ${result.final_equity}"
+        )
+
+        # 3. Verify equity curve shows no change (flat line)
+        assert len(result.equity_curve) >= 1, "Expected equity curve data"
+        # All equity values should be $100 (no trades executed)
+        for timestamp, equity in result.equity_curve:
+            assert equity == Decimal("100.0"), (
+                f"Expected equity=$100.0 throughout backtest, "
+                f"got ${equity} at {timestamp}"
+            )
+
+    def test_insufficient_capital_with_logging(self, caplog) -> None:
+        """
+        Test that BacktestEngine logs warnings when rejecting trades due to insufficient capital.
+
+        This test verifies that capital validation failures are properly logged for debugging
+        and audit purposes.
+
+        Given:
+            - Initial capital: $100
+            - Stock price: $150 per share
+            - Strategy signals BUY
+            - pytest caplog fixture captures log messages
+
+        When:
+            BacktestEngine.run(config) executes and rejects the trade
+
+        Then:
+            - Warning logged with message containing:
+              * "Insufficient capital"
+              * Symbol ("TSLA")
+              * Price ($150.00)
+              * Available cash ($100.00)
+
+        From: specs/001-backtesting-engine/tasks.md T023
+        Phase: TDD RED - test MUST FAIL until logging implemented
+        """
+        # Arrange: Same setup as test_insufficient_capital
+        @dataclass
+        class AlwaysBuyStrategy:
+            """Test strategy that always signals to buy on first bar."""
+
+            def should_enter(self, bars: List[HistoricalDataBar]) -> bool:
+                return len(bars) == 1
+
+            def should_exit(
+                self, position: Position, bars: List[HistoricalDataBar]
+            ) -> bool:
+                return False
+
+            def position_size(self, capital: float, price: float) -> int:
+                return 1
+
+        config = BacktestConfig(
+            strategy_class=AlwaysBuyStrategy,
+            symbols=["TSLA"],
+            start_date=datetime(2023, 1, 1, tzinfo=timezone.utc),
+            end_date=datetime(2023, 1, 10, tzinfo=timezone.utc),
+            initial_capital=Decimal("100.0"),
+            commission=Decimal("0.0"),
+            slippage_pct=Decimal("0.0"),
+        )
+
+        historical_data = [
+            HistoricalDataBar(
+                symbol="TSLA",
+                timestamp=datetime(2023, 1, 3, 9, 30, tzinfo=timezone.utc),
+                open=Decimal("150.00"),
+                high=Decimal("152.00"),
+                low=Decimal("149.00"),
+                close=Decimal("151.00"),
+                volume=1000000,
+            ),
+        ]
+
+        engine = BacktestEngine(config=config)
+
+        # Act: Run backtest and capture logs
+        import logging
+        with caplog.at_level(logging.WARNING):
+            result = engine.run(
+                strategy=AlwaysBuyStrategy(),
+                historical_data={"TSLA": historical_data}
+            )
+
+        # Assert: Verify warning was logged
+        assert len(caplog.records) > 0, "Expected at least one log message"
+
+        # Find capital-related warning message
+        capital_warnings = [
+            record
+            for record in caplog.records
+            if "insufficient capital" in record.message.lower()
+        ]
+
+        assert len(capital_warnings) >= 1, (
+            "Expected warning about insufficient capital. "
+            f"Captured logs: {[r.message for r in caplog.records]}"
+        )
+
+        # Verify warning message contains key details
+        warning_message = capital_warnings[0].message.lower()
+        assert "tsla" in warning_message, "Warning should mention symbol (TSLA)"
+        assert "150" in warning_message, "Warning should mention stock price ($150)"
+        assert "100" in warning_message, "Warning should mention available capital ($100)"
