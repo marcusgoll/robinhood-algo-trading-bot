@@ -57,6 +57,11 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-fail-under=90",  # Constitution v1.0.0: 90% coverage required
 ]
+markers = [
+    "integration: marks tests as integration tests (make real API calls, can be slow)",
+    "slow: marks tests as slow (may take >10 seconds)",
+    "smoke: marks tests as smoke tests (quick validation of critical paths)",
+]
 
 [tool.mypy]
 python_version = "3.11"
