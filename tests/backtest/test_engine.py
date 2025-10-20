@@ -277,3 +277,293 @@ class TestBacktestEngineChronologicalExecution:
         assert current_bar.close == Decimal("106.00"), (
             f"Bar 5 should have close price $106.00, but has {current_bar.close}"
         )
+
+
+class TestBacktestEngineReproducibility:
+    """
+    Test Suite: Reproducibility (NFR-010)
+
+    Verifies that backtest engine produces deterministic, reproducible results.
+    Running the same configuration multiple times must produce identical outcomes.
+
+    From: spec.md NFR-010, tasks.md T024
+    TDD Phase: RED (tests written before BacktestEngine implementation)
+    """
+
+    @pytest.fixture
+    def deterministic_config(self) -> BacktestConfig:
+        """
+        Create BacktestConfig with fixed parameters for reproducibility testing.
+
+        Fixed seed, dates, and parameters ensure deterministic execution.
+        Any randomness should produce the same sequence given the same config.
+
+        Returns:
+            BacktestConfig with deterministic parameters
+        """
+        return BacktestConfig(
+            strategy_class=TrackingStrategy,
+            symbols=["AAPL"],
+            start_date=datetime(2023, 1, 1, tzinfo=timezone.utc),
+            end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
+            initial_capital=Decimal("100000.0"),
+            commission=Decimal("0.0"),
+            slippage_pct=Decimal("0.001"),
+            risk_free_rate=Decimal("0.02"),
+            cache_enabled=True,
+        )
+
+    def test_reproducibility(self, deterministic_config: BacktestConfig):
+        """
+        Test: Reproducibility - Same inputs produce identical outputs (NFR-010).
+
+        **Acceptance Criteria**:
+        1. Run backtest twice with identical BacktestConfig
+        2. Both runs produce identical results:
+           - Same number of trades
+           - Identical trade entry/exit prices, dates, and durations
+           - Identical trade P&L and P&L percentages
+           - Identical performance metrics (total_return, sharpe_ratio, win_rate, etc.)
+           - Identical equity curve (timestamps and values)
+           - Identical data warnings
+
+        **Determinism Requirements**:
+        - Fixed random seeds if any randomness is used
+        - Consistent data loading order from cache
+        - Consistent strategy execution logic
+        - Consistent float/Decimal arithmetic
+
+        This test will FAIL because BacktestEngine doesn't exist yet (TDD RED phase).
+
+        From: spec.md NFR-010 (Reproducibility), spec.md Success Criteria #4
+        """
+        # ARRANGE: Create BacktestEngine
+        # This will fail with ImportError until BacktestEngine is implemented
+        engine = BacktestEngine()
+
+        # ACT: Run backtest twice with identical configuration
+        result1 = engine.run(deterministic_config)
+        result2 = engine.run(deterministic_config)
+
+        # ASSERT 1: Same number of trades
+        assert len(result1.trades) == len(result2.trades), (
+            f"Trade count mismatch between runs: "
+            f"run1={len(result1.trades)}, run2={len(result2.trades)}"
+        )
+
+        # ASSERT 2: Identical trades (entry/exit prices, dates, shares, P&L)
+        for i, (trade1, trade2) in enumerate(zip(result1.trades, result2.trades)):
+            assert trade1.symbol == trade2.symbol, (
+                f"Trade {i}: symbol mismatch ({trade1.symbol} != {trade2.symbol})"
+            )
+            assert trade1.entry_date == trade2.entry_date, (
+                f"Trade {i}: entry_date mismatch ({trade1.entry_date} != {trade2.entry_date})"
+            )
+            assert trade1.entry_price == trade2.entry_price, (
+                f"Trade {i}: entry_price mismatch ({trade1.entry_price} != {trade2.entry_price})"
+            )
+            assert trade1.exit_date == trade2.exit_date, (
+                f"Trade {i}: exit_date mismatch ({trade1.exit_date} != {trade2.exit_date})"
+            )
+            assert trade1.exit_price == trade2.exit_price, (
+                f"Trade {i}: exit_price mismatch ({trade1.exit_price} != {trade2.exit_price})"
+            )
+            assert trade1.shares == trade2.shares, (
+                f"Trade {i}: shares mismatch ({trade1.shares} != {trade2.shares})"
+            )
+            assert trade1.pnl == trade2.pnl, (
+                f"Trade {i}: pnl mismatch ({trade1.pnl} != {trade2.pnl})"
+            )
+            assert trade1.pnl_pct == trade2.pnl_pct, (
+                f"Trade {i}: pnl_pct mismatch ({trade1.pnl_pct} != {trade2.pnl_pct})"
+            )
+            assert trade1.duration_days == trade2.duration_days, (
+                f"Trade {i}: duration_days mismatch "
+                f"({trade1.duration_days} != {trade2.duration_days})"
+            )
+            assert trade1.exit_reason == trade2.exit_reason, (
+                f"Trade {i}: exit_reason mismatch "
+                f"({trade1.exit_reason} != {trade2.exit_reason})"
+            )
+            assert trade1.commission == trade2.commission, (
+                f"Trade {i}: commission mismatch ({trade1.commission} != {trade2.commission})"
+            )
+            assert trade1.slippage == trade2.slippage, (
+                f"Trade {i}: slippage mismatch ({trade1.slippage} != {trade2.slippage})"
+            )
+
+        # ASSERT 3: Identical performance metrics
+        metrics1 = result1.metrics
+        metrics2 = result2.metrics
+
+        assert metrics1.total_return == metrics2.total_return, (
+            f"total_return mismatch ({metrics1.total_return} != {metrics2.total_return})"
+        )
+        assert metrics1.annualized_return == metrics2.annualized_return, (
+            f"annualized_return mismatch "
+            f"({metrics1.annualized_return} != {metrics2.annualized_return})"
+        )
+        assert metrics1.cagr == metrics2.cagr, (
+            f"cagr mismatch ({metrics1.cagr} != {metrics2.cagr})"
+        )
+        assert metrics1.win_rate == metrics2.win_rate, (
+            f"win_rate mismatch ({metrics1.win_rate} != {metrics2.win_rate})"
+        )
+        assert metrics1.profit_factor == metrics2.profit_factor, (
+            f"profit_factor mismatch ({metrics1.profit_factor} != {metrics2.profit_factor})"
+        )
+        assert metrics1.average_win == metrics2.average_win, (
+            f"average_win mismatch ({metrics1.average_win} != {metrics2.average_win})"
+        )
+        assert metrics1.average_loss == metrics2.average_loss, (
+            f"average_loss mismatch ({metrics1.average_loss} != {metrics2.average_loss})"
+        )
+        assert metrics1.max_drawdown == metrics2.max_drawdown, (
+            f"max_drawdown mismatch ({metrics1.max_drawdown} != {metrics2.max_drawdown})"
+        )
+        assert metrics1.max_drawdown_duration_days == metrics2.max_drawdown_duration_days, (
+            f"max_drawdown_duration_days mismatch "
+            f"({metrics1.max_drawdown_duration_days} != {metrics2.max_drawdown_duration_days})"
+        )
+        assert metrics1.sharpe_ratio == metrics2.sharpe_ratio, (
+            f"sharpe_ratio mismatch ({metrics1.sharpe_ratio} != {metrics2.sharpe_ratio})"
+        )
+        assert metrics1.total_trades == metrics2.total_trades, (
+            f"total_trades mismatch ({metrics1.total_trades} != {metrics2.total_trades})"
+        )
+        assert metrics1.winning_trades == metrics2.winning_trades, (
+            f"winning_trades mismatch "
+            f"({metrics1.winning_trades} != {metrics2.winning_trades})"
+        )
+        assert metrics1.losing_trades == metrics2.losing_trades, (
+            f"losing_trades mismatch ({metrics1.losing_trades} != {metrics2.losing_trades})"
+        )
+
+        # ASSERT 4: Identical equity curve (timestamps and values)
+        assert len(result1.equity_curve) == len(result2.equity_curve), (
+            f"Equity curve length mismatch: "
+            f"run1={len(result1.equity_curve)}, run2={len(result2.equity_curve)}"
+        )
+
+        for i, ((ts1, value1), (ts2, value2)) in enumerate(
+            zip(result1.equity_curve, result2.equity_curve)
+        ):
+            assert ts1 == ts2, (
+                f"Equity curve point {i}: timestamp mismatch ({ts1} != {ts2})"
+            )
+            assert value1 == value2, (
+                f"Equity curve point {i}: value mismatch ({value1} != {value2})"
+            )
+
+        # ASSERT 5: Identical data warnings (deterministic data loading)
+        assert result1.data_warnings == result2.data_warnings, (
+            f"data_warnings mismatch: "
+            f"run1={result1.data_warnings}, run2={result2.data_warnings}"
+        )
+
+    def test_reproducibility_with_multiple_trades(self):
+        """
+        Test: Reproducibility with complex strategy generating multiple trades.
+
+        **Scenario**: Use a strategy that generates multiple buy/sell signals
+        to verify reproducibility holds for non-trivial backtests.
+
+        **Expected**: 10 identical trades with exact same entry/exit points.
+
+        This test ensures reproducibility isn't just for simple cases but
+        holds for realistic trading scenarios with multiple positions.
+
+        TDD Phase: RED (expected to fail - BacktestEngine not implemented)
+        """
+        # ARRANGE: Create config with a more complex strategy
+        # (This would use a real momentum or mean-reversion strategy)
+        # For now, using TrackingStrategy as placeholder
+
+        config = BacktestConfig(
+            strategy_class=TrackingStrategy,
+            symbols=["AAPL", "MSFT"],  # Multiple symbols
+            start_date=datetime(2023, 1, 1, tzinfo=timezone.utc),
+            end_date=datetime(2023, 6, 30, tzinfo=timezone.utc),
+            initial_capital=Decimal("100000.0"),
+            commission=Decimal("1.0"),  # $1 commission
+            slippage_pct=Decimal("0.002"),  # 0.2% slippage
+            risk_free_rate=Decimal("0.04"),
+            cache_enabled=True,
+        )
+
+        # ACT: Run backtest twice
+        engine = BacktestEngine()
+        result1 = engine.run(config)
+        result2 = engine.run(config)
+
+        # ASSERT: All fields match
+        # Using dataclass equality (BacktestResult is frozen)
+        # Note: Exclude execution_time_seconds and completed_at as they vary
+        assert result1.config == result2.config
+        assert result1.trades == result2.trades
+        assert result1.equity_curve == result2.equity_curve
+        assert result1.metrics == result2.metrics
+        assert result1.data_warnings == result2.data_warnings
+
+    def test_reproducibility_across_cache_states(self, deterministic_config: BacktestConfig):
+        """
+        Test: Reproducibility with and without cache.
+
+        **Scenario**:
+        1. Run backtest with cache_enabled=True (first run caches data)
+        2. Run backtest with cache_enabled=True (second run loads from cache)
+        3. Run backtest with cache_enabled=False (bypasses cache)
+
+        **Expected**: All three runs produce identical results.
+
+        This verifies that caching doesn't introduce non-determinism.
+
+        TDD Phase: RED (expected to fail - BacktestEngine not implemented)
+        """
+        # ARRANGE: Create three configs with different cache settings
+        config_with_cache = BacktestConfig(
+            strategy_class=TrackingStrategy,
+            symbols=["AAPL"],
+            start_date=datetime(2023, 1, 1, tzinfo=timezone.utc),
+            end_date=datetime(2023, 3, 31, tzinfo=timezone.utc),
+            initial_capital=Decimal("100000.0"),
+            commission=Decimal("0.0"),
+            slippage_pct=Decimal("0.001"),
+            risk_free_rate=Decimal("0.02"),
+            cache_enabled=True,
+        )
+
+        config_without_cache = BacktestConfig(
+            strategy_class=TrackingStrategy,
+            symbols=["AAPL"],
+            start_date=datetime(2023, 1, 1, tzinfo=timezone.utc),
+            end_date=datetime(2023, 3, 31, tzinfo=timezone.utc),
+            initial_capital=Decimal("100000.0"),
+            commission=Decimal("0.0"),
+            slippage_pct=Decimal("0.001"),
+            risk_free_rate=Decimal("0.02"),
+            cache_enabled=False,
+        )
+
+        # ACT: Run backtests
+        engine = BacktestEngine()
+
+        # First run: populate cache
+        result_cache_populate = engine.run(config_with_cache)
+
+        # Second run: load from cache
+        result_cache_load = engine.run(config_with_cache)
+
+        # Third run: bypass cache
+        result_no_cache = engine.run(config_without_cache)
+
+        # ASSERT: All results are identical
+        # (excluding execution_time_seconds which may vary)
+        assert result_cache_populate.trades == result_cache_load.trades
+        assert result_cache_populate.trades == result_no_cache.trades
+
+        assert result_cache_populate.equity_curve == result_cache_load.equity_curve
+        assert result_cache_populate.equity_curve == result_no_cache.equity_curve
+
+        assert result_cache_populate.metrics == result_cache_load.metrics
+        assert result_cache_populate.metrics == result_no_cache.metrics
