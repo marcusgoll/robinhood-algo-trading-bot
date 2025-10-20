@@ -376,7 +376,7 @@ class TestAlpacaFetch:
             # When/Then: Invalid date range raises ValueError
             start_date = datetime(2023, 12, 31, tzinfo=timezone.utc)
             end_date = datetime(2023, 1, 1, tzinfo=timezone.utc)
-            with pytest.raises(ValueError, match="start_date must be < end_date|chronological"):
+            with pytest.raises(ValueError, match="start_date.*must be.*end_date"):
                 manager.fetch_data(symbol="AAPL", start_date=start_date, end_date=end_date)
 
         except (ImportError, ModuleNotFoundError) as e:
