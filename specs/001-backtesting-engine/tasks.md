@@ -335,12 +335,14 @@ Story completion order:
   - Expected: Sharpe ratio matches manual calculation
   - From: spec.md FR-013
 
-- [ ] T037 [P] [US3] Write test: Maximum drawdown calculation
+- [X] T037 [P] [US3] Write test: Maximum drawdown calculation
   - File: tests/backtest/test_performance_calculator.py
   - Test: test_drawdown_calculation() - Check peak-to-trough logic
   - Given: Equity curve with known drawdown
-  - Expected: Max drawdown = 15%, duration = 45 days
+  - Expected: Max drawdown = 15%, duration = 42 days (Feb 1 to Mar 15)
   - Pattern: Standard drawdown calculation
+  - Notes: Test written (TDD RED phase - failing as expected)
+  - Evidence: pytest: ModuleNotFoundError - performance_calculator module does not exist
 
 - [ ] T038 [P] [US3] Write test: Metrics accuracy vs manual calculations
   - File: tests/backtest/test_performance_calculator.py
