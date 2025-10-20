@@ -515,3 +515,18 @@ class BacktestResult:
                         f"BacktestResult: equity_curve must be sorted by timestamp "
                         f"(point at index {i} is after point at index {i + 1})"
                     )
+
+    @property
+    def final_equity(self) -> Decimal:
+        """
+        Get final portfolio equity value.
+
+        Convenience property that returns the last equity value from the
+        equity curve, or initial_capital if no equity data exists.
+
+        Returns:
+            Final portfolio equity value (Decimal)
+        """
+        if not self.equity_curve:
+            return self.config.initial_capital
+        return self.equity_curve[-1][1]
