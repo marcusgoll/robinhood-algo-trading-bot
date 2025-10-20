@@ -9,21 +9,28 @@ feature:
 deployment_model: local-only
 
 workflow:
-  phase: 3
-  status: completed
+  phase: 5
+  status: blocked
   phases_completed:
     - spec-flow
     - plan
     - tasks
     - analyze
-  phases_failed: []
+    - implement
+  phases_failed:
+    - optimize
   started_at: 2025-10-19T17:30:00Z
   completed_at: null
+  blocker_reason: "Quality gates failed: 29 test failures (14 TDD RED phase tests need GREEN implementation), coverage unknown"
 
 quality_gates:
   analysis_passed: true
-  critical_issues: 0
+  critical_issues: 1
   pre_flight_passed: false
+  optimization_passed: false
+  test_pass_rate: 68.8
+  type_check_errors: 0
+  coverage_verified: false
 
 manual_gates:
   preview:
@@ -53,6 +60,7 @@ artifacts:
   plan: specs/019-status-dashboard/plan.md
   tasks: specs/019-status-dashboard/tasks.md
   analysis_report: specs/019-status-dashboard/analysis-report.md
+  optimization_report: specs/019-status-dashboard/optimization-report.md
   notes: specs/019-status-dashboard/NOTES.md
   error_log: specs/019-status-dashboard/error-log.md
 

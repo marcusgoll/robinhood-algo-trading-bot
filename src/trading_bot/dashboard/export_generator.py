@@ -51,9 +51,9 @@ class ExportGenerator:
             "is_data_stale": snapshot.is_data_stale,
             "warnings": list(snapshot.warnings),
             "account_status": {
-                "buying_power": float(snapshot.account_status.buying_power),
-                "account_balance": float(snapshot.account_status.account_balance),
-                "cash_balance": float(snapshot.account_status.cash_balance),
+                "buying_power": str(snapshot.account_status.buying_power),
+                "account_balance": str(snapshot.account_status.account_balance),
+                "cash_balance": str(snapshot.account_status.cash_balance),
                 "day_trade_count": snapshot.account_status.day_trade_count,
                 "last_updated": snapshot.account_status.last_updated.isoformat(),
             },
@@ -61,21 +61,21 @@ class ExportGenerator:
             "performance_metrics": {
                 "win_rate": snapshot.performance_metrics.win_rate,
                 "avg_risk_reward": snapshot.performance_metrics.avg_risk_reward,
-                "total_realized_pl": float(snapshot.performance_metrics.total_realized_pl),
-                "total_unrealized_pl": float(snapshot.performance_metrics.total_unrealized_pl),
-                "total_pl": float(snapshot.performance_metrics.total_pl),
+                "total_realized_pl": str(snapshot.performance_metrics.total_realized_pl),
+                "total_unrealized_pl": str(snapshot.performance_metrics.total_unrealized_pl),
+                "total_pl": str(snapshot.performance_metrics.total_pl),
                 "current_streak": snapshot.performance_metrics.current_streak,
                 "streak_type": snapshot.performance_metrics.streak_type,
                 "trades_today": snapshot.performance_metrics.trades_today,
                 "session_count": snapshot.performance_metrics.session_count,
-                "max_drawdown": float(snapshot.performance_metrics.max_drawdown),
+                "max_drawdown": str(snapshot.performance_metrics.max_drawdown),
             },
             "targets": (
                 {
                     "win_rate_target": snapshot.targets.win_rate_target,
-                    "daily_pl_target": float(snapshot.targets.daily_pl_target),
+                    "daily_pl_target": str(snapshot.targets.daily_pl_target),
                     "trades_per_day_target": snapshot.targets.trades_per_day_target,
-                    "max_drawdown_target": float(snapshot.targets.max_drawdown_target),
+                    "max_drawdown_target": str(snapshot.targets.max_drawdown_target),
                     "avg_risk_reward_target": snapshot.targets.avg_risk_reward_target,
                 }
                 if snapshot.targets
@@ -88,10 +88,10 @@ class ExportGenerator:
         return {
             "symbol": position.symbol,
             "quantity": position.quantity,
-            "entry_price": float(position.entry_price),
-            "current_price": float(position.current_price),
-            "unrealized_pl": float(position.unrealized_pl),
-            "unrealized_pl_pct": float(position.unrealized_pl_pct),
+            "entry_price": str(position.entry_price),
+            "current_price": str(position.current_price),
+            "unrealized_pl": str(position.unrealized_pl),
+            "unrealized_pl_pct": str(position.unrealized_pl_pct),
             "last_updated": position.last_updated.isoformat(),
         }
 
@@ -124,11 +124,15 @@ class ExportGenerator:
             lines.append("| Symbol | Quantity | Entry Price | Current Price | P&L | P&L % | Updated |")
             lines.append("|--------|----------|-------------|---------------|-----|-------|---------|")
             for position in positions:
-                pl_sign = "+" if position.unrealized_pl >= 0 else ""
+                # Format P&L with sign before dollar sign
+                pl_val = float(position.unrealized_pl)
+                pl_formatted = f"+${pl_val:.2f}" if pl_val >= 0 else f"-${abs(pl_val):.2f}"
+                pct_val = float(position.unrealized_pl_pct)
+                pct_formatted = f"+{pct_val:.2f}%" if pct_val >= 0 else f"{pct_val:.2f}%"
                 lines.append(
                     f"| {position.symbol} | {position.quantity} | ${position.entry_price:.2f} | "
-                    f"${position.current_price:.2f} | {pl_sign}${position.unrealized_pl:.2f} | "
-                    f"{pl_sign}{position.unrealized_pl_pct:.2f}% | {position.last_updated.strftime('%H:%M:%S')} |"
+                    f"${position.current_price:.2f} | {pl_formatted} | "
+                    f"{pct_formatted} | {position.last_updated.strftime('%H:%M:%S')} |"
                 )
         else:
             lines.append("*No open positions*")
@@ -156,32 +160,32 @@ class ExportGenerator:
             win_diff = metrics.win_rate - targets.win_rate_target
             lines.append(
                 f"- **Win Rate:** {metrics.win_rate:.2f}% vs {targets.win_rate_target:.2f}% "
-                f"({win_diff:+.2f}%) {'✓' if win_diff >= 0 else '✗'}"
+                f"({win_diff:+.2f}%) {'>' if win_diff >= 0 else '<'}"
             )
 
             if targets.avg_risk_reward_target is not None:
                 rr_diff = metrics.avg_risk_reward - targets.avg_risk_reward_target
                 lines.append(
                     f"- **Avg Risk/Reward:** {metrics.avg_risk_reward:.2f} vs {targets.avg_risk_reward_target:.2f} "
-                    f"({rr_diff:+.2f}) {'✓' if rr_diff >= 0 else '✗'}"
+                    f"({rr_diff:+.2f}) {'>' if rr_diff >= 0 else '<'}"
                 )
 
             pl_diff = metrics.total_pl - targets.daily_pl_target
             lines.append(
                 f"- **Total P&L:** ${metrics.total_pl:,.2f} vs ${targets.daily_pl_target:,.2f} "
-                f"(${pl_diff:+,.2f}) {'✓' if pl_diff >= 0 else '✗'}"
+                f"(${pl_diff:+,.2f}) {'>' if pl_diff >= 0 else '<'}"
             )
 
             trades_diff = metrics.trades_today - targets.trades_per_day_target
             lines.append(
                 f"- **Trades Today:** {metrics.trades_today} vs {targets.trades_per_day_target} "
-                f"({trades_diff:+d}) {'✓' if trades_diff >= 0 else '✗'}"
+                f"({trades_diff:+d}) {'>' if trades_diff >= 0 else '<'}"
             )
 
             drawdown_diff = metrics.max_drawdown - targets.max_drawdown_target
             lines.append(
                 f"- **Max Drawdown:** ${metrics.max_drawdown:,.2f} vs ${targets.max_drawdown_target:,.2f} "
-                f"(${drawdown_diff:+,.2f}) {'✓' if drawdown_diff >= 0 else '✗'}"
+                f"(${drawdown_diff:+,.2f}) {'>' if drawdown_diff >= 0 else '<'}"
             )
 
             lines.append("")

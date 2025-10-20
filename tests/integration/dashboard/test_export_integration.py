@@ -131,23 +131,23 @@ class TestExportIntegration:
         assert "warnings" in data
 
         # Verify account status
-        assert data["account_status"]["buying_power"] == 60000.0
-        assert data["account_status"]["account_balance"] == 25000.0
-        assert data["account_status"]["cash_balance"] == 15000.0
+        assert data["account_status"]["buying_power"] == "60000.00"
+        assert data["account_status"]["account_balance"] == "25000.00"
+        assert data["account_status"]["cash_balance"] == "15000.00"
         assert data["account_status"]["day_trade_count"] == 2
 
         # Verify positions
         assert len(data["positions"]) == 2
         assert data["positions"][0]["symbol"] == "AAPL"
-        assert data["positions"][0]["unrealized_pl"] == 525.0
+        assert data["positions"][0]["unrealized_pl"] == "525.00"
         assert data["positions"][1]["symbol"] == "TSLA"
-        assert data["positions"][1]["unrealized_pl"] == -225.0
+        assert data["positions"][1]["unrealized_pl"] == "-225.00"
 
         # Verify performance metrics
         metrics = data["performance_metrics"]
         assert metrics["win_rate"] == 75.0
         assert metrics["avg_risk_reward"] == 2.8
-        assert metrics["total_pl"] == 1550.5
+        assert metrics["total_pl"] == "1550.50"
         assert metrics["trades_today"] == 8
         assert metrics["current_streak"] == 3
         assert metrics["streak_type"] == "WIN"
@@ -155,7 +155,7 @@ class TestExportIntegration:
         # Verify targets
         targets = data["targets"]
         assert targets["win_rate_target"] == 70.0
-        assert targets["daily_pl_target"] == 500.0
+        assert targets["daily_pl_target"] == "500.00"
 
         # Verify warnings
         assert len(data["warnings"]) == 1
@@ -385,8 +385,8 @@ class TestExportIntegration:
         with json_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
 
-        assert data["performance_metrics"]["total_pl"] == 1550.5
-        assert data["performance_metrics"]["total_realized_pl"] == 1250.5
+        assert data["performance_metrics"]["total_pl"] == "1550.50"
+        assert data["performance_metrics"]["total_realized_pl"] == "1250.50"
 
         # Verify Markdown formats with 2 decimal places
         content = md_path.read_text(encoding="utf-8")

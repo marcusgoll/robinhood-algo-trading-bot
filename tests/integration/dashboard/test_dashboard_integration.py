@@ -75,57 +75,103 @@ def mock_trade_helper(tmp_path):
     trade_helper.log_dir.mkdir(parents=True, exist_ok=True)
 
     # Create today's log file with sample trades
-    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    now = datetime.now(UTC)
+    today = now.strftime("%Y-%m-%d")
     log_file = trade_helper.log_dir / f"{today}.jsonl"
+
+    # Create timestamps explicitly on today's date to avoid midnight boundary issues
+    today_date = now.date()
+    ts_2h_ago = datetime.combine(today_date, datetime.min.time()).replace(hour=10, minute=0, tzinfo=UTC).isoformat().replace('+00:00', 'Z')
+    ts_1h_ago = datetime.combine(today_date, datetime.min.time()).replace(hour=11, minute=0, tzinfo=UTC).isoformat().replace('+00:00', 'Z')
+    ts_30m_ago = datetime.combine(today_date, datetime.min.time()).replace(hour=11, minute=30, tzinfo=UTC).isoformat().replace('+00:00', 'Z')
 
     trades = [
         TradeRecord(
-            timestamp=datetime.now(UTC) - timedelta(hours=2),
-            action="BUY",
+            timestamp=ts_2h_ago,
             symbol="AAPL",
+            action="BUY",
             quantity=100,
             price=Decimal("150.00"),
-            mode="PAPER",
-            session_id="session-001",
+            total_value=Decimal("15000.00"),
+            order_id="order-001",
+            execution_mode="PAPER",
+            account_id=None,
+            strategy_name="momentum",
+            entry_type="breakout",
+            stop_loss=Decimal("148.00"),
+            target=Decimal("156.00"),
+            decision_reasoning="Strong momentum breakout above resistance",
+            indicators_used=["VWAP", "EMA-9"],
+            risk_reward_ratio=3.0,
+            outcome="open",
             profit_loss=None,
-            profit_loss_pct=None,
-            exit_price=None,
-            exit_timestamp=None,
             hold_duration_seconds=None,
-            strategy="momentum",
-            risk_reward_ratio=None,
+            exit_timestamp=None,
+            exit_reasoning=None,
+            slippage=None,
+            commission=None,
+            net_profit_loss=None,
+            session_id="session-001",
+            bot_version="1.0.0",
+            config_hash="abc123",
         ),
         TradeRecord(
-            timestamp=datetime.now(UTC) - timedelta(hours=1),
-            action="SELL",
+            timestamp=ts_1h_ago,
             symbol="AAPL",
+            action="SELL",
             quantity=100,
             price=Decimal("155.25"),
-            mode="PAPER",
-            session_id="session-001",
+            total_value=Decimal("15525.00"),
+            order_id="order-002",
+            execution_mode="PAPER",
+            account_id=None,
+            strategy_name="momentum",
+            entry_type="breakout",
+            stop_loss=Decimal("148.00"),
+            target=Decimal("156.00"),
+            decision_reasoning="Target reached",
+            indicators_used=["VWAP", "EMA-9"],
+            risk_reward_ratio=3.0,
+            outcome="win",
             profit_loss=Decimal("525.00"),
-            profit_loss_pct=Decimal("3.50"),
-            exit_price=Decimal("155.25"),
-            exit_timestamp=datetime.now(UTC) - timedelta(hours=1),
             hold_duration_seconds=3600,
-            strategy="momentum",
-            risk_reward_ratio=Decimal("3.5"),
+            exit_timestamp=ts_1h_ago,
+            exit_reasoning="Target reached",
+            slippage=Decimal("0.00"),
+            commission=Decimal("0.00"),
+            net_profit_loss=Decimal("525.00"),
+            session_id="session-001",
+            bot_version="1.0.0",
+            config_hash="abc123",
         ),
         TradeRecord(
-            timestamp=datetime.now(UTC) - timedelta(minutes=30),
-            action="BUY",
+            timestamp=ts_30m_ago,
             symbol="TSLA",
+            action="BUY",
             quantity=50,
             price=Decimal("250.00"),
-            mode="PAPER",
-            session_id="session-002",
+            total_value=Decimal("12500.00"),
+            order_id="order-003",
+            execution_mode="PAPER",
+            account_id=None,
+            strategy_name="reversal",
+            entry_type="reversal",
+            stop_loss=Decimal("245.00"),
+            target=Decimal("260.00"),
+            decision_reasoning="Reversal pattern detected",
+            indicators_used=["RSI", "MACD"],
+            risk_reward_ratio=2.0,
+            outcome="open",
             profit_loss=None,
-            profit_loss_pct=None,
-            exit_price=None,
-            exit_timestamp=None,
             hold_duration_seconds=None,
-            strategy="reversal",
-            risk_reward_ratio=None,
+            exit_timestamp=None,
+            exit_reasoning=None,
+            slippage=None,
+            commission=None,
+            net_profit_loss=None,
+            session_id="session-002",
+            bot_version="1.0.0",
+            config_hash="abc123",
         ),
     ]
 
@@ -310,7 +356,8 @@ class TestDashboardIntegration:
 
         renderer = DisplayRenderer()
         exporter = ExportGenerator()
-        mock_console = Mock(spec=["print"])
+        # Use MagicMock instead of Mock to allow all attribute access
+        mock_console = MagicMock()
 
         # Should run and exit cleanly with Q command
         run_dashboard_loop(
