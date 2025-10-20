@@ -533,7 +533,7 @@ Story completion order:
   - Evidence: 3 complete example files with detailed documentation and usage instructions
   - Committed: fde846e
 
-- [ ] T075 Update project README with backtest module
+- [X] T075 Update project README with backtest module
   - File: README.md
   - Section: Add "Backtesting Engine" section
   - Content: Quick start, example usage, link to docs

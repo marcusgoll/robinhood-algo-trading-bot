@@ -250,3 +250,7 @@ New components needed:
   - Evidence: pytest: test_full_report_workflow and test_full_report_workflow_no_trades passing
   - Committed: 25c0a7a
 
+✅ T075: Updated README with backtesting engine documentation
+  - Evidence: README.md updated with Quick Start and links to examples
+  - Committed: d292384
+
