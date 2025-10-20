@@ -79,3 +79,36 @@ New components needed:
 
 ## Last Updated
 2025-10-19T19:58:00Z
+
+### Phase 2: Tasks (2025-10-19)
+
+**Summary**:
+- Total tasks: 61
+- User story tasks: 39 (US1: 8, US2: 12, US3: 10, US4: 9)
+- Parallel opportunities: 40 tasks marked [P]
+- Setup tasks: 3 (Phase 1)
+- Foundational tasks: 3 (Phase 2)
+- Integration tasks: 5 (Phase 7)
+- Polish tasks: 11 (Phase 8)
+- Task file: specs/001-backtesting-engine/tasks.md
+
+**Checkpoint**:
+- ✅ Tasks generated: 61 concrete tasks
+- ✅ User story organization: Complete (US1-US4 phases)
+- ✅ Dependency graph: Created (US1 → US2 → US3 → US4)
+- ✅ MVP strategy: Defined (US1-US4 only, defer US5-US9)
+- ✅ REUSE markers: 7 existing modules identified
+- ✅ NEW components: 5 to create
+- ✅ Parallel execution: 40 tasks can run in parallel
+- ✅ TDD approach: Tests before implementation for each story
+- 📋 Ready for: /analyze
+
+**Task Breakdown by Phase**:
+- Phase 1 (Setup): T001-T003 (3 tasks)
+- Phase 2 (Foundational): T005-T007 (3 tasks)
+- Phase 3 (US1 - Historical Data): T010-T018 (9 tasks)
+- Phase 4 (US2 - Backtest Engine): T020-T031 (12 tasks)
+- Phase 5 (US3 - Performance Metrics): T035-T045 (11 tasks)
+- Phase 6 (US4 - Report Generation): T050-T059 (10 tasks)
+- Phase 7 (Integration): T070-T075 (6 tasks)
+- Phase 8 (Polish): T080-T092 (13 tasks)
