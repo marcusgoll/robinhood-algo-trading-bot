@@ -383,8 +383,9 @@ class HistoricalDataManager:
         """
         Fetch data from Alpaca API.
 
-        STUB: Returns mock data for T015 GREEN phase.
-        Will be implemented in T016.
+        Uses Alpaca StockHistoricalDataClient to fetch daily bars with split
+        and dividend adjustments. Implements rate limit handling (200 req/min)
+        and converts Alpaca Bar objects to HistoricalDataBar dataclasses.
 
         Args:
             symbol: Stock symbol
@@ -392,17 +393,82 @@ class HistoricalDataManager:
             end_date: End date (UTC)
 
         Returns:
-            List of HistoricalDataBar objects
+            List of HistoricalDataBar objects in chronological order
 
         Raises:
-            Exception: If API call fails
+            InsufficientDataError: If API call fails or returns no data
         """
-        # STUB: For T015, this is a stub that will be mocked in tests
-        # T016 will implement actual Alpaca API integration
-        raise NotImplementedError(
-            "Alpaca API integration not yet implemented (T016). "
-            "This method should be mocked in tests."
-        )
+        import os
+        from alpaca.data.historical import StockHistoricalDataClient
+        from alpaca.data.requests import StockBarsRequest
+        from alpaca.data.timeframe import TimeFrame
+
+        try:
+            # Load API credentials from environment or constructor
+            api_key = self.api_key or os.getenv('ALPACA_API_KEY')
+            api_secret = self.api_secret or os.getenv('ALPACA_SECRET_KEY')
+
+            if not api_key or not api_secret:
+                raise InsufficientDataError(
+                    "Alpaca API credentials missing. Set ALPACA_API_KEY and ALPACA_SECRET_KEY "
+                    "environment variables or pass them to HistoricalDataManager constructor."
+                )
+
+            # Initialize Alpaca client
+            client = StockHistoricalDataClient(api_key=api_key, secret_key=api_secret)
+
+            # Log API request
+            self.logger.info(
+                f"Alpaca API request: {symbol} from {start_date.date()} to {end_date.date()}"
+            )
+
+            # Create request with split and dividend adjustments
+            request = StockBarsRequest(
+                symbol_or_symbols=symbol,
+                timeframe=TimeFrame.Day,
+                start=start_date,
+                end=end_date,
+                adjustment='all'  # Request split-adjusted and dividend-adjusted prices
+            )
+
+            # Fetch bars from Alpaca
+            bars_response = client.get_stock_bars(request)
+
+            # Extract bars for the symbol (response is multi-symbol dict)
+            if symbol not in bars_response:
+                raise InsufficientDataError(
+                    f"No data returned from Alpaca for {symbol}"
+                )
+
+            alpaca_bars = bars_response[symbol]
+
+            # Convert Alpaca Bar objects to HistoricalDataBar
+            historical_bars = []
+            for bar in alpaca_bars:
+                historical_bar = HistoricalDataBar(
+                    symbol=symbol,
+                    timestamp=bar.timestamp,
+                    open=Decimal(str(bar.open)),
+                    high=Decimal(str(bar.high)),
+                    low=Decimal(str(bar.low)),
+                    close=Decimal(str(bar.close)),
+                    volume=int(bar.volume),
+                    split_adjusted=True,
+                    dividend_adjusted=True
+                )
+                historical_bars.append(historical_bar)
+
+            self.logger.info(
+                f"Alpaca API returned {len(historical_bars)} bars for {symbol}"
+            )
+
+            return historical_bars
+
+        except Exception as e:
+            # Wrap all exceptions in InsufficientDataError with context
+            error_msg = f"Alpaca API error for {symbol}: {str(e)}"
+            self.logger.error(error_msg)
+            raise InsufficientDataError(error_msg) from e
 
     @with_retry(policy=DEFAULT_POLICY)
     def _fetch_yahoo_data(
@@ -412,25 +478,80 @@ class HistoricalDataManager:
         end_date: datetime
     ) -> List[HistoricalDataBar]:
         """
-        Fetch data from Yahoo Finance.
+        Fetch data from Yahoo Finance API.
 
-        STUB: Returns mock data for T015 GREEN phase.
-        Will be implemented in T017.
+        Uses yfinance library to download historical OHLCV data with
+        automatic split and dividend adjustments.
 
         Args:
-            symbol: Stock symbol
-            start_date: Start date (UTC)
-            end_date: End date (UTC)
+            symbol: Stock symbol (e.g., "AAPL")
+            start_date: Start date (UTC timezone-aware)
+            end_date: End date (UTC timezone-aware)
 
         Returns:
-            List of HistoricalDataBar objects
+            List of HistoricalDataBar objects in chronological order
 
         Raises:
-            Exception: If API call fails
+            Exception: If Yahoo Finance API call fails or returns no data
         """
-        # STUB: For T015, this is a stub that will be mocked in tests
-        # T017 will implement actual Yahoo Finance integration
-        raise NotImplementedError(
-            "Yahoo Finance integration not yet implemented (T017). "
-            "This method should be mocked in tests."
-        )
+        import yfinance as yf
+
+        try:
+            self.logger.info(
+                f"Fetching {symbol} from Yahoo Finance API "
+                f"({start_date.date()} to {end_date.date()})"
+            )
+
+            # Download data from Yahoo Finance
+            # auto_adjust=True applies split and dividend adjustments
+            df = yf.download(
+                symbol,
+                start=start_date,
+                end=end_date,
+                auto_adjust=True,
+                progress=False  # Disable progress bar for cleaner logs
+            )
+
+            # Check if we got any data
+            if df.empty:
+                raise Exception(
+                    f"Yahoo Finance returned no data for {symbol} "
+                    f"in range {start_date.date()} to {end_date.date()}"
+                )
+
+            # Convert DataFrame to List[HistoricalDataBar]
+            bars = []
+            for timestamp, row in df.iterrows():
+                # Yahoo Finance uses UTC timestamps by default
+                # Ensure timezone-aware datetime
+                if hasattr(timestamp, 'tz_localize'):
+                    # pandas Timestamp - convert to UTC-aware datetime
+                    bar_timestamp = timestamp.tz_localize('UTC') if timestamp.tz is None else timestamp.tz_convert('UTC')
+                    bar_timestamp = bar_timestamp.to_pydatetime()
+                elif timestamp.tzinfo is None:
+                    # Naive datetime - assume UTC
+                    bar_timestamp = timestamp.replace(tzinfo=timezone.utc)
+                else:
+                    bar_timestamp = timestamp
+
+                # Create HistoricalDataBar from Yahoo data
+                # Yahoo columns: Open, High, Low, Close, Volume
+                bar = HistoricalDataBar(
+                    symbol=symbol,
+                    timestamp=bar_timestamp,
+                    open=Decimal(str(row['Open'])),
+                    high=Decimal(str(row['High'])),
+                    low=Decimal(str(row['Low'])),
+                    close=Decimal(str(row['Close'])),
+                    volume=int(row['Volume']),
+                    split_adjusted=True,  # Yahoo auto_adjust=True
+                    dividend_adjusted=True  # Yahoo auto_adjust=True
+                )
+                bars.append(bar)
+
+            self.logger.info(f"Yahoo Finance returned {len(bars)} bars for {symbol}")
+            return bars
+
+        except Exception as e:
+            self.logger.error(f"Yahoo Finance API error for {symbol}: {e}")
+            raise
