@@ -500,13 +500,188 @@ class TestAlpacaFetch:
             pytest.fail(f"TDD RED PHASE: HistoricalDataManager not implemented yet. Error: {e}")
 
 
-class TestYahooFallback:
-    """Test Yahoo Finance fallback when Alpaca fails (placeholder for T011)."""
 
-    def test_fetch_yahoo_fallback_placeholder(self):
-        """Placeholder test for T011: Yahoo Finance fallback."""
-        # This will be implemented in task T011
-        pytest.skip("T011: Yahoo Finance fallback not implemented yet")
+class TestYahooFinanceFallback:
+    """Test Yahoo Finance fallback when Alpaca API fails."""
+
+    @patch("src.trading_bot.backtest.historical_data_manager.yfinance")
+    @patch("src.trading_bot.backtest.historical_data_manager.AlpacaClient")
+    def test_fetch_yahoo_fallback(self, mock_alpaca_client, mock_yfinance):
+        """
+        Test automatic fallback to Yahoo Finance when Alpaca API fails.
+
+        TDD RED PHASE: This test is expected to FAIL because:
+        1. HistoricalDataManager module does not exist yet
+        2. Fallback logic is not implemented
+
+        Scenario:
+        - Given: Alpaca API raises an exception (network error, API down, rate limit)
+        - When: HistoricalDataManager.fetch_data() is called
+        - Then: Automatically falls back to Yahoo Finance without manual intervention
+        - And: Returns List[HistoricalDataBar] with Yahoo Finance data
+        - And: No exception is raised to the caller (fallback is transparent)
+        """
+        # ARRANGE: Configure mocks
+        symbol = "AAPL"
+        start_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        end_date = datetime(2024, 1, 5, tzinfo=timezone.utc)
+
+        # Mock Alpaca to raise an exception (simulating API failure)
+        mock_alpaca_instance = mock_alpaca_client.return_value
+        mock_alpaca_instance.get_bars.side_effect = Exception(
+            "Alpaca API unavailable - connection timeout"
+        )
+
+        # Mock Yahoo Finance to return successful data
+        mock_ticker = MagicMock()
+        mock_yfinance.Ticker.return_value = mock_ticker
+
+        # Simulate Yahoo Finance historical data response
+        mock_hist_data = MagicMock()
+        mock_hist_data.index = [
+            datetime(2024, 1, 2, tzinfo=timezone.utc),
+            datetime(2024, 1, 3, tzinfo=timezone.utc),
+            datetime(2024, 1, 4, tzinfo=timezone.utc),
+        ]
+        mock_hist_data.iterrows.return_value = [
+            (
+                datetime(2024, 1, 2, tzinfo=timezone.utc),
+                {
+                    "Open": 185.50,
+                    "High": 187.25,
+                    "Low": 184.75,
+                    "Close": 186.80,
+                    "Volume": 52000000,
+                },
+            ),
+            (
+                datetime(2024, 1, 3, tzinfo=timezone.utc),
+                {
+                    "Open": 186.90,
+                    "High": 188.10,
+                    "Low": 186.00,
+                    "Close": 187.50,
+                    "Volume": 48000000,
+                },
+            ),
+            (
+                datetime(2024, 1, 4, tzinfo=timezone.utc),
+                {
+                    "Open": 187.60,
+                    "High": 189.30,
+                    "Low": 187.20,
+                    "Close": 188.90,
+                    "Volume": 51000000,
+                },
+            ),
+        ]
+        mock_ticker.history.return_value = mock_hist_data
+
+        # ACT & ASSERT: Try to import HistoricalDataManager
+        # RED PHASE: This will fail because the module doesn't exist yet
+        try:
+            from src.trading_bot.backtest.historical_data_manager import (
+                HistoricalDataManager,
+            )
+
+            # If import succeeds, we're in GREEN/REFACTOR phase - run full test
+            manager = HistoricalDataManager()
+            result = manager.fetch_data(
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+            # ASSERT: Verify fallback behavior
+            # 1. Alpaca was attempted first
+            mock_alpaca_instance.get_bars.assert_called_once()
+
+            # 2. Yahoo Finance was called as fallback
+            mock_yfinance.Ticker.assert_called_once_with(symbol)
+            mock_ticker.history.assert_called_once()
+
+            # 3. Returns List[HistoricalDataBar] with Yahoo data
+            assert isinstance(result, list)
+            assert len(result) == 3
+            assert all(isinstance(bar, HistoricalDataBar) for bar in result)
+
+            # 4. Verify first bar data matches Yahoo Finance response
+            first_bar = result[0]
+            assert first_bar.symbol == symbol
+            assert first_bar.timestamp == datetime(2024, 1, 2, tzinfo=timezone.utc)
+            assert first_bar.open == Decimal("185.50")
+            assert first_bar.high == Decimal("187.25")
+            assert first_bar.low == Decimal("184.75")
+            assert first_bar.close == Decimal("186.80")
+            assert first_bar.volume == 52000000
+
+        except (ImportError, ModuleNotFoundError) as e:
+            # RED PHASE: Expected failure - implementation doesn't exist yet
+            pytest.fail(
+                f"TDD RED PHASE: HistoricalDataManager not implemented yet.\n"
+                f"Import error: {e}\n\n"
+                f"Expected behavior (for GREEN phase implementation):\n"
+                f"1. HistoricalDataManager class in src/trading_bot/backtest/historical_data_manager.py\n"
+                f"2. fetch_data() method with automatic Alpaca -> Yahoo fallback\n"
+                f"3. Try Alpaca API first, catch exceptions\n"
+                f"4. On Alpaca failure, automatically try Yahoo Finance (yfinance library)\n"
+                f"5. Transform Yahoo data to List[HistoricalDataBar]\n"
+                f"6. Fallback should be transparent to caller (no exception raised)"
+            )
+
+    @patch("src.trading_bot.backtest.historical_data_manager.yfinance")
+    @patch("src.trading_bot.backtest.historical_data_manager.AlpacaClient")
+    def test_fetch_yahoo_fallback_both_fail(self, mock_alpaca_client, mock_yfinance):
+        """
+        Test that InsufficientDataError is raised when both Alpaca and Yahoo fail.
+
+        TDD RED PHASE: This test will also fail initially.
+
+        Scenario:
+        - Given: Both Alpaca API and Yahoo Finance raise exceptions
+        - When: HistoricalDataManager.fetch_data() is called
+        - Then: Raises InsufficientDataError with descriptive message
+        """
+        # ARRANGE
+        symbol = "AAPL"
+        start_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        end_date = datetime(2024, 1, 5, tzinfo=timezone.utc)
+
+        # Mock both sources to fail
+        mock_alpaca_instance = mock_alpaca_client.return_value
+        mock_alpaca_instance.get_bars.side_effect = Exception("Alpaca API error")
+
+        mock_ticker = MagicMock()
+        mock_yfinance.Ticker.return_value = mock_ticker
+        mock_ticker.history.side_effect = Exception("Yahoo Finance error")
+
+        # ACT & ASSERT
+        try:
+            from src.trading_bot.backtest.historical_data_manager import (
+                HistoricalDataManager,
+            )
+
+            manager = HistoricalDataManager()
+
+            with pytest.raises(InsufficientDataError, match="Failed to fetch.*both"):
+                manager.fetch_data(
+                    symbol=symbol,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+
+        except (ImportError, ModuleNotFoundError) as e:
+            # RED PHASE: Expected failure
+            pytest.fail(
+                f"TDD RED PHASE: HistoricalDataManager not implemented yet.\n"
+                f"Import error: {e}\n\n"
+                f"Expected behavior:\n"
+                f"1. When both Alpaca and Yahoo Finance fail\n"
+                f"2. Should raise InsufficientDataError\n"
+                f"3. Error message should mention both sources failed"
+            )
+
+
 
 
 
