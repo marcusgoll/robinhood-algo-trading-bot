@@ -186,3 +186,11 @@ New components needed:
   - Evidence: pytest: tests/backtest/test_historical_data_manager.py - 18/18 tests passing
   - Committed: f2fb645
 
+✅ T027 [US2]: BacktestEngine core with chronological execution. Tests passing: T021 (chronological), T022 (buy-and-hold), T023 (capital validation). State tracking and equity curve implemented.
+  - Evidence: pytest: test_chronological_execution, test_buy_and_hold_strategy, test_insufficient_capital PASSING
+  - Committed: f35216e
+
+✅ T035 [P]: Test for win rate calculation (TDD RED phase)
+  - Evidence: pytest: ModuleNotFoundError - PerformanceCalculator not implemented
+  - Committed: 2fbd501
+

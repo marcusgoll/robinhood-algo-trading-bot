@@ -321,7 +321,7 @@ Story completion order:
 
 ### Tests
 
-- [ ] T035 [P] [US3] Write test: Win rate calculation accuracy
+- [X] T035 [P] [US3] Write test: Win rate calculation accuracy
   - File: tests/backtest/test_performance_calculator.py
   - Test: test_win_rate_calculation() - Verify formula
   - Given: 10 trades (6 wins, 4 losses)

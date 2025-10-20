@@ -116,3 +116,174 @@ def test_sharpe_ratio_calculation():
 
     # Verify Sharpe is at least moderately good (> 1.0) for this positive return series
     assert sharpe > 1.0, f"Expected Sharpe > 1.0 for 19% return strategy, got {sharpe}"
+
+
+def test_win_rate_calculation():
+    """
+    Test win rate calculation accuracy with 10 sample trades (6 wins, 4 losses).
+
+    Given: 10 trades (6 profitable, 4 unprofitable)
+    Expected: 60% win rate (6/10 = 0.60)
+
+    Validates PerformanceCalculator.calculate_win_rate() returns correct percentage
+    based on number of winning vs. total trades.
+
+    TDD RED phase: This test should FAIL (PerformanceCalculator not implemented yet)
+    """
+    # Create 6 winning trades (positive P&L)
+    winning_trades = [
+        Trade(
+            symbol="AAPL",
+            entry_date=datetime(2024, 1, 2, tzinfo=timezone.utc),
+            entry_price=Decimal("100.00"),
+            exit_date=datetime(2024, 1, 5, tzinfo=timezone.utc),
+            exit_price=Decimal("110.00"),
+            shares=100,
+            pnl=Decimal("1000.00"),
+            pnl_pct=Decimal("0.10"),
+            duration_days=3,
+            exit_reason="strategy_signal",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+        Trade(
+            symbol="TSLA",
+            entry_date=datetime(2024, 1, 3, tzinfo=timezone.utc),
+            entry_price=Decimal("200.00"),
+            exit_date=datetime(2024, 1, 8, tzinfo=timezone.utc),
+            exit_price=Decimal("220.00"),
+            shares=50,
+            pnl=Decimal("1000.00"),
+            pnl_pct=Decimal("0.10"),
+            duration_days=5,
+            exit_reason="take_profit",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+        Trade(
+            symbol="GOOGL",
+            entry_date=datetime(2024, 1, 5, tzinfo=timezone.utc),
+            entry_price=Decimal("150.00"),
+            exit_date=datetime(2024, 1, 10, tzinfo=timezone.utc),
+            exit_price=Decimal("165.00"),
+            shares=75,
+            pnl=Decimal("1125.00"),
+            pnl_pct=Decimal("0.10"),
+            duration_days=5,
+            exit_reason="strategy_signal",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+        Trade(
+            symbol="MSFT",
+            entry_date=datetime(2024, 1, 8, tzinfo=timezone.utc),
+            entry_price=Decimal("300.00"),
+            exit_date=datetime(2024, 1, 12, tzinfo=timezone.utc),
+            exit_price=Decimal("315.00"),
+            shares=30,
+            pnl=Decimal("450.00"),
+            pnl_pct=Decimal("0.05"),
+            duration_days=4,
+            exit_reason="take_profit",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+        Trade(
+            symbol="NVDA",
+            entry_date=datetime(2024, 1, 10, tzinfo=timezone.utc),
+            entry_price=Decimal("500.00"),
+            exit_date=datetime(2024, 1, 15, tzinfo=timezone.utc),
+            exit_price=Decimal("550.00"),
+            shares=20,
+            pnl=Decimal("1000.00"),
+            pnl_pct=Decimal("0.10"),
+            duration_days=5,
+            exit_reason="strategy_signal",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+        Trade(
+            symbol="AMZN",
+            entry_date=datetime(2024, 1, 12, tzinfo=timezone.utc),
+            entry_price=Decimal("180.00"),
+            exit_date=datetime(2024, 1, 18, tzinfo=timezone.utc),
+            exit_price=Decimal("198.00"),
+            shares=60,
+            pnl=Decimal("1080.00"),
+            pnl_pct=Decimal("0.10"),
+            duration_days=6,
+            exit_reason="take_profit",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+    ]
+
+    # Create 4 losing trades (negative P&L)
+    losing_trades = [
+        Trade(
+            symbol="META",
+            entry_date=datetime(2024, 1, 4, tzinfo=timezone.utc),
+            entry_price=Decimal("350.00"),
+            exit_date=datetime(2024, 1, 9, tzinfo=timezone.utc),
+            exit_price=Decimal("340.00"),
+            shares=25,
+            pnl=Decimal("-250.00"),
+            pnl_pct=Decimal("-0.0286"),
+            duration_days=5,
+            exit_reason="stop_loss",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+        Trade(
+            symbol="NFLX",
+            entry_date=datetime(2024, 1, 6, tzinfo=timezone.utc),
+            entry_price=Decimal("450.00"),
+            exit_date=datetime(2024, 1, 11, tzinfo=timezone.utc),
+            exit_price=Decimal("430.00"),
+            shares=20,
+            pnl=Decimal("-400.00"),
+            pnl_pct=Decimal("-0.0444"),
+            duration_days=5,
+            exit_reason="stop_loss",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+        Trade(
+            symbol="AMD",
+            entry_date=datetime(2024, 1, 9, tzinfo=timezone.utc),
+            entry_price=Decimal("120.00"),
+            exit_date=datetime(2024, 1, 13, tzinfo=timezone.utc),
+            exit_price=Decimal("110.00"),
+            shares=40,
+            pnl=Decimal("-400.00"),
+            pnl_pct=Decimal("-0.0833"),
+            duration_days=4,
+            exit_reason="stop_loss",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+        Trade(
+            symbol="INTC",
+            entry_date=datetime(2024, 1, 11, tzinfo=timezone.utc),
+            entry_price=Decimal("45.00"),
+            exit_date=datetime(2024, 1, 16, tzinfo=timezone.utc),
+            exit_price=Decimal("42.00"),
+            shares=100,
+            pnl=Decimal("-300.00"),
+            pnl_pct=Decimal("-0.0667"),
+            duration_days=5,
+            exit_reason="stop_loss",
+            commission=Decimal("0.00"),
+            slippage=Decimal("0.00"),
+        ),
+    ]
+
+    # Combine all trades
+    all_trades = winning_trades + losing_trades
+
+    # Calculate win rate using PerformanceCalculator
+    calculator = PerformanceCalculator()
+    win_rate = calculator.calculate_win_rate(all_trades)
+
+    # Assert: 6 wins out of 10 trades = 60% win rate
+    assert win_rate == Decimal("0.60"), f"Expected 60% win rate, got {win_rate}"
