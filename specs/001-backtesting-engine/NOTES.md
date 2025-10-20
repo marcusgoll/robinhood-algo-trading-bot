@@ -138,3 +138,15 @@ New components needed:
   - Validation: Positive prices/capital, valid date ranges, commission/slippage [0,1], P&L calculations, chronological ordering
   - Committed: 5301396
 
+✅ T013 [P]: Test for parquet caching written (RED phase - failing)
+  - Evidence: pytest: 3/3 tests FAILED (expected - HistoricalDataManager not implemented)
+  - Committed: 78c5384
+
+✅ T010 [P]: Test for Alpaca data fetching written (RED phase - failing as expected)
+  - Evidence: pytest: FAILED - ModuleNotFoundError: No module named 'src.trading_bot.backtest.historical_data_manager'
+  - Committed: 5b473fa
+
+✅ T012 [P]: Test for data validation written (RED phase - failing as expected)
+  - Evidence: pytest: 7 FAILED - ModuleNotFoundError (HistoricalDataManager.validate_data not implemented)
+  - Committed: f76fa14
+
