@@ -235,7 +235,88 @@ Will be populated during planning phase with:
 - Emergency exit flag implementation optional (T076)
 - Global error logging optional (T161)
 
-**Next Phase**: `/optimize` for production readiness (performance, security, a11y, code review)
+**Next Phase**: Address critical issues from optimization report, then `/preview` for manual validation
+
+---
+
+## Phase 5: Optimization (2025-10-21)
+
+**Summary**:
+- Overall verdict: **CONDITIONAL PASS**
+- Performance: Test suite 0.98s (3x faster than 3s target) ✅
+- Security: Bandit scan clean (0 issues) ✅
+- Accessibility: CLI output readable ✅
+- Code review: 9/12 constitution principles ✅
+- Test coverage: 93%+ average (module-wide) ✅
+
+**Critical Issues (Blocking Production)**:
+1. **Missing override password verification** (FR-007, NFR-003 violation)
+   - Severity: CRITICAL (security bypass)
+   - Impact: Operators can advance phases without meeting criteria
+   - Effort: 2 hours
+   - Fix: Implement `PhaseOverrideError` exception and `PHASE_OVERRIDE_PASSWORD` env var check
+
+2. **No NFR-001 performance benchmarks** (targets unverified)
+   - Severity: CRITICAL (latency SLAs at risk)
+   - Impact: Could violate ≤50ms validation, ≤200ms calculation, ≤1s export targets
+   - Effort: 4 hours
+   - Fix: Create `tests/phase/test_performance.py` with `@pytest.mark.benchmark`
+
+3. **Non-atomic phase transitions** (NFR-002 violation)
+   - Severity: CRITICAL (data corruption risk)
+   - Impact: Crash between config update and history log creates audit gap
+   - Effort: 8 hours (6h transaction + 2h Config.save())
+   - Fix: Implement atomic transaction with rollback, add `Config.save()` method
+
+**Non-Critical Issues (Technical Debt)**:
+4. Hardcoded loss threshold ($500 vs 5% of portfolio) - 1 hour
+5. DRY violation in validators (template method pattern) - 3 hours
+6. Bare exception clause in history_logger.py:318 - 15 minutes
+7. Inefficient JSONL query (add early termination) - 1 hour
+
+**Performance Results**:
+- Test execution: 0.98s for 153 tests (✅ 3x faster than 3s target)
+- Module size: 1,496 lines (compact)
+- Test size: 4,000 lines (2.67:1 test-to-code ratio - excellent)
+- Slowest test: 0.07s (export CSV)
+
+**Security Results**:
+- Bandit scan: 0 issues (1,125 lines scanned)
+- No external dependencies (stdlib only)
+- Override password environment variable referenced (but not enforced)
+
+**Code Review Results**:
+- API contract compliance: 6/7 methods (missing `override_password` param)
+- FR coverage: 7/8 requirements (FR-007 incomplete)
+- NFR coverage: 4/9 targets verified (5 critical gaps)
+- Constitution compliance: 9/12 principles (3 warnings)
+
+**Test Coverage**:
+- models.py: 100.00%
+- validators.py: 100.00%
+- trade_limiter.py: 100.00%
+- history_logger.py: 94.64%
+- manager.py: 93.20%
+- cli.py: 73.68% (acceptable, primary usage via Python API)
+- __main__.py: 0.00% (entry point, acceptable)
+- **Average (excluding entry point)**: 93.09%
+
+**Estimated Effort to Production-Ready**: 14-18 hours
+- Critical issues: 14 hours
+- Integration tests: 4 hours
+
+**Artifacts Created**:
+- optimization-report.md (400+ lines) - Production readiness assessment
+
+**Checkpoint**:
+- ✅ Performance validated: Test suite 3x faster than target
+- ✅ Security scan clean: 0 issues
+- ✅ Accessibility verified: CLI output readable
+- ✅ Code review complete: CONDITIONAL PASS verdict
+- ❌ Blocked by: 3 critical issues (password, benchmarks, atomicity)
+- ⏭️ Next: Fix critical issues, then `/preview` for manual validation
+
+**Recommendation**: Fix 3 critical issues (14 hours), add integration tests (4 hours), then deploy to staging for validation testing.
 
 ---
 
