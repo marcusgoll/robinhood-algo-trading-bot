@@ -14,9 +14,9 @@ deployment:
   model: remote-direct  # staging-prod | direct-prod | local-only
 
 workflow:
-  phase: initialization
+  phase: plan
   status: in_progress
-  phases_completed: []
+  phases_completed: [spec]
   phases_failed: []
 
 manual_gates:
@@ -48,7 +48,7 @@ deployment_state:
     version: null
 
 artifacts:
-  spec: null
+  spec: specs/024-zone-bull-flag-integration/spec.md
   plan: null
   tasks: null
   analysis_report: null

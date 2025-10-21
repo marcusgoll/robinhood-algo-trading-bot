@@ -1,0 +1,205 @@
+# Internal API Contracts: zone-bull-flag-integration
+
+# NOTE: This feature is internal service integration only (no external API exposure)
+# This file documents internal type signatures and data contracts
+
+dataclasses:
+  TargetCalculation:
+    description: Bull flag profit target calculation result with zone adjustment metadata
+    type: object
+    frozen: true  # Immutable dataclass
+    properties:
+      adjusted_target:
+        type: Decimal
+        description: Final profit target to use for trade (zone-adjusted or original 2:1)
+        validation: Must be positive (> 0)
+      original_2r_target:
+        type: Decimal
+        description: Baseline 2:1 R:R calculation (entry + pole_height * 2)
+        validation: Must be positive (> 0), must be >= adjusted_target
+      adjustment_reason:
+        type: str
+        description: Why target was/wasn't adjusted
+        enum:
+          - resistance_zone_closer
+          - no_zone_within_range
+          - zone_detector_unavailable
+          - zone_detection_error
+          - zone_detection_timeout
+      resistance_zone_price:
+        type: Decimal | None
+        description: Price level of nearest resistance zone (None if no zone found)
+        validation: If not None, must be positive (> 0)
+      resistance_zone_strength:
+        type: int | None
+        description: Strength score of resistance zone (None if no zone found)
+        validation: If not None, must be non-negative (>= 0)
+
+method_signatures:
+  BullFlagDetector.__init__:
+    description: Initialize bull flag detector with optional zone detector
+    parameters:
+      - name: config
+        type: MomentumConfig
+        required: true
+      - name: market_data_service
+        type: MarketDataService
+        required: true
+      - name: momentum_logger
+        type: MomentumLogger | None
+        required: false
+        default: None
+      - name: zone_detector  # NEW PARAMETER
+        type: ZoneDetector | None
+        required: false
+        default: None
+        description: Optional zone detector for target adjustment
+    returns: None
+
+  BullFlagDetector._calculate_targets:
+    description: Calculate breakout price and zone-adjusted price target (MODIFIED)
+    parameters:
+      - name: pole_high
+        type: float
+        description: Highest price during pole formation
+      - name: pole_low
+        type: float
+        description: Lowest price during pole formation
+      - name: flag_high
+        type: float
+        description: Highest price during flag consolidation
+      - name: symbol  # NEW PARAMETER
+        type: str
+        description: Stock ticker symbol (for zone lookup)
+      - name: entry_price  # NEW PARAMETER
+        type: Decimal
+        description: Entry price (for zone comparison)
+    returns:
+      type: TargetCalculation
+      description: Target calculation result with adjustment metadata
+    raises:
+      - ValueError: If price parameters are invalid
+      - TimeoutError: If zone detection exceeds 50ms
+
+  BullFlagDetector._adjust_target_for_zones:
+    description: Adjust profit target based on nearest resistance zone (NEW METHOD)
+    parameters:
+      - name: symbol
+        type: str
+        description: Stock ticker symbol
+      - name: entry_price
+        type: Decimal
+        description: Bull flag entry price
+      - name: original_target
+        type: Decimal
+        description: Original 2:1 R:R profit target
+    returns:
+      type: TargetCalculation
+      description: Target calculation with zone adjustment applied
+    raises:
+      - ValueError: If parameters are invalid
+    logic:
+      - If zone_detector is None: Return fallback (no adjustment)
+      - Detect zones via zone_detector.detect_zones(symbol, days=60)
+      - Find nearest resistance via ProximityChecker.find_nearest_resistance()
+      - If resistance zone within 5% and closer than original target: Adjust to 90% of zone price
+      - Otherwise: Use original 2:1 target
+      - Return TargetCalculation with metadata
+
+jsonl_logging:
+  target_calculated:
+    description: Logged when bull flag profit target calculated
+    event: target_calculated
+    fields:
+      symbol:
+        type: str
+        example: "AAPL"
+      entry:
+        type: float
+        example: 150.00
+        description: Bull flag entry price
+      adjusted_target:
+        type: float
+        example: 139.50
+        description: Final profit target (zone-adjusted or original)
+      original_target:
+        type: float
+        example: 156.00
+        description: Baseline 2:1 R:R target
+      reason:
+        type: str
+        enum: [resistance_zone_closer, no_zone_within_range, zone_detector_unavailable, zone_detection_error, zone_detection_timeout]
+        example: "resistance_zone_closer"
+      zone_price:
+        type: float | None
+        example: 155.00
+        description: Nearest resistance zone price (null if no zone)
+      zone_strength:
+        type: int | None
+        example: 7
+        description: Resistance zone strength score (null if no zone)
+
+examples:
+  - scenario: Resistance zone closer than 2:1 target
+    input:
+      symbol: "AAPL"
+      entry_price: Decimal("150.00")
+      pole_height: Decimal("6.00")  # 2:1 target = 150 + 6 = 156
+      resistance_zone: Decimal("155.00")  # Closer than 156
+    output:
+      adjusted_target: Decimal("139.50")  # 155 * 0.90
+      original_2r_target: Decimal("156.00")
+      adjustment_reason: "resistance_zone_closer"
+      resistance_zone_price: Decimal("155.00")
+      resistance_zone_strength: 7
+    log:
+      event: "target_calculated"
+      symbol: "AAPL"
+      entry: 150.00
+      adjusted_target: 139.50
+      original_target: 156.00
+      reason: "resistance_zone_closer"
+      zone_price: 155.00
+      zone_strength: 7
+
+  - scenario: No resistance zone within 5%
+    input:
+      symbol: "TSLA"
+      entry_price: Decimal("200.00")
+      pole_height: Decimal("10.00")  # 2:1 target = 200 + 10 = 210
+      resistance_zone: None  # No zone within 5% (200 * 1.05 = 210)
+    output:
+      adjusted_target: Decimal("210.00")  # Use original
+      original_2r_target: Decimal("210.00")
+      adjustment_reason: "no_zone_within_range"
+      resistance_zone_price: None
+      resistance_zone_strength: None
+    log:
+      event: "target_calculated"
+      symbol: "TSLA"
+      entry: 200.00
+      adjusted_target: 210.00
+      original_target: 210.00
+      reason: "no_zone_within_range"
+      zone_price: null
+      zone_strength: null
+
+  - scenario: Zone detector unavailable (graceful degradation)
+    input:
+      symbol: "GOOGL"
+      zone_detector: None  # Not injected
+    output:
+      adjusted_target: Decimal("2800.00")  # Original 2:1 target
+      original_2r_target: Decimal("2800.00")
+      adjustment_reason: "zone_detector_unavailable"
+      resistance_zone_price: None
+      resistance_zone_strength: None
+    log:
+      event: "target_calculated"
+      symbol: "GOOGL"
+      entry: 2700.00
+      adjusted_target: 2800.00
+      original_target: 2800.00
+      reason: "zone_detector_unavailable"
+      zone_price: null
+      zone_strength: null
