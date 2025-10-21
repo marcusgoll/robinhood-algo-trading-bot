@@ -2,7 +2,7 @@
 Momentum Signal Data Models
 
 Dataclasses for momentum detection: SignalType, CatalystType, MomentumSignal,
-CatalystEvent, PreMarketMover, BullFlagPattern
+CatalystEvent, PreMarketMover, BullFlagPattern, TargetCalculation
 
 All dataclasses include __post_init__ validation for data integrity.
 Follows patterns from src/trading_bot/market_data/data_models.py
@@ -11,6 +11,7 @@ Follows patterns from src/trading_bot/market_data/data_models.py
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 
 
@@ -202,4 +203,77 @@ class BullFlagPattern:
             raise ValueError(
                 f"Invalid BullFlagPattern: price_target ({self.price_target}) "
                 f"must be >= breakout_price ({self.breakout_price})"
+            )
+
+
+@dataclass(frozen=True)
+class TargetCalculation:
+    """
+    Immutable target calculation metadata for backtesting analysis.
+
+    Preserves target adjustment decisions and metadata for later analysis
+    of zone-based target optimization effectiveness.
+
+    Attributes:
+        adjusted_target: Final profit target after zone adjustment (must be > 0)
+        original_2r_target: Standard 2:1 R:R target before adjustment (must be > 0)
+        adjustment_reason: Why target was adjusted
+            Valid values: "zone_resistance" | "no_zone" | "zone_detection_failed"
+        resistance_zone_price: Price level of resistance zone (None if no zone)
+        resistance_zone_strength: Strength score of resistance zone (None if no zone)
+
+    Raises:
+        ValueError: If adjusted_target or original_2r_target are not positive,
+                   or if adjustment_reason is not a valid enum value
+
+    Example:
+        >>> # Zone-adjusted target
+        >>> calc = TargetCalculation(
+        ...     adjusted_target=Decimal("139.50"),
+        ...     original_2r_target=Decimal("156.00"),
+        ...     adjustment_reason="zone_resistance",
+        ...     resistance_zone_price=Decimal("155.00"),
+        ...     resistance_zone_strength=7.5
+        ... )
+
+        >>> # No zone detected
+        >>> calc = TargetCalculation(
+        ...     adjusted_target=Decimal("156.00"),
+        ...     original_2r_target=Decimal("156.00"),
+        ...     adjustment_reason="no_zone",
+        ...     resistance_zone_price=None,
+        ...     resistance_zone_strength=None
+        ... )
+    """
+
+    adjusted_target: Decimal
+    original_2r_target: Decimal
+    adjustment_reason: str
+    resistance_zone_price: Decimal | None
+    resistance_zone_strength: float | None
+
+    def __post_init__(self) -> None:
+        """Validate target calculation after initialization."""
+        # Valid adjustment reasons from spec FR-005
+        VALID_REASONS = {"zone_resistance", "no_zone", "zone_detection_failed"}
+
+        # Validate adjusted_target > 0
+        if self.adjusted_target <= 0:
+            raise ValueError(
+                f"Invalid TargetCalculation: adjusted_target ({self.adjusted_target}) "
+                f"must be > 0"
+            )
+
+        # Validate original_2r_target > 0
+        if self.original_2r_target <= 0:
+            raise ValueError(
+                f"Invalid TargetCalculation: original_2r_target ({self.original_2r_target}) "
+                f"must be > 0"
+            )
+
+        # Validate adjustment_reason is in valid set
+        if self.adjustment_reason not in VALID_REASONS:
+            raise ValueError(
+                f"Invalid TargetCalculation: adjustment_reason ('{self.adjustment_reason}') "
+                f"must be one of {VALID_REASONS}"
             )
