@@ -81,8 +81,8 @@ print(f"Sharpe Ratio: {result.metrics.sharpe_ratio:.2f}")
 
 1. **Clone the repository**:
    ```bash
-   git clone <your-repo-url>
-   cd Stocks
+   git clone https://github.com/marcusgoll/robinhood-algo-trading-bot.git
+   cd robinhood-algo-trading-bot
    ```
 
 2. **Create virtual environment**:
