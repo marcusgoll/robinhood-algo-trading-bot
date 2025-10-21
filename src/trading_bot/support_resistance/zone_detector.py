@@ -197,10 +197,51 @@ class ZoneDetector:
             DataFrame with columns: date, open, high, low, close, volume
             Or empty DataFrame if data unavailable
         """
-        # Placeholder - actual implementation would call MarketDataService
-        # For now, return empty DataFrame as graceful degradation
-        logger.debug(f"Fetching OHLCV for {symbol} from {start_date} to {end_date}")
-        return pd.DataFrame()
+        try:
+            # Map timeframe to interval parameter
+            interval = "day" if timeframe == Timeframe.DAILY else "5minute"
+
+            # Calculate days in range
+            days_delta = (end_date - start_date).days
+
+            # Map days to span parameter (robin_stocks API constraint)
+            if days_delta <= 7:
+                span = "week"
+            elif days_delta <= 31:
+                span = "month"
+            elif days_delta <= 90:
+                span = "3month"
+            elif days_delta <= 365:
+                span = "year"
+            else:
+                span = "5year"
+
+            logger.debug(f"Fetching OHLCV for {symbol} from {start_date} to {end_date} (interval={interval}, span={span})")
+
+            # Fetch from MarketDataService
+            df = self.market_data.get_historical_data(symbol, interval=interval, span=span)
+
+            if df.empty:
+                logger.warning(f"No OHLCV data returned for {symbol}")
+                return df
+
+            # Parse date column to datetime
+            df['date'] = pd.to_datetime(df['date'])
+
+            # Filter to requested date range
+            df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+
+            # Convert price/volume columns to appropriate types
+            for col in ['open', 'high', 'low', 'close']:
+                df[col] = df[col].astype(float)
+            df['volume'] = df['volume'].astype(float)
+
+            logger.info(f"Fetched {len(df)} bars for {symbol} ({timeframe.value})")
+            return df
+
+        except Exception as e:
+            logger.error(f"Failed to fetch OHLCV for {symbol}: {e}")
+            return pd.DataFrame()
 
     def _identify_swing_highs(
         self,
@@ -436,10 +477,31 @@ class ZoneDetector:
             first_touch_date = min(cluster_dates)
             last_touch_date = max(cluster_dates)
 
-            # Calculate volume metrics (placeholder - would fetch actual volume data)
-            # For now, use dummy values
-            average_volume = Decimal("1000000")
-            highest_volume_touch = Decimal("1500000")
+            # Calculate volume metrics from OHLCV data
+            # Match touch dates to OHLCV bars and extract volumes
+            touch_volumes = []
+            if not ohlcv.empty and 'date' in ohlcv.columns and 'volume' in ohlcv.columns:
+                for touch_date, _ in cluster:
+                    # Find matching bar in OHLCV (pandas datetime comparison)
+                    matching_rows = ohlcv[ohlcv['date'] == touch_date]
+                    if not matching_rows.empty:
+                        volume = Decimal(str(matching_rows.iloc[0]['volume']))
+                        touch_volumes.append(volume)
+                    else:
+                        # Fallback: use average volume from entire dataset if exact date not found
+                        logger.debug(f"No volume data for touch date {touch_date}, using dataset average")
+                        volume = Decimal(str(ohlcv['volume'].mean()))
+                        touch_volumes.append(volume)
+
+            # Calculate volume statistics
+            if touch_volumes:
+                average_volume = Decimal(str(np.mean([float(v) for v in touch_volumes])))
+                highest_volume_touch = max(touch_volumes)
+            else:
+                # Fallback if no volumes found
+                logger.warning(f"No volume data available for cluster, using defaults")
+                average_volume = Decimal("1000000")
+                highest_volume_touch = Decimal("1500000")
 
             # Calculate strength score using volume bonus
             # Create ZoneTouch objects for strength calculation
@@ -448,10 +510,10 @@ class ZoneDetector:
                     zone_id="",  # Will be set by Zone
                     touch_date=date,
                     price=price,
-                    volume=average_volume,  # Placeholder - would fetch actual
+                    volume=touch_volumes[i] if i < len(touch_volumes) else average_volume,
                     touch_type=TouchType.BOUNCE
                 )
-                for date, price in cluster
+                for i, (date, price) in enumerate(cluster)
             ]
 
             strength_score = self._calculate_strength_score(touches, average_volume)
