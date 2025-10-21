@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .models import Zone, ProximityAlert
+from .models import ProximityAlert, Zone
 
 
 class ZoneLogger:

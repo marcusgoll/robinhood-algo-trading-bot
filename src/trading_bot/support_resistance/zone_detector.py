@@ -17,12 +17,12 @@ import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from ..market_data.market_data_service import MarketDataService
 from .config import ZoneDetectionConfig
-from .models import Zone, ZoneType, Timeframe, ZoneTouch, TouchType
+from .models import Timeframe, TouchType, Zone, ZoneTouch, ZoneType
 from .zone_logger import ZoneLogger
 
 # Module logger

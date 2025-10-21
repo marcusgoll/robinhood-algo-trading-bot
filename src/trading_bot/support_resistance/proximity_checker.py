@@ -13,11 +13,11 @@ Tasks: T025-T027 - Proximity alert implementation
 """
 
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from decimal import Decimal
 
-from .models import Zone, ProximityAlert, ZoneType
 from .config import ZoneDetectionConfig
+from .models import ProximityAlert, Zone, ZoneType
 from .zone_logger import ZoneLogger
 
 # Module logger
@@ -114,6 +114,8 @@ class ProximityChecker:
                     direction = "approaching_resistance"
 
                 # Create alert
+                # zone_id is auto-generated in Zone.__post_init__, so should never be None
+                assert zone.zone_id is not None, "Zone must have zone_id after initialization"
                 alert = ProximityAlert(
                     symbol=symbol,
                     zone_id=zone.zone_id,

@@ -7,11 +7,11 @@ All models use Decimal for price fields, comprehensive validation, and serializa
 to ensure data integrity throughout zone detection and proximity monitoring.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import Any
 
 
 class ZoneType(Enum):
@@ -65,7 +65,7 @@ class Zone:
     average_volume: Decimal
     highest_volume_touch: Decimal
     timeframe: Timeframe
-    zone_id: Optional[str] = None  # Auto-generated from price_level + zone_type
+    zone_id: str | None = None  # Auto-generated from price_level + zone_type
 
     def __post_init__(self) -> None:
         """Validate zone attributes after initialization."""
@@ -91,7 +91,7 @@ class Zone:
                 f"{self.zone_type.value}_{self.price_level}_{self.timeframe.value}"
             )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """
         Serialize zone to dictionary for storage/transmission.
 
@@ -154,7 +154,7 @@ class ZoneTouch:
         if self.volume < 0:
             raise ValueError(f"volume must be non-negative, got {self.volume}")
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """
         Serialize touch to dictionary.
 
@@ -227,7 +227,7 @@ class ProximityAlert:
                 f"got {self.direction}"
             )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """
         Serialize alert to dictionary.
 

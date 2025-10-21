@@ -8,10 +8,10 @@ Feature Status:
 - US4 (4-hour zones): Supported via Timeframe.FOUR_HOUR
 """
 
-from .models import Zone, ZoneTouch, ProximityAlert, ZoneType, Timeframe, TouchType
 from .config import ZoneDetectionConfig
-from .zone_detector import ZoneDetector
+from .models import ProximityAlert, Timeframe, TouchType, Zone, ZoneTouch, ZoneType
 from .proximity_checker import ProximityChecker
+from .zone_detector import ZoneDetector
 from .zone_logger import ZoneLogger
 
 __all__ = [
