@@ -344,6 +344,44 @@ class ZoneDetector:
 
         return clusters
 
+    def _calculate_strength_score(
+        self,
+        touches: list[ZoneTouch],
+        avg_volume: Decimal
+    ) -> Decimal:
+        """Calculate zone strength score with volume bonus.
+
+        Formula: base_score (touch count) + volume_bonus
+        Volume bonus: +1 for each touch with volume > 1.5x average
+
+        Args:
+            touches: List of ZoneTouch objects for the zone
+            avg_volume: Average volume across all touches
+
+        Returns:
+            Strength score as Decimal
+
+        Example:
+            >>> touches = [
+            ...     ZoneTouch(..., volume=Decimal("1000000")),  # Normal
+            ...     ZoneTouch(..., volume=Decimal("2000000")),  # High (>1.5x)
+            ...     ZoneTouch(..., volume=Decimal("3000000"))   # High (>1.5x)
+            ... ]
+            >>> score = detector._calculate_strength_score(touches, Decimal("1000000"))
+            >>> score
+            Decimal('5')  # 3 touches + 2 high-volume bonus
+        """
+        base_score = len(touches)
+
+        # Calculate volume bonus
+        volume_threshold = avg_volume * self.config.volume_threshold  # Default 1.5x
+        volume_bonus = sum(
+            1 for touch in touches
+            if touch.volume > volume_threshold
+        )
+
+        return Decimal(str(base_score + volume_bonus))
+
     def _build_zones_from_clusters(
         self,
         clusters: list[list[tuple[datetime, Decimal]]],
@@ -403,9 +441,20 @@ class ZoneDetector:
             average_volume = Decimal("1000000")
             highest_volume_touch = Decimal("1500000")
 
-            # Calculate strength score (base + volume bonus)
-            # Volume bonus: +1 for each touch with volume > 1.5x average
-            strength_score = Decimal(str(touch_count))  # Base score = touch count
+            # Calculate strength score using volume bonus
+            # Create ZoneTouch objects for strength calculation
+            touches = [
+                ZoneTouch(
+                    zone_id="",  # Will be set by Zone
+                    touch_date=date,
+                    price=price,
+                    volume=average_volume,  # Placeholder - would fetch actual
+                    touch_type=TouchType.BOUNCE
+                )
+                for date, price in cluster
+            ]
+
+            strength_score = self._calculate_strength_score(touches, average_volume)
 
             # Create Zone object
             zone = Zone(
