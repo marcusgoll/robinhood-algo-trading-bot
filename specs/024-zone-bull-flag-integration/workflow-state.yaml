@@ -1,0 +1,64 @@
+# Workflow State for zone-bull-flag-integration
+# Generated: 2025-10-21
+
+feature:
+  slug: zone-bull-flag-integration
+  number: 24
+  title: Bull flag profit target integration with resistance zones
+  branch_name: feature/024-zone-bull-flag-integration
+  github_issue: 31
+  created_at: 2025-10-21T00:00:00Z
+  updated_at: 2025-10-21T00:00:00Z
+
+deployment:
+  model: remote-direct  # staging-prod | direct-prod | local-only
+
+workflow:
+  phase: initialization
+  status: in_progress
+  phases_completed: []
+  phases_failed: []
+
+manual_gates:
+  preview:
+    required: true
+    approved: false
+    timestamp: null
+  validate_staging:
+    required: false  # Not applicable for direct-prod model
+    approved: false
+    timestamp: null
+
+quality_gates:
+  preflight_checks: pending
+  code_review: pending
+  rollback_capability: pending
+
+deployment_state:
+  staging:
+    deployed: false
+    url: null
+    deployment_id: null
+    timestamp: null
+  production:
+    deployed: false
+    url: null
+    deployment_id: null
+    timestamp: null
+    version: null
+
+artifacts:
+  spec: null
+  plan: null
+  tasks: null
+  analysis_report: null
+  optimization_report: null
+  release_notes: null
+
+token_budget:
+  phase: initialization
+  total_consumed: 0
+  budget_remaining: 75000
+  compaction_needed: false
+
+phase_summaries: {}
