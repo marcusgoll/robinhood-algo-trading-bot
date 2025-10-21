@@ -215,25 +215,84 @@ class PhaseManager:
         else:
             raise ValueError(f"Unexpected validator key: {validator_key}")
 
-    def advance_phase(self, to_phase: Phase, force: bool = False) -> PhaseTransition:
+    def advance_phase(
+        self,
+        to_phase: Phase,
+        force: bool = False,
+        override_password: Optional[str] = None
+    ) -> PhaseTransition:
         """Advance to next phase after validation.
 
         Args:
             to_phase: Target phase to advance to
-            force: Bypass validation (requires override password in production)
+            force: Bypass validation (requires override password)
+            override_password: Password for forced transitions (required if force=True)
 
         Returns:
             PhaseTransition record with transition details
 
         Raises:
             PhaseValidationError: If validation fails and force=False
+            PhaseOverrideError: If force=True but override password incorrect
             ValueError: If transition is non-sequential
         """
+        from os import getenv
+        from .models import PhaseOverrideError
+
         from_phase = Phase.from_string(self.config.current_phase)
 
-        # Validate unless forced
+        # Validate override password if force=True
         validation_result = None
-        if not force:
+        if force:
+            # Check override password configured
+            expected_password = getenv("PHASE_OVERRIDE_PASSWORD")
+
+            if not expected_password:
+                # Log failed attempt
+                if hasattr(self, 'history_logger'):
+                    self.history_logger.log_override_attempt(
+                        phase=from_phase,
+                        action="force_advance",
+                        blocked=True,
+                        reason="Override password not configured in environment"
+                    )
+                raise PhaseOverrideError("Override password not configured in environment")
+
+            # Check password provided
+            if override_password is None:
+                # Log failed attempt
+                if hasattr(self, 'history_logger'):
+                    self.history_logger.log_override_attempt(
+                        phase=from_phase,
+                        action="force_advance",
+                        blocked=True,
+                        reason="Override password required for forced transitions"
+                    )
+                raise PhaseOverrideError("Override password required for forced transitions")
+
+            # Verify password matches
+            if override_password != expected_password:
+                # Log failed attempt
+                if hasattr(self, 'history_logger'):
+                    self.history_logger.log_override_attempt(
+                        phase=from_phase,
+                        action="force_advance",
+                        blocked=True,
+                        reason="Invalid override password"
+                    )
+                raise PhaseOverrideError("Invalid override password")
+
+            # Log successful override
+            if hasattr(self, 'history_logger'):
+                self.history_logger.log_override_attempt(
+                    phase=from_phase,
+                    action="force_advance",
+                    blocked=False,
+                    reason=f"Force advance from {from_phase.value} to {to_phase.value}"
+                )
+
+        else:
+            # Normal validation path
             validation_result = self.validate_transition(to_phase)
             if not validation_result.can_advance:
                 raise PhaseValidationError(validation_result)
@@ -245,7 +304,7 @@ class PhaseManager:
             from_phase=from_phase,
             to_phase=to_phase,
             trigger="manual" if force else "auto",
-            validation_passed=True,  # Either forced or validation passed
+            validation_passed=not force,  # Force bypasses validation
             metrics_snapshot=self._get_metrics(),
             override_password_used=force
         )

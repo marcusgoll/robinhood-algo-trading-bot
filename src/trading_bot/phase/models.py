@@ -39,6 +39,16 @@ class Phase(str, Enum):
         raise ValueError(f"Invalid phase: {value}")
 
 
+class PhaseOverrideError(Exception):
+    """Raised when manual override attempt fails.
+
+    Used for FR-007 override password verification.
+    """
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(f"Phase override failed: {reason}")
+
+
 @dataclass
 class SessionMetrics:
     """Trading session performance metrics.

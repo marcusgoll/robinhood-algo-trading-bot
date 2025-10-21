@@ -217,8 +217,8 @@ class TestPhaseManagerAdvancePhase:
         assert len(error.result.missing_requirements) > 0
         assert "Phase validation failed" in str(error)
 
-    def test_advance_with_force_bypasses_validation(self):
-        """Should bypass validation when force=True."""
+    def test_advance_with_force_bypasses_validation(self, monkeypatch):
+        """Should bypass validation when force=True with correct password."""
         # Arrange
         config = Config(
             robinhood_username="test",
@@ -226,6 +226,9 @@ class TestPhaseManagerAdvancePhase:
             current_phase="experience"
         )
         manager = PhaseManager(config)
+
+        # Set override password
+        monkeypatch.setenv("PHASE_OVERRIDE_PASSWORD", "test123")
 
         # Bad metrics that would fail validation
         manager._metrics = {
@@ -235,10 +238,14 @@ class TestPhaseManagerAdvancePhase:
         }
 
         # Act
-        transition = manager.advance_phase(Phase.PROOF_OF_CONCEPT, force=True)
+        transition = manager.advance_phase(
+            Phase.PROOF_OF_CONCEPT,
+            force=True,
+            override_password="test123"
+        )
 
         # Assert
-        assert transition.validation_passed is True  # Force passed
+        assert transition.validation_passed is False  # Validation was bypassed
         assert transition.trigger == "manual"
         assert transition.override_password_used is True
         assert config.current_phase == "proof"
