@@ -181,6 +181,7 @@ class Trade:
         exit_reason: Why position closed (stop_loss, take_profit, strategy_signal, end_of_data)
         commission: Total commission paid entry + exit (Decimal)
         slippage: Total slippage cost in dollars (Decimal)
+        metadata: Optional dict for additional info (e.g., strategy_id)
 
     Raises:
         ValueError: If validation fails (exit before entry, non-positive shares, etc.)
@@ -197,6 +198,7 @@ class Trade:
     exit_reason: str
     commission: Decimal
     slippage: Decimal
+    metadata: dict[str, str] | None = None
 
     def __post_init__(self) -> None:
         """Validate trade consistency after initialization."""
@@ -312,10 +314,10 @@ class PerformanceMetrics:
 
     def __post_init__(self) -> None:
         """Validate performance metrics after initialization."""
-        # Validate total_trades = winning_trades + losing_trades
-        if self.total_trades != self.winning_trades + self.losing_trades:
+        # Validate total_trades >= winning_trades + losing_trades (accounts for breakeven trades with pnl == 0)
+        if self.total_trades < self.winning_trades + self.losing_trades:
             raise ValueError(
-                f"PerformanceMetrics: total_trades ({self.total_trades}) must equal "
+                f"PerformanceMetrics: total_trades ({self.total_trades}) must be >= "
                 f"winning_trades ({self.winning_trades}) + losing_trades ({self.losing_trades})"
             )
 

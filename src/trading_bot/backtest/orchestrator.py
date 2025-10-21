@@ -305,63 +305,94 @@ class StrategyOrchestrator:
             f"Completed backtest execution for {len(sorted_timestamps)} timestamps"
         )
 
-        # T018: Aggregate results into OrchestratorResult
-        # Placeholder for now - will implement result aggregation in next phase
+        # T024-T027: Calculate per-strategy metrics and comparison table
         from datetime import UTC
-        from src.trading_bot.backtest.models import PerformanceMetrics, BacktestResult
+        from src.trading_bot.backtest.models import PerformanceMetrics, BacktestResult, BacktestConfig
+        from src.trading_bot.backtest.performance_calculator import PerformanceCalculator
 
-        # Create placeholder strategy results
+        calculator = PerformanceCalculator()
         strategy_results: dict[str, BacktestResult] = {}
         current_time = datetime.now(UTC)
 
+        # Calculate metrics for each strategy (FR-009)
         for strategy_id in self._strategies.keys():
-            # Create placeholder BacktestResult for each strategy
-            # Will be replaced with actual results in later tasks
-            placeholder_metrics = PerformanceMetrics(
-                total_return=Decimal("0.0"),
-                annualized_return=Decimal("0.0"),
-                cagr=Decimal("0.0"),
-                win_rate=Decimal("0.0"),
-                profit_factor=Decimal("0.0"),
-                average_win=Decimal("0.0"),
-                average_loss=Decimal("0.0"),
-                max_drawdown=Decimal("0.0"),
-                max_drawdown_duration_days=0,
-                sharpe_ratio=Decimal("0.0"),
-                total_trades=len(self._strategy_trades[strategy_id]),
-                winning_trades=0,
-                losing_trades=0
+            # Get allocation and strategy for this strategy_id
+            allocation = next(
+                alloc for alloc in self._allocations if alloc.strategy_id == strategy_id
+            )
+            strategy = self._strategies[strategy_id]
+
+            # Create minimal BacktestConfig for performance calculation
+            strategy_config = BacktestConfig(
+                strategy_class=type(strategy),  # Use actual strategy class
+                symbols=list(historical_data.keys()),  # All symbols being traded
+                initial_capital=allocation.allocated_capital,
+                start_date=sorted_timestamps[0] if sorted_timestamps else datetime.now(UTC),
+                end_date=sorted_timestamps[-1] if sorted_timestamps else datetime.now(UTC),
+                risk_free_rate=Decimal("0.02")  # Default 2% risk-free rate
             )
 
-            strategy_results[strategy_id] = BacktestResult(
-                config=None,  # Placeholder
+            # Calculate performance metrics using PerformanceCalculator
+            metrics = calculator.calculate_metrics(
                 trades=self._strategy_trades[strategy_id],
                 equity_curve=self._strategy_equity[strategy_id],
-                metrics=placeholder_metrics,
+                config=strategy_config
+            )
+
+            # Create BacktestResult for this strategy
+            strategy_results[strategy_id] = BacktestResult(
+                config=strategy_config,
+                trades=self._strategy_trades[strategy_id],
+                equity_curve=self._strategy_equity[strategy_id],
+                metrics=metrics,
                 data_warnings=[],
-                execution_time_seconds=0.001,  # Minimum execution time
+                execution_time_seconds=0.001,  # Minimal execution time
                 completed_at=current_time
             )
 
-        # Create placeholder aggregate metrics
-        aggregate_metrics = PerformanceMetrics(
-            total_return=Decimal("0.0"),
-            annualized_return=Decimal("0.0"),
-            cagr=Decimal("0.0"),
-            win_rate=Decimal("0.0"),
-            profit_factor=Decimal("0.0"),
-            average_win=Decimal("0.0"),
-            average_loss=Decimal("0.0"),
-            max_drawdown=Decimal("0.0"),
-            max_drawdown_duration_days=0,
-            sharpe_ratio=Decimal("0.0"),
-            total_trades=sum(len(trades) for trades in self._strategy_trades.values()),
-            winning_trades=0,
-            losing_trades=0
+        # Calculate aggregate portfolio metrics
+        # Combine all trades across strategies
+        all_trades = []
+        for trades in self._strategy_trades.values():
+            all_trades.extend(trades)
+
+        # Create aggregate equity curve from all strategies
+        aggregate_equity: dict[datetime, Decimal] = {}
+        for strategy_id, equity_curve in self._strategy_equity.items():
+            for timestamp, equity in equity_curve:
+                if timestamp not in aggregate_equity:
+                    aggregate_equity[timestamp] = Decimal("0.0")
+                aggregate_equity[timestamp] += equity
+
+        aggregate_equity_curve = sorted(aggregate_equity.items())
+
+        # Create aggregate config
+        aggregate_config = BacktestConfig(
+            strategy_class=type(list(self._strategies.values())[0]) if self._strategies else type(None),
+            symbols=list(historical_data.keys()),
+            initial_capital=self.initial_capital,
+            start_date=sorted_timestamps[0] if sorted_timestamps else datetime.now(UTC),
+            end_date=sorted_timestamps[-1] if sorted_timestamps else datetime.now(UTC),
+            risk_free_rate=Decimal("0.02")
         )
 
-        # Create placeholder comparison table
-        comparison_table: dict[str, dict] = {}
+        # Calculate aggregate metrics
+        aggregate_metrics = calculator.calculate_metrics(
+            trades=all_trades,
+            equity_curve=aggregate_equity_curve,
+            config=aggregate_config
+        )
+
+        # T027: Generate comparison table (FR-013)
+        comparison_table: dict[str, dict[str, Decimal]] = {}
+        for strategy_id, result in strategy_results.items():
+            comparison_table[strategy_id] = {
+                "total_return": result.metrics.total_return,
+                "sharpe_ratio": result.metrics.sharpe_ratio,
+                "max_drawdown": result.metrics.max_drawdown,
+                "win_rate": result.metrics.win_rate,
+                "total_trades": Decimal(str(result.metrics.total_trades))
+            }
 
         # Return OrchestratorResult
         return OrchestratorResult(
@@ -451,7 +482,7 @@ class StrategyOrchestrator:
                         )
 
             # Update equity curve for this strategy at this timestamp
-            self._update_strategy_equity(strategy_id, current_timestamp)
+            self._update_strategy_equity(strategy_id, current_timestamp, current_bars)
 
     def _enter_position(
         self,
@@ -461,7 +492,7 @@ class StrategyOrchestrator:
         allocation: StrategyAllocation
     ) -> None:
         """
-        Enter a new position for a strategy.
+        Enter a new position for a strategy with capital limit enforcement.
 
         Args:
             strategy_id: Strategy identifier
@@ -470,27 +501,40 @@ class StrategyOrchestrator:
             allocation: Strategy capital allocation
 
         Side Effects:
-            - Creates position in self._strategy_positions
-            - Updates allocation.used_capital
+            - Creates position in self._strategy_positions if capital available
+            - Updates allocation.used_capital via allocation.allocate()
+            - Logs warning if capital limit blocks entry (FR-007)
         """
         # Use current bar's close as fill price (conservative fill simulation)
         fill_price = current_bar.close
 
         # Calculate position size using available capital
-        # Simple sizing: use all available capital for this strategy
-        max_shares = int(allocation.available_capital / fill_price)
+        # Use 95% of available capital to leave buffer for price movements
+        position_size_pct = Decimal("0.95")
+        target_capital = allocation.available_capital * position_size_pct
+        max_shares = int(target_capital / fill_price)
 
         if max_shares <= 0:
-            logger.debug(
-                f"{strategy_id}: Insufficient capital for {symbol} at ${fill_price}. "
-                f"Available: ${allocation.available_capital}"
+            logger.warning(
+                f"[CAPITAL_LIMIT] {strategy_id}: Blocked entry for {symbol} at ${fill_price}. "
+                f"Insufficient capital. Available: ${allocation.available_capital}, "
+                f"Allocated: ${allocation.allocated_capital}, Used: ${allocation.used_capital}"
             )
             return
 
         # Calculate actual position cost
         position_cost = max_shares * fill_price
 
-        # Allocate capital for this position
+        # FR-007: Check if we can allocate capital before entering position
+        if not allocation.can_allocate(position_cost):
+            logger.warning(
+                f"[CAPITAL_LIMIT] {strategy_id}: Blocked entry for {symbol}. "
+                f"Position cost ${position_cost} exceeds available capital ${allocation.available_capital}. "
+                f"Strategy at allocation limit: {allocation.used_capital}/{allocation.allocated_capital}"
+            )
+            return
+
+        # Allocate capital for this position (T035: Capital allocation)
         allocation.allocate(position_cost)
 
         # Create position
@@ -560,7 +604,8 @@ class StrategyOrchestrator:
             duration_days=duration_days,
             exit_reason=exit_reason,
             commission=Decimal("0.0"),  # No commission for MVP
-            slippage=Decimal("0.0")  # No slippage for MVP
+            slippage=Decimal("0.0"),  # No slippage for MVP
+            metadata={"strategy_id": strategy_id}  # FR-006: Tag trade with strategy
         )
 
         # Store trade
@@ -581,16 +626,18 @@ class StrategyOrchestrator:
     def _update_strategy_equity(
         self,
         strategy_id: str,
-        current_timestamp: datetime
+        current_timestamp: datetime,
+        current_bars: dict[str, HistoricalDataBar]
     ) -> None:
         """
         Calculate and record current equity for a strategy.
 
-        Equity = available_capital + used_capital (position values at current prices)
+        Equity = available_capital + mark-to-market value of positions
 
         Args:
             strategy_id: Strategy identifier
             current_timestamp: Current bar timestamp
+            current_bars: Current bars with prices for mark-to-market valuation
 
         Side Effects:
             - Appends (timestamp, equity) to self._strategy_equity[strategy_id]
@@ -600,9 +647,18 @@ class StrategyOrchestrator:
             alloc for alloc in self._allocations if alloc.strategy_id == strategy_id
         )
 
-        # Calculate total equity = available + used capital
-        # Note: used_capital already reflects current position values
-        total_equity = allocation.available_capital + allocation.used_capital
+        # Calculate mark-to-market value of all positions
+        mark_to_market_value = Decimal("0.0")
+        for symbol, position in self._strategy_positions[strategy_id].items():
+            # Get current price from current_bars
+            if symbol in current_bars:
+                current_price = current_bars[symbol].close
+                # Calculate position value at current price
+                position_value = position.shares * current_price
+                mark_to_market_value += position_value
+
+        # Calculate total equity = available capital + mark-to-market position values
+        total_equity = allocation.available_capital + mark_to_market_value
 
         # Record equity point
         self._strategy_equity[strategy_id].append((current_timestamp, total_equity))
