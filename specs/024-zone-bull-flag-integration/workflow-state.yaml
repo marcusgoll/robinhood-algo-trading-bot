@@ -14,9 +14,9 @@ deployment:
   model: remote-direct  # staging-prod | direct-prod | local-only
 
 workflow:
-  phase: plan
+  phase: implement
   status: in_progress
-  phases_completed: [spec]
+  phases_completed: [spec, plan, tasks, analyze]
   phases_failed: []
 
 manual_gates:
@@ -49,9 +49,9 @@ deployment_state:
 
 artifacts:
   spec: specs/024-zone-bull-flag-integration/spec.md
-  plan: null
-  tasks: null
-  analysis_report: null
+  plan: specs/024-zone-bull-flag-integration/plan.md
+  tasks: specs/024-zone-bull-flag-integration/tasks.md
+  analysis_report: specs/024-zone-bull-flag-integration/analysis-report.md
   optimization_report: null
   release_notes: null
 

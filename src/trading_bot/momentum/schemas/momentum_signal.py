@@ -218,7 +218,7 @@ class TargetCalculation:
         adjusted_target: Final profit target after zone adjustment (must be > 0)
         original_2r_target: Standard 2:1 R:R target before adjustment (must be > 0)
         adjustment_reason: Why target was adjusted
-            Valid values: "zone_resistance" | "no_zone" | "zone_detection_failed"
+            Valid values: "zone_resistance" | "no_zone" | "zone_detection_failed" | "zone_detection_timeout"
         resistance_zone_price: Price level of resistance zone (None if no zone)
         resistance_zone_strength: Strength score of resistance zone (None if no zone)
 
@@ -254,8 +254,8 @@ class TargetCalculation:
 
     def __post_init__(self) -> None:
         """Validate target calculation after initialization."""
-        # Valid adjustment reasons from spec FR-005
-        VALID_REASONS = {"zone_resistance", "no_zone", "zone_detection_failed"}
+        # Valid adjustment reasons from spec FR-005 and US3 (graceful degradation)
+        VALID_REASONS = {"zone_resistance", "no_zone", "zone_detection_failed", "zone_detection_timeout"}
 
         # Validate adjusted_target > 0
         if self.adjusted_target <= 0:

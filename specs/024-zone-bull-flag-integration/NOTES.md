@@ -180,3 +180,9 @@ Integration of ZoneDetector service with BullFlagDetector to dynamically adjust 
 4. Coverage target: 90%+ per spec NFR-006 (enforced in test guardrails)
 5. Performance validation: T012, T030 measure <50ms zone detection, <100ms total
 
+✅ T001: Project structure verified: all required files exist
+  - Evidence: 5 core files found: bull_flag_detector.py, proximity_checker.py, zone_detector.py, momentum_signal.py, momentum_logger.py
+
+✅ T002 [P]: Dependencies validated: pandas, numpy, pytest available in both requirements.txt and pyproject.toml
+  - Evidence: pandas==2.3.3, numpy==1.26.3, pytest==8.4.2 confirmed. Decimal is Python stdlib (no install needed)
+
