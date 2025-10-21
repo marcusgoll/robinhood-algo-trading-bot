@@ -499,7 +499,7 @@ class ZoneDetector:
                 highest_volume_touch = max(touch_volumes)
             else:
                 # Fallback if no volumes found
-                logger.warning(f"No volume data available for cluster, using defaults")
+                logger.warning("No volume data available for cluster, using defaults")
                 average_volume = Decimal("1000000")
                 highest_volume_touch = Decimal("1500000")
 
