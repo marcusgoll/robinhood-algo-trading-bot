@@ -10,12 +10,14 @@ See specs/022-pos-scale-progress/spec.md for full requirements.
 """
 
 # Phase models and management
-from .models import Phase
+from .models import Phase, SessionMetrics, PhaseTransition
 from .manager import PhaseManager, PhaseValidationError
 from .trade_limiter import TradeLimitExceeded
 
 __all__ = [
     "Phase",
+    "SessionMetrics",
+    "PhaseTransition",
     "PhaseManager",
     "TradeLimitExceeded",
     "PhaseValidationError",
