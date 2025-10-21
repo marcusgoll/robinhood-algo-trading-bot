@@ -30,7 +30,7 @@ where = ["src"]
 dev = [
     "pytest==7.4.4",
     "pytest-cov==4.1.0",
-    "pytest-mock==3.12.0",
+    "pytest-mock==3.15.1",
     "pytest-asyncio==0.23.3",
     "freezegun==1.4.0",
     "mypy==1.8.0",
