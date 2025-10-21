@@ -68,4 +68,38 @@ Will be populated during planning phase with:
 
 ---
 
+## Phase 2: Tasks (2025-10-21)
+
+**Summary**:
+- Total tasks: 77
+- User story tasks: 58 (organized by US1-US6)
+- Parallel opportunities: 24 tasks marked [P]
+- TDD tasks: 35 tasks marked [TDD]
+- MVP scope: 51 tasks (Phases 1-5, US1-US3)
+
+**Task Breakdown**:
+- Phase 1 (Setup): 3 tasks
+- Phase 2 (Foundational): 13 tasks
+- Phase 3 (US1 - Phase System): 22 tasks
+- Phase 4 (US2 - Trade Limits): 13 tasks
+- Phase 5 (US3 - Profitability): 13 tasks
+- Phase 6 (US4 - Position Scaling): 7 tasks
+- Phase 7 (US5 - Auto Downgrades): 12 tasks
+- Phase 8 (US6 - Export CLI): 11 tasks
+- Phase 9 (Polish): 12 tasks
+
+**Checkpoint**:
+- ✅ Tasks generated: 77 concrete tasks
+- ✅ User story organization: Complete (6 stories)
+- ✅ Dependency graph: Created
+- ✅ MVP strategy: Defined (US1-US3, 51 tasks)
+- ✅ TDD approach: 35 test-first tasks
+- 📋 Ready for: /analyze
+
+**Estimated Effort**:
+- MVP (US1-US3): ~28 hours (3.5 days)
+- Full feature (US1-US6): ~46 hours (5.75 days)
+
+---
+
 *This file is updated throughout the workflow phases.*
