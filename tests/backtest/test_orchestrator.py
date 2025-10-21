@@ -493,3 +493,424 @@ class TestStrategyOrchestratorChronologicalExecution:
                     f"At step {i}, bar {j}: Strategy1 sees {bar1.timestamp}, "
                     f"Strategy2 sees {bar2.timestamp} - data mismatch!"
                 )
+
+
+class TestStrategyOrchestratorIndependentTracking:
+    """
+    Test Suite: US2 - Independent Performance Tracking
+
+    Verifies that each strategy's performance is tracked independently:
+    - Each strategy has separate equity curve tracking (FR-005)
+    - Trades are tagged with originating strategy_id (FR-006)
+    - Performance metrics calculated per-strategy (FR-009)
+    - Comparison table generated (FR-013)
+
+    From: specs/021-strategy-orchestrato/spec.md User Story 2
+    TDD Phase: RED - tests will fail until US2 implementation complete
+    """
+
+    def test_per_strategy_equity_curves_independent(self, sample_strategies: List[IStrategy]):
+        """
+        T020 [P] [US2]: Test each strategy has independent equity curve tracking.
+
+        **Acceptance Criteria** (spec.md FR-005):
+        GIVEN: 2 strategies with different performance characteristics
+        WHEN: orchestrator.run() completes
+        THEN: Each strategy has distinct equity curve in result.strategy_results
+
+        **Expected Behavior**:
+        - Strategy 1 equity curve != Strategy 2 equity curve
+        - Each strategy_results[strategy_id] contains BacktestResult
+        - Each BacktestResult has equity_curve attribute
+        - Equity curves reflect independent performance
+
+        **TDD RED PHASE**: This test WILL FAIL because:
+        - orchestrator.run() doesn't track per-strategy equity curves yet
+        - Expected AttributeError or missing equity_curve data
+
+        From: spec.md FR-005, tasks.md T020
+        Pattern: tests/backtest/test_engine.py equity tracking tests
+        """
+        from decimal import Decimal
+        from datetime import datetime, timezone
+
+        # ARRANGE: Create 2 strategies with different behaviors
+        # Strategy 1: Always buys (aggressive)
+        # Strategy 2: Never trades (passive)
+        class AggressiveStrategy:
+            def should_enter(self, bars: List[HistoricalDataBar]) -> bool:
+                return len(bars) >= 2  # Enter after seeing 2 bars
+
+            def should_exit(self, position: Position, bars: List[HistoricalDataBar]) -> bool:
+                return len(bars) >= 5  # Exit after 5 bars
+
+            def position_size(self, capital: float, price: float) -> int:
+                return int(capital / price)  # Use all capital
+
+        class PassiveStrategy:
+            def should_enter(self, bars: List[HistoricalDataBar]) -> bool:
+                return False  # Never enter
+
+            def should_exit(self, position: Position, bars: List[HistoricalDataBar]) -> bool:
+                return False  # Never exit (won't be called)
+
+            def position_size(self, capital: float, price: float) -> int:
+                return 100
+
+        strategies_with_weights = [
+            (AggressiveStrategy(), Decimal("0.5")),  # 50% allocation
+            (PassiveStrategy(), Decimal("0.5")),     # 50% allocation
+        ]
+
+        # Create simple historical data (5 bars with price movement)
+        historical_data = {
+            "AAPL": [
+                HistoricalDataBar(
+                    symbol="AAPL",
+                    timestamp=datetime(2024, 1, i+1, 9, 30, tzinfo=timezone.utc),
+                    open=Decimal(f"{100 + i*2}"),
+                    high=Decimal(f"{102 + i*2}"),
+                    low=Decimal(f"{99 + i*2}"),
+                    close=Decimal(f"{101 + i*2}"),
+                    volume=1000000,
+                    split_adjusted=True,
+                    dividend_adjusted=True,
+                )
+                for i in range(5)
+            ]
+        }
+
+        # ACT: Run backtest
+        orchestrator = StrategyOrchestrator(
+            strategies_with_weights=strategies_with_weights,
+            initial_capital=Decimal("100000")
+        )
+        result = orchestrator.run(historical_data)
+
+        # ASSERT: Verify independent equity curves exist
+        assert hasattr(result, 'strategy_results'), (
+            "OrchestratorResult should have strategy_results attribute"
+        )
+        assert len(result.strategy_results) == 2, (
+            f"Expected 2 strategy results, got {len(result.strategy_results)}"
+        )
+
+        # Get equity curves for each strategy
+        strategy_ids = list(result.strategy_results.keys())
+        strategy_0_result = result.strategy_results[strategy_ids[0]]
+        strategy_1_result = result.strategy_results[strategy_ids[1]]
+
+        # Verify each BacktestResult has equity_curve
+        assert hasattr(strategy_0_result, 'equity_curve'), (
+            f"Strategy {strategy_ids[0]} result should have equity_curve attribute"
+        )
+        assert hasattr(strategy_1_result, 'equity_curve'), (
+            f"Strategy {strategy_ids[1]} result should have equity_curve attribute"
+        )
+
+        # Verify equity curves are not empty
+        assert len(strategy_0_result.equity_curve) > 0, (
+            f"Strategy {strategy_ids[0]} equity curve should not be empty"
+        )
+        assert len(strategy_1_result.equity_curve) > 0, (
+            f"Strategy {strategy_ids[1]} equity curve should not be empty"
+        )
+
+        # Verify equity curves are different (independent tracking)
+        # AggressiveStrategy will have changing equity due to trades
+        # PassiveStrategy will have flat equity (no trades)
+        equity_0 = [equity for _, equity in strategy_0_result.equity_curve]
+        equity_1 = [equity for _, equity in strategy_1_result.equity_curve]
+
+        # At least one strategy should have non-constant equity
+        equity_0_varies = len(set(equity_0)) > 1
+        equity_1_varies = len(set(equity_1)) > 1
+
+        assert equity_0_varies or equity_1_varies, (
+            "At least one strategy should have varying equity curve "
+            "(indicates independent tracking is working)"
+        )
+
+    def test_trades_tagged_with_strategy_id(self, sample_strategies: List[IStrategy]):
+        """
+        T021 [P] [US2]: Test trades are tagged with originating strategy_id.
+
+        **Acceptance Criteria** (spec.md FR-006):
+        GIVEN: 2 strategies generating trades
+        WHEN: orchestrator.run() completes
+        THEN: Each trade.metadata["strategy_id"] matches originating strategy
+
+        **Expected Behavior**:
+        - All trades have metadata["strategy_id"] attribute
+        - strategy_id values match strategy identifiers
+        - Can determine which strategy generated each trade
+
+        **TDD RED PHASE**: This test WILL FAIL because:
+        - orchestrator doesn't tag trades with strategy_id yet
+        - Expected KeyError or missing metadata
+
+        From: spec.md FR-006, tasks.md T021
+        Pattern: tests/backtest/test_engine.py trade tracking tests
+        """
+        from decimal import Decimal
+        from datetime import datetime, timezone
+
+        # ARRANGE: Create 2 trading strategies
+        class EarlyEntryStrategy:
+            """Enters on bar 1, exits on bar 3"""
+            def should_enter(self, bars: List[HistoricalDataBar]) -> bool:
+                return len(bars) == 1
+
+            def should_exit(self, position: Position, bars: List[HistoricalDataBar]) -> bool:
+                return len(bars) == 3
+
+            def position_size(self, capital: float, price: float) -> int:
+                return 100
+
+        class LateEntryStrategy:
+            """Enters on bar 2, exits on bar 4"""
+            def should_enter(self, bars: List[HistoricalDataBar]) -> bool:
+                return len(bars) == 2
+
+            def should_exit(self, position: Position, bars: List[HistoricalDataBar]) -> bool:
+                return len(bars) == 4
+
+            def position_size(self, capital: float, price: float) -> int:
+                return 100
+
+        strategies_with_weights = [
+            (EarlyEntryStrategy(), Decimal("0.5")),
+            (LateEntryStrategy(), Decimal("0.5")),
+        ]
+
+        # Create historical data (5 bars)
+        historical_data = {
+            "AAPL": [
+                HistoricalDataBar(
+                    symbol="AAPL",
+                    timestamp=datetime(2024, 1, i+1, 9, 30, tzinfo=timezone.utc),
+                    open=Decimal("100"),
+                    high=Decimal("102"),
+                    low=Decimal("99"),
+                    close=Decimal("101"),
+                    volume=1000000,
+                    split_adjusted=True,
+                    dividend_adjusted=True,
+                )
+                for i in range(5)
+            ]
+        }
+
+        # ACT: Run backtest
+        orchestrator = StrategyOrchestrator(
+            strategies_with_weights=strategies_with_weights,
+            initial_capital=Decimal("100000")
+        )
+        result = orchestrator.run(historical_data)
+
+        # ASSERT: Verify trades are tagged with strategy_id
+        assert hasattr(result, 'strategy_results'), (
+            "OrchestratorResult should have strategy_results"
+        )
+
+        # Check each strategy's trades
+        for strategy_id, strategy_result in result.strategy_results.items():
+            assert hasattr(strategy_result, 'trades'), (
+                f"Strategy {strategy_id} result should have trades attribute"
+            )
+
+            # If strategy has trades, verify they're tagged
+            if len(strategy_result.trades) > 0:
+                for i, trade in enumerate(strategy_result.trades):
+                    assert hasattr(trade, 'metadata'), (
+                        f"Strategy {strategy_id} trade {i} should have metadata attribute"
+                    )
+                    assert 'strategy_id' in trade.metadata, (
+                        f"Strategy {strategy_id} trade {i} metadata should contain 'strategy_id' key"
+                    )
+                    assert trade.metadata['strategy_id'] == strategy_id, (
+                        f"Strategy {strategy_id} trade {i} has wrong strategy_id: "
+                        f"expected {strategy_id}, got {trade.metadata['strategy_id']}"
+                    )
+
+    def test_per_strategy_performance_metrics(self, sample_strategies: List[IStrategy]):
+        """
+        T022 [P] [US2]: Test performance metrics calculated per-strategy.
+
+        **Acceptance Criteria** (spec.md FR-009):
+        GIVEN: 2 strategies with known performance characteristics
+        WHEN: orchestrator.run() completes
+        THEN: Each strategy_result contains PerformanceMetrics
+
+        **Expected Metrics**:
+        - Sharpe ratio
+        - Maximum drawdown
+        - Total return
+        - Win rate
+
+        **TDD RED PHASE**: This test WILL FAIL because:
+        - orchestrator doesn't calculate per-strategy metrics yet
+        - Expected AttributeError or missing metrics
+
+        From: spec.md FR-009, tasks.md T022
+        Pattern: tests/backtest/test_performance_calculator.py metric tests
+        """
+        from decimal import Decimal
+        from datetime import datetime, timezone
+
+        # ARRANGE: Simple strategy for testing
+        class SimpleStrategy:
+            def should_enter(self, bars: List[HistoricalDataBar]) -> bool:
+                return len(bars) == 2
+
+            def should_exit(self, position: Position, bars: List[HistoricalDataBar]) -> bool:
+                return len(bars) == 4
+
+            def position_size(self, capital: float, price: float) -> int:
+                return 100
+
+        strategies_with_weights = [
+            (SimpleStrategy(), Decimal("0.5")),
+            (sample_strategies[0], Decimal("0.5")),
+        ]
+
+        # Create historical data
+        historical_data = {
+            "AAPL": [
+                HistoricalDataBar(
+                    symbol="AAPL",
+                    timestamp=datetime(2024, 1, i+1, 9, 30, tzinfo=timezone.utc),
+                    open=Decimal("100"),
+                    high=Decimal("102"),
+                    low=Decimal("99"),
+                    close=Decimal("101"),
+                    volume=1000000,
+                    split_adjusted=True,
+                    dividend_adjusted=True,
+                )
+                for i in range(5)
+            ]
+        }
+
+        # ACT: Run backtest
+        orchestrator = StrategyOrchestrator(
+            strategies_with_weights=strategies_with_weights,
+            initial_capital=Decimal("100000")
+        )
+        result = orchestrator.run(historical_data)
+
+        # ASSERT: Verify each strategy has performance metrics
+        for strategy_id, strategy_result in result.strategy_results.items():
+            assert hasattr(strategy_result, 'metrics'), (
+                f"Strategy {strategy_id} result should have metrics attribute"
+            )
+
+            metrics = strategy_result.metrics
+
+            # Verify metrics has required attributes
+            assert hasattr(metrics, 'sharpe_ratio'), (
+                f"Strategy {strategy_id} metrics should have sharpe_ratio"
+            )
+            assert hasattr(metrics, 'max_drawdown'), (
+                f"Strategy {strategy_id} metrics should have max_drawdown"
+            )
+            assert hasattr(metrics, 'total_return'), (
+                f"Strategy {strategy_id} metrics should have total_return"
+            )
+
+            # Verify metrics are Decimal type (for precision)
+            assert isinstance(metrics.total_return, Decimal), (
+                f"Strategy {strategy_id} total_return should be Decimal type"
+            )
+
+    def test_comparison_table_format(self, sample_strategies: List[IStrategy]):
+        """
+        T023 [P] [US2]: Test comparison table generated correctly.
+
+        **Acceptance Criteria** (spec.md FR-013):
+        GIVEN: 3 strategies with different performance
+        WHEN: orchestrator.run() completes
+        THEN: result.comparison_table contains rows for each strategy with metrics
+
+        **Expected Structure**:
+        comparison_table = {
+            "strategy_0": {"total_return": ..., "sharpe_ratio": ..., "win_rate": ...},
+            "strategy_1": {...},
+            "strategy_2": {...}
+        }
+
+        **TDD RED PHASE**: This test WILL FAIL because:
+        - orchestrator doesn't generate comparison_table yet
+        - Expected AttributeError or empty table
+
+        From: spec.md FR-013, tasks.md T023
+        Pattern: tests/backtest/test_report_generator.py table format tests
+        """
+        from decimal import Decimal
+        from datetime import datetime, timezone
+
+        # ARRANGE: 3 strategies
+        strategies_with_weights = [
+            (sample_strategies[0], Decimal("0.4")),
+            (sample_strategies[1], Decimal("0.3")),
+            (sample_strategies[2], Decimal("0.3")),
+        ]
+
+        # Create historical data
+        historical_data = {
+            "AAPL": [
+                HistoricalDataBar(
+                    symbol="AAPL",
+                    timestamp=datetime(2024, 1, i+1, 9, 30, tzinfo=timezone.utc),
+                    open=Decimal("100"),
+                    high=Decimal("102"),
+                    low=Decimal("99"),
+                    close=Decimal("101"),
+                    volume=1000000,
+                    split_adjusted=True,
+                    dividend_adjusted=True,
+                )
+                for i in range(5)
+            ]
+        }
+
+        # ACT: Run backtest
+        orchestrator = StrategyOrchestrator(
+            strategies_with_weights=strategies_with_weights,
+            initial_capital=Decimal("100000")
+        )
+        result = orchestrator.run(historical_data)
+
+        # ASSERT: Verify comparison table exists and has correct format
+        assert hasattr(result, 'comparison_table'), (
+            "OrchestratorResult should have comparison_table attribute"
+        )
+
+        comparison_table = result.comparison_table
+
+        # Verify table has entry for each strategy
+        assert len(comparison_table) == 3, (
+            f"Comparison table should have 3 rows (one per strategy), "
+            f"got {len(comparison_table)}"
+        )
+
+        # Verify table keys match strategy IDs
+        strategy_ids = set(result.strategy_results.keys())
+        table_ids = set(comparison_table.keys())
+        assert table_ids == strategy_ids, (
+            f"Comparison table keys {table_ids} should match "
+            f"strategy IDs {strategy_ids}"
+        )
+
+        # Verify each row has required metrics
+        required_metrics = ['total_return', 'sharpe_ratio', 'max_drawdown']
+        for strategy_id, metrics_row in comparison_table.items():
+            assert isinstance(metrics_row, dict), (
+                f"Comparison table row for {strategy_id} should be a dict"
+            )
+
+            for metric_name in required_metrics:
+                assert metric_name in metrics_row, (
+                    f"Comparison table row for {strategy_id} should contain "
+                    f"'{metric_name}' metric"
+                )
