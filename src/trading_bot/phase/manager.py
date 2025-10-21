@@ -4,16 +4,17 @@ Central service for managing phase transitions, validation, and progression.
 Coordinates validators, config updates, and transition logging.
 
 Based on specs/022-pos-scale-progress/contracts/phase-api.yaml
-Tasks: T045-T047
+Tasks: T045-T047, T080-T081 (TradeLimiter integration)
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Dict, Optional, Tuple
 from uuid import uuid4
 
 from trading_bot.config import Config
 from trading_bot.phase.models import Phase, PhaseTransition
+from trading_bot.phase.trade_limiter import TradeLimiter
 from trading_bot.phase.validators import (
     ExperienceToPoCValidator,
     PoCToTrialValidator,
@@ -80,6 +81,9 @@ class PhaseManager:
             ("proof", "trial"): PoCToTrialValidator(),
             ("trial", "scaling"): TrialToScalingValidator()
         }
+
+        # Trade limiter for PoC phase enforcement
+        self.trade_limiter = TradeLimiter(config)
 
         # Metrics storage (for testing - in production this comes from PerformanceTracker)
         self._metrics: Dict[str, any] = {}
@@ -208,3 +212,17 @@ class PhaseManager:
         self.config.current_phase = to_phase.value
 
         return transition
+
+    def enforce_trade_limit(self, phase: Phase, trade_date: date) -> None:
+        """Enforce daily trade limit for given phase.
+
+        Delegates to TradeLimiter for phase-specific limit checking.
+
+        Args:
+            phase: Current trading phase
+            trade_date: Date of proposed trade
+
+        Raises:
+            TradeLimitExceeded: If daily limit exceeded for this phase
+        """
+        self.trade_limiter.check_limit(phase, trade_date)

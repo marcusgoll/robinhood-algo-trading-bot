@@ -9,17 +9,14 @@ This module implements a four-phase trading progression system:
 See specs/022-pos-scale-progress/spec.md for full requirements.
 """
 
-# These will be implemented in subsequent tasks
-# Uncomment as each module is created
-
-# from .models import Phase
-# from .manager import PhaseManager
-# from .trade_limiter import TradeLimitExceeded
-# from .validators import PhaseValidationError
+# Phase models and management
+from .models import Phase
+from .manager import PhaseManager, PhaseValidationError
+from .trade_limiter import TradeLimitExceeded
 
 __all__ = [
-    # "Phase",
-    # "PhaseManager",
-    # "TradeLimitExceeded",
-    # "PhaseValidationError",
+    "Phase",
+    "PhaseManager",
+    "TradeLimitExceeded",
+    "PhaseValidationError",
 ]

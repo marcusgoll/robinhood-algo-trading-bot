@@ -4,19 +4,21 @@ TDD RED phase: Write failing tests for PhaseManager.
 - validate_transition() tests
 - advance_phase() tests
 - Error handling tests
+- TradeLimiter integration tests (T082)
 
 Based on specs/022-pos-scale-progress/contracts/phase-api.yaml
-Tasks: T040-T041
+Tasks: T040-T041, T082
 """
 
 import pytest
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
 from trading_bot.phase.models import Phase, PhaseTransition
 from trading_bot.phase.validators import ValidationResult
 from trading_bot.phase.manager import PhaseManager, PhaseValidationError
+from trading_bot.phase.trade_limiter import TradeLimiter, TradeLimitExceeded
 from trading_bot.config import Config
 
 
@@ -310,3 +312,122 @@ class TestPhaseValidationError:
         assert "session_count" in str(error)
         assert "win_rate" in str(error)
         assert error.result == result
+
+
+class TestTradeLimiterIntegration:
+    """Test TradeLimiter integration with PhaseManager (T082)."""
+
+    def test_enforce_trade_limit_poc_first_trade_allowed(self):
+        """PoC phase: First trade should be allowed."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="proof"
+        )
+        manager = PhaseManager(config)
+        trade_date = date(2025, 1, 15)
+
+        # Act & Assert - should not raise exception
+        manager.enforce_trade_limit(Phase.PROOF_OF_CONCEPT, trade_date)
+
+        # Verify counter incremented
+        assert manager.trade_limiter._trade_counts[trade_date] == 1
+
+    def test_enforce_trade_limit_poc_second_trade_blocked(self):
+        """PoC phase: Second trade should raise TradeLimitExceeded."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="proof"
+        )
+        manager = PhaseManager(config)
+        trade_date = date(2025, 1, 15)
+
+        # First trade allowed
+        manager.enforce_trade_limit(Phase.PROOF_OF_CONCEPT, trade_date)
+
+        # Act & Assert - second trade should fail
+        with pytest.raises(TradeLimitExceeded) as exc_info:
+            manager.enforce_trade_limit(Phase.PROOF_OF_CONCEPT, trade_date)
+
+        # Verify exception details
+        exc = exc_info.value
+        assert exc.phase == Phase.PROOF_OF_CONCEPT
+        assert exc.limit == 1
+
+    def test_enforce_trade_limit_experience_phase_unlimited(self):
+        """Experience phase: Multiple trades should be allowed."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="experience"
+        )
+        manager = PhaseManager(config)
+        trade_date = date(2025, 1, 15)
+
+        # Act - execute 5 trades
+        for _ in range(5):
+            manager.enforce_trade_limit(Phase.EXPERIENCE, trade_date)
+
+        # Assert - no exceptions raised, no counter tracked
+        assert trade_date not in manager.trade_limiter._trade_counts
+
+    def test_enforce_trade_limit_trial_phase_unlimited(self):
+        """Trial phase: Multiple trades should be allowed."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="trial"
+        )
+        manager = PhaseManager(config)
+        trade_date = date(2025, 1, 15)
+
+        # Act - execute 5 trades
+        for _ in range(5):
+            manager.enforce_trade_limit(Phase.REAL_MONEY_TRIAL, trade_date)
+
+        # Assert - no exceptions raised, no counter tracked
+        assert trade_date not in manager.trade_limiter._trade_counts
+
+    def test_enforce_trade_limit_scaling_phase_unlimited(self):
+        """Scaling phase: Multiple trades should be allowed."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+        trade_date = date(2025, 1, 15)
+
+        # Act - execute 5 trades
+        for _ in range(5):
+            manager.enforce_trade_limit(Phase.SCALING, trade_date)
+
+        # Assert - no exceptions raised, no counter tracked
+        assert trade_date not in manager.trade_limiter._trade_counts
+
+    def test_enforce_trade_limit_delegates_to_trade_limiter(self):
+        """Should delegate limit checking to TradeLimiter instance."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="proof"
+        )
+        manager = PhaseManager(config)
+        trade_date = date(2025, 1, 15)
+
+        # Verify TradeLimiter instance exists
+        assert manager.trade_limiter is not None
+        assert isinstance(manager.trade_limiter, TradeLimiter)
+
+        # Act - use enforce_trade_limit
+        manager.enforce_trade_limit(Phase.PROOF_OF_CONCEPT, trade_date)
+
+        # Assert - counter should be in TradeLimiter instance
+        assert manager.trade_limiter._trade_counts[trade_date] == 1
