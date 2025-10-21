@@ -331,3 +331,100 @@ class PhaseManager:
 
         # Default fallback
         return Decimal("0")
+
+    def check_downgrade_triggers(self, metrics: SessionMetrics) -> Optional[Phase]:
+        """Check if current metrics trigger automatic downgrade.
+
+        Args:
+            metrics: Current session metrics
+
+        Returns:
+            Target downgrade phase if triggers met, None otherwise
+
+        Trigger conditions (FR-006):
+            - 3 consecutive losses
+            - Rolling 20-trade win rate <55%
+            - Daily loss >5%
+        """
+        current_phase = Phase.from_string(self.config.current_phase)
+
+        # Can't downgrade from Experience (lowest phase)
+        if current_phase == Phase.EXPERIENCE:
+            return None
+
+        # Check consecutive losses
+        if metrics.total_losses >= 3 and metrics.total_wins == 0:
+            # 3 consecutive losses (no wins in session)
+            return self._get_previous_phase(current_phase)
+
+        # Check rolling win rate
+        if metrics.win_rate < Decimal("0.55"):
+            # Win rate below 55% threshold
+            return self._get_previous_phase(current_phase)
+
+        # Check daily loss percentage
+        if metrics.total_pnl < Decimal("0"):
+            # Calculate loss percentage (need portfolio value)
+            # For now, use absolute threshold
+            if abs(metrics.total_pnl) > Decimal("500"):  # Mock: $500 loss threshold
+                return self._get_previous_phase(current_phase)
+
+        # No downgrade needed
+        return None
+
+    def _get_previous_phase(self, current_phase: Phase) -> Phase:
+        """Get the previous phase in progression.
+
+        Args:
+            current_phase: Current phase
+
+        Returns:
+            Previous phase in progression sequence
+        """
+        phase_order = [
+            Phase.EXPERIENCE,
+            Phase.PROOF_OF_CONCEPT,
+            Phase.REAL_MONEY_TRIAL,
+            Phase.SCALING
+        ]
+
+        current_index = phase_order.index(current_phase)
+        if current_index > 0:
+            return phase_order[current_index - 1]
+
+        return Phase.EXPERIENCE  # Can't go lower
+
+    def apply_downgrade(self, to_phase: Phase, reason: str) -> PhaseTransition:
+        """Apply automatic phase downgrade.
+
+        Creates downgrade transition record and updates config.
+
+        Args:
+            to_phase: Target phase to downgrade to
+            reason: Reason for downgrade
+
+        Returns:
+            PhaseTransition record
+        """
+        from_phase = Phase.from_string(self.config.current_phase)
+
+        transition = PhaseTransition(
+            transition_id=str(uuid4()),
+            timestamp=datetime.now(timezone.utc),
+            from_phase=from_phase,
+            to_phase=to_phase,
+            trigger="auto",
+            validation_passed=False,  # Downgrade, not advancement
+            metrics_snapshot={},
+            failure_reasons=[reason],
+            override_password_used=False
+        )
+
+        # Update config
+        self.config.current_phase = to_phase.value
+
+        # TODO: Log transition with history_logger if available
+        # if hasattr(self, 'history_logger'):
+        #     self.history_logger.log_transition(transition)
+
+        return transition

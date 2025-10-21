@@ -416,3 +416,170 @@ class TestPhaseWorkflowIntegration:
             record = json.loads(line)
             assert "transition_id" in record
             assert "timestamp" in record
+
+    def test_automatic_downgrade_trial_to_poc(self, manager, logger):
+        """Test automatic downgrade from Trial to PoC after 3 losses (T130-T131)."""
+        # Start in Trial phase
+        manager.config.current_phase = "trial"
+
+        # Mock metrics: 3 consecutive losses (trigger downgrade)
+        from trading_bot.phase.models import SessionMetrics
+        metrics = SessionMetrics(
+            session_date=date(2025, 1, 15),
+            phase="trial",
+            trades_executed=3,
+            total_wins=0,
+            total_losses=3,
+            win_rate=Decimal("0.00"),
+            average_rr=Decimal("0.00"),
+            total_pnl=Decimal("-150.00")
+        )
+
+        # Check if downgrade is triggered
+        target_phase = manager.check_downgrade_triggers(metrics)
+        assert target_phase == Phase.PROOF_OF_CONCEPT  # Trial → PoC
+
+        # Apply downgrade
+        transition = manager.apply_downgrade(
+            to_phase=target_phase,
+            reason="3 consecutive losses"
+        )
+
+        # Verify transition details
+        assert transition.from_phase == Phase.REAL_MONEY_TRIAL
+        assert transition.to_phase == Phase.PROOF_OF_CONCEPT
+        assert transition.trigger == "auto"
+        assert transition.validation_passed is False  # Downgrade
+        assert "3 consecutive losses" in transition.failure_reasons
+
+        # Log transition
+        logger.log_transition(transition)
+
+        # Verify config updated
+        assert manager.config.current_phase == "proof"
+
+        # Verify JSONL logged correctly
+        assert logger.transition_log.exists()
+
+        # Read and verify JSONL content
+        with open(logger.transition_log, "r") as f:
+            record = json.loads(f.readline())
+
+        assert record["from_phase"] == "trial"
+        assert record["to_phase"] == "proof"
+        assert record["trigger"] == "auto"
+        assert record["validation_passed"] is False
+        assert "3 consecutive losses" in record["failure_reasons"]
+
+    def test_automatic_downgrade_scaling_to_trial_win_rate(self, manager, logger):
+        """Test automatic downgrade from Scaling to Trial due to low win rate (T130-T131)."""
+        # Start in Scaling phase
+        manager.config.current_phase = "scaling"
+
+        # Mock metrics: Win rate below 55% threshold
+        from trading_bot.phase.models import SessionMetrics
+        metrics = SessionMetrics(
+            session_date=date(2025, 1, 15),
+            phase="scaling",
+            trades_executed=20,
+            total_wins=10,
+            total_losses=10,
+            win_rate=Decimal("0.52"),  # Below 0.55 threshold
+            average_rr=Decimal("1.5"),
+            total_pnl=Decimal("50.00")
+        )
+
+        # Check if downgrade is triggered
+        target_phase = manager.check_downgrade_triggers(metrics)
+        assert target_phase == Phase.REAL_MONEY_TRIAL  # Scaling → Trial
+
+        # Apply downgrade
+        transition = manager.apply_downgrade(
+            to_phase=target_phase,
+            reason="Win rate 52% below 55% threshold"
+        )
+
+        # Verify transition
+        assert transition.from_phase == Phase.SCALING
+        assert transition.to_phase == Phase.REAL_MONEY_TRIAL
+        assert manager.config.current_phase == "trial"
+
+        # Log and verify
+        logger.log_transition(transition)
+
+        with open(logger.transition_log, "r") as f:
+            record = json.loads(f.readline())
+
+        assert record["from_phase"] == "scaling"
+        assert record["to_phase"] == "trial"
+        assert record["validation_passed"] is False
+
+    def test_automatic_downgrade_daily_loss_threshold(self, manager, logger):
+        """Test automatic downgrade due to daily loss >5% (T130-T131)."""
+        # Start in Trial phase
+        manager.config.current_phase = "trial"
+
+        # Mock metrics: Daily loss exceeds threshold
+        from trading_bot.phase.models import SessionMetrics
+        metrics = SessionMetrics(
+            session_date=date(2025, 1, 15),
+            phase="trial",
+            trades_executed=5,
+            total_wins=1,
+            total_losses=4,
+            win_rate=Decimal("0.20"),
+            average_rr=Decimal("0.5"),
+            total_pnl=Decimal("-600.00")  # Critical loss (>5% of $10k)
+        )
+
+        # Check if downgrade is triggered
+        target_phase = manager.check_downgrade_triggers(metrics)
+        assert target_phase == Phase.PROOF_OF_CONCEPT  # Trial → PoC
+
+        # Apply downgrade
+        transition = manager.apply_downgrade(
+            to_phase=target_phase,
+            reason="Daily loss $600 exceeds 5% threshold"
+        )
+
+        # Verify transition
+        assert transition.from_phase == Phase.REAL_MONEY_TRIAL
+        assert transition.to_phase == Phase.PROOF_OF_CONCEPT
+        assert manager.config.current_phase == "proof"
+
+        # Log and verify
+        logger.log_transition(transition)
+
+        with open(logger.transition_log, "r") as f:
+            record = json.loads(f.readline())
+
+        assert record["from_phase"] == "trial"
+        assert record["to_phase"] == "proof"
+        assert "Daily loss $600 exceeds 5% threshold" in record["failure_reasons"]
+
+    def test_no_downgrade_when_metrics_acceptable(self, manager):
+        """Test no downgrade when metrics are within thresholds (T130-T131)."""
+        # Start in Trial phase
+        manager.config.current_phase = "trial"
+
+        # Mock metrics: Good performance (no downgrade needed)
+        from trading_bot.phase.models import SessionMetrics
+        metrics = SessionMetrics(
+            session_date=date(2025, 1, 15),
+            phase="trial",
+            trades_executed=10,
+            total_wins=6,
+            total_losses=4,
+            win_rate=Decimal("0.60"),  # Above 0.55 threshold
+            average_rr=Decimal("1.5"),
+            total_pnl=Decimal("200.00")  # Positive P&L
+        )
+
+        # Check if downgrade is triggered
+        target_phase = manager.check_downgrade_triggers(metrics)
+
+        # Should not trigger downgrade
+        assert target_phase is None
+
+        # Config should remain unchanged
+        assert manager.config.current_phase == "trial"

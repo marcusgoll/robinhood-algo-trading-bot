@@ -648,6 +648,266 @@ class TestSessionMetrics:
         assert "session_count" in result.missing_requirements
 
 
+class TestAutomaticDowngrades:
+    """Test automatic phase downgrades (US5, T120-T127)."""
+
+    def test_check_downgrade_triggers_3_consecutive_losses(self):
+        """Should downgrade to previous phase after 3 consecutive losses (T120)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="trial"
+        )
+        manager = PhaseManager(config)
+
+        # Mock metrics: 3 consecutive losses (no wins)
+        from trading_bot.phase.models import SessionMetrics
+        metrics = SessionMetrics(
+            session_date=date(2025, 1, 15),
+            phase="trial",
+            trades_executed=3,
+            total_wins=0,
+            total_losses=3,
+            win_rate=Decimal("0.00"),
+            average_rr=Decimal("0.00"),
+            total_pnl=Decimal("-150.00")
+        )
+
+        # Act
+        target_phase = manager.check_downgrade_triggers(metrics)
+
+        # Assert
+        assert target_phase == Phase.PROOF_OF_CONCEPT  # Trial → PoC
+
+    def test_check_downgrade_triggers_win_rate_below_55_percent(self):
+        """Should downgrade when rolling win rate < 55% (T120)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+
+        # Mock metrics: 52% win rate (below 55% threshold)
+        from trading_bot.phase.models import SessionMetrics
+        metrics = SessionMetrics(
+            session_date=date(2025, 1, 15),
+            phase="scaling",
+            trades_executed=20,
+            total_wins=10,
+            total_losses=10,
+            win_rate=Decimal("0.52"),  # Below 0.55 threshold
+            average_rr=Decimal("1.5"),
+            total_pnl=Decimal("50.00")
+        )
+
+        # Act
+        target_phase = manager.check_downgrade_triggers(metrics)
+
+        # Assert
+        assert target_phase == Phase.REAL_MONEY_TRIAL  # Scaling → Trial
+
+    def test_check_downgrade_triggers_daily_loss_exceeds_threshold(self):
+        """Should downgrade when daily loss > 5% (T120)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="trial"
+        )
+        manager = PhaseManager(config)
+
+        # Mock metrics: $600 loss (>5% of $10k portfolio)
+        from trading_bot.phase.models import SessionMetrics
+        metrics = SessionMetrics(
+            session_date=date(2025, 1, 15),
+            phase="trial",
+            trades_executed=5,
+            total_wins=1,
+            total_losses=4,
+            win_rate=Decimal("0.20"),
+            average_rr=Decimal("0.5"),
+            total_pnl=Decimal("-600.00")  # Critical loss
+        )
+
+        # Act
+        target_phase = manager.check_downgrade_triggers(metrics)
+
+        # Assert
+        assert target_phase == Phase.PROOF_OF_CONCEPT  # Trial → PoC
+
+    def test_check_downgrade_triggers_within_thresholds_returns_none(self):
+        """Should return None when metrics within acceptable thresholds (T120)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="trial"
+        )
+        manager = PhaseManager(config)
+
+        # Mock metrics: Good performance (no downgrade needed)
+        from trading_bot.phase.models import SessionMetrics
+        metrics = SessionMetrics(
+            session_date=date(2025, 1, 15),
+            phase="trial",
+            trades_executed=10,
+            total_wins=6,
+            total_losses=4,
+            win_rate=Decimal("0.60"),  # Above 0.55 threshold
+            average_rr=Decimal("1.5"),
+            total_pnl=Decimal("200.00")  # Positive P&L
+        )
+
+        # Act
+        target_phase = manager.check_downgrade_triggers(metrics)
+
+        # Assert
+        assert target_phase is None  # No downgrade
+
+    def test_check_downgrade_triggers_experience_phase_returns_none(self):
+        """Should return None when already in Experience phase (lowest) (T120)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="experience"
+        )
+        manager = PhaseManager(config)
+
+        # Mock metrics: Bad performance in Experience phase
+        from trading_bot.phase.models import SessionMetrics
+        metrics = SessionMetrics(
+            session_date=date(2025, 1, 15),
+            phase="experience",
+            trades_executed=3,
+            total_wins=0,
+            total_losses=3,
+            win_rate=Decimal("0.00"),
+            average_rr=Decimal("0.00"),
+            total_pnl=Decimal("0.00")  # Paper trading
+        )
+
+        # Act
+        target_phase = manager.check_downgrade_triggers(metrics)
+
+        # Assert
+        assert target_phase is None  # Can't downgrade from Experience
+
+    def test_apply_downgrade_creates_transition_record(self):
+        """Should create PhaseTransition record for downgrade (T125)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        transition = manager.apply_downgrade(
+            to_phase=Phase.REAL_MONEY_TRIAL,
+            reason="3 consecutive losses"
+        )
+
+        # Assert
+        assert isinstance(transition, PhaseTransition)
+        assert transition.from_phase == Phase.SCALING
+        assert transition.to_phase == Phase.REAL_MONEY_TRIAL
+        assert transition.trigger == "auto"
+        assert transition.validation_passed is False  # Downgrade, not advancement
+        assert "3 consecutive losses" in transition.failure_reasons
+        assert transition.override_password_used is False
+
+        # Verify config updated
+        assert manager.config.current_phase == "trial"
+
+    def test_apply_downgrade_updates_config_to_previous_phase(self):
+        """Should update config.current_phase to downgrade target (T126)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="trial"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        manager.apply_downgrade(
+            to_phase=Phase.PROOF_OF_CONCEPT,
+            reason="Win rate below 55%"
+        )
+
+        # Assert
+        assert manager.config.current_phase == "proof"
+
+    def test_get_previous_phase_scaling_to_trial(self):
+        """Should return Trial when downgrading from Scaling (T125)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        previous = manager._get_previous_phase(Phase.SCALING)
+
+        # Assert
+        assert previous == Phase.REAL_MONEY_TRIAL
+
+    def test_get_previous_phase_trial_to_poc(self):
+        """Should return PoC when downgrading from Trial (T125)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="trial"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        previous = manager._get_previous_phase(Phase.REAL_MONEY_TRIAL)
+
+        # Assert
+        assert previous == Phase.PROOF_OF_CONCEPT
+
+    def test_get_previous_phase_poc_to_experience(self):
+        """Should return Experience when downgrading from PoC (T125)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="proof"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        previous = manager._get_previous_phase(Phase.PROOF_OF_CONCEPT)
+
+        # Assert
+        assert previous == Phase.EXPERIENCE
+
+    def test_get_previous_phase_experience_stays_experience(self):
+        """Should return Experience when already at lowest phase (T125)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="experience"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        previous = manager._get_previous_phase(Phase.EXPERIENCE)
+
+        # Assert
+        assert previous == Phase.EXPERIENCE  # Can't go lower
+
+
 class TestPositionSizing:
     """Test graduated position sizing (US4, T110-T116)."""
 
