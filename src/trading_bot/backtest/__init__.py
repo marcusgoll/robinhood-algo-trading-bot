@@ -38,6 +38,7 @@ from trading_bot.backtest.models import (
     StrategyAllocation,
     Trade,
 )
+from trading_bot.backtest.orchestrator import StrategyOrchestrator
 from trading_bot.backtest.performance_calculator import PerformanceCalculator
 from trading_bot.backtest.report_generator import ReportGenerator
 from trading_bot.backtest.strategy_protocol import IStrategy
@@ -61,5 +62,6 @@ __all__ = [
     "ReportGenerator",
     "StrategyAllocation",
     "StrategyError",
+    "StrategyOrchestrator",
     "Trade",
 ]

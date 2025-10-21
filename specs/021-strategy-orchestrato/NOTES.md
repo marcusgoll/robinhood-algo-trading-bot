@@ -365,3 +365,53 @@ Standard (backend feature with measurable outcomes)
     - spec.md FR-015: System MUST maintain chronological order guarantee (no look-ahead bias)
     - tasks.md T012: Write test for chronological execution across all strategies
   - Status: ✅ Complete (RED phase successful - expected import failure confirmed)
+
+✅ T015 [US1]: Create StrategyOrchestrator class skeleton
+  - Evidence: Class created with comprehensive docstrings and complete __init__ method
+  - Files:
+    - src/trading_bot/backtest/orchestrator.py (NEW FILE - 252 lines)
+    - src/trading_bot/backtest/__init__.py (StrategyOrchestrator added to imports and __all__)
+  - Class structure:
+    - __init__(strategies_with_weights, initial_capital, config):
+      - Validates initial_capital > 0
+      - Validates non-empty strategies list
+      - Validates weights sum ≤1.0 (FR-002)
+      - Creates strategy registry: _strategies dict[str, IStrategy]
+      - Creates capital allocations: _allocations list[StrategyAllocation] (FR-003)
+      - Sets up structured JSON logging
+      - Generates unique strategy IDs (zero-indexed: "strategy_0", "strategy_1", etc.)
+    - run(historical_data):
+      - Signature complete with proper type hints
+      - Comprehensive docstring with usage examples
+      - Validates historical_data not empty
+      - Raises NotImplementedError (implementation pending in T016-T018)
+    - Attributes:
+      - _strategies: dict[str, IStrategy] - Strategy instances by ID
+      - _allocations: list[StrategyAllocation] - Capital allocations (ordered)
+      - _config: OrchestratorConfig - Configuration parameters
+      - initial_capital: Decimal - Total portfolio capital
+  - Documentation:
+    - Comprehensive class docstring with usage example
+    - Complete __init__ docstring with parameter descriptions and error cases
+    - Complete run() docstring with return type and workflow description
+    - References to FR requirements (FR-002, FR-003, FR-007, FR-012, FR-015)
+  - Imports:
+    - IStrategy from strategy_protocol.py
+    - StrategyAllocation, OrchestratorConfig, OrchestratorResult from models.py
+    - HistoricalDataBar from models.py
+    - logging, Decimal from standard library
+  - Code quality:
+    - Auto-formatted by ruff (linter applied improvements)
+    - Weights type changed from float to Decimal for consistency
+    - Default initial_capital added: Decimal("100000.0")
+    - Comprehensive error messages with context
+    - Structured logging with JSON format
+    - Pattern follows BacktestEngine class structure
+  - Import verified: `from trading_bot.backtest import StrategyOrchestrator` works
+  - Test status: T010-T012 tests still in RED phase (expected - awaiting T016-T018 implementation)
+  - Pattern followed: src/trading_bot/backtest/engine.py BacktestEngine class
+  - From:
+    - spec.md US1: Multi-strategy execution framework
+    - tasks.md T015: Create StrategyOrchestrator class skeleton
+    - plan.md [STRUCTURE]: orchestrator.py module specification
+  - Status: ✅ Complete (skeleton ready, implementation continues in T016-T018)
