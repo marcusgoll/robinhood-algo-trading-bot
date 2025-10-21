@@ -5,6 +5,11 @@
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
 
+**GitHub Issues Integration**: Active and Backlog features have been migrated to [GitHub Issues](https://github.com/marcusgoll/robinhood-algo-trading-bot/issues?q=is%3Aissue+label%3Atype%3Afeature)
+- Use GitHub Issues for tracking Next, Later, and Backlog features
+- This roadmap.md remains the source of truth for Shipped features
+- ICE scores and metadata are maintained in GitHub issue frontmatter
+
 ## Shipped
 
 <!-- Released and operational -->
