@@ -39,33 +39,63 @@
     "comment_phases": "experience → proof → trial → scaling",
 
     "experience": {
-      "mode": "paper",
-      "max_trades_per_day": 999,
-      "comment": "Unlimited paper trading to learn"
+      "max_trades_per_day": null,
+      "comment_max_trades": "null = unlimited paper trading to learn",
+      "position_size": 0,
+      "advancement_criteria": {
+        "min_sessions": 20,
+        "min_win_rate": 0.60,
+        "min_avg_rr": 1.5,
+        "comment": "Requirements to advance to proof phase"
+      }
     },
 
     "proof": {
-      "mode": "paper",
       "max_trades_per_day": 1,
-      "min_sessions_required": 10,
-      "min_win_rate_pct": 55.0,
-      "comment": "Prove consistency with 1 trade/day"
+      "comment_max_trades": "Prove consistency with 1 trade/day",
+      "position_size": 100,
+      "advancement_criteria": {
+        "min_sessions": 30,
+        "min_trades": 50,
+        "min_win_rate": 0.65,
+        "min_avg_rr": 1.8,
+        "comment": "Requirements to advance to trial phase"
+      }
     },
 
     "trial": {
-      "mode": "live",
-      "max_trades_per_day": 1,
-      "position_size_shares": 25,
-      "min_sessions_required": 20,
-      "comment": "Real money trial with small size"
+      "max_trades_per_day": null,
+      "comment_max_trades": "null = unlimited trades, but small size",
+      "position_size": 200,
+      "advancement_criteria": {
+        "min_sessions": 60,
+        "min_trades": 100,
+        "min_win_rate": 0.70,
+        "min_avg_rr": 2.0,
+        "max_drawdown": 0.05,
+        "comment": "Requirements to advance to scaling phase"
+      }
     },
 
     "scaling": {
-      "mode": "live",
-      "max_trades_per_day": 3,
-      "position_size_shares": 100,
-      "scale_increment_shares": 25,
-      "comment": "Gradually increase size based on consistency"
+      "max_trades_per_day": null,
+      "comment_max_trades": "null = unlimited, focus on consistency",
+      "position_size_min": 200,
+      "position_size_max": 2000,
+      "consistency_triggers": {
+        "consecutive_wins_for_increase": 5,
+        "position_increase_amount": 100,
+        "win_rate_threshold": 0.70,
+        "comment": "Scale position size based on consistent performance"
+      }
+    },
+
+    "scaler_state": {
+      "current_multiplier": 1.0,
+      "milestone_count": 0,
+      "sessions_since_milestone": 0,
+      "last_scaled_at": null,
+      "comment": "Internal state tracking for position scaling (auto-managed)"
     }
   },
 
