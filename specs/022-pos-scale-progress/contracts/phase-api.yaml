@@ -1,0 +1,388 @@
+# Phase Management API Contracts
+# Note: This is a Python module API (not REST), contracts defined as Python protocols
+
+## PhaseManager Protocol
+
+```python
+from typing import Protocol, Optional
+from decimal import Decimal
+from datetime import datetime, date
+from .models import Phase, PhaseTransition, ValidationResult, SessionMetrics
+
+class PhaseManagerProtocol(Protocol):
+    """Phase management service contract."""
+
+    def validate_transition(self, to_phase: Phase) -> ValidationResult:
+        """
+        Validate if current phase can transition to target phase.
+
+        Args:
+            to_phase: Target phase to validate transition to
+
+        Returns:
+            ValidationResult with can_advance, criteria_met, missing_requirements
+
+        Raises:
+            ValueError: If to_phase is invalid or not sequential
+        """
+        ...
+
+    def advance_phase(self, to_phase: Phase, force: bool = False) -> PhaseTransition:
+        """
+        Advance to next phase after validation.
+
+        Args:
+            to_phase: Target phase
+            force: Bypass validation (requires override password)
+
+        Returns:
+            PhaseTransition record logged to phase-history.jsonl
+
+        Raises:
+            PhaseValidationError: If validation fails and force=False
+            PhaseOverrideError: If force=True but override password incorrect
+        """
+        ...
+
+    def check_downgrade_triggers(self, metrics: SessionMetrics) -> Optional[Phase]:
+        """
+        Check if current metrics trigger automatic downgrade.
+
+        Args:
+            metrics: Current session metrics
+
+        Returns:
+            Target downgrade phase if triggers met, None otherwise
+
+        Trigger conditions (FR-006):
+            - 3 consecutive losses
+            - Rolling 20-trade win rate <55%
+            - Daily loss >5%
+        """
+        ...
+
+    def get_position_size(
+        self,
+        phase: Phase,
+        consistency_metrics: dict
+    ) -> Decimal:
+        """
+        Calculate position size based on phase and consistency.
+
+        Args:
+            phase: Current trading phase
+            consistency_metrics:
+                - consecutive_wins: int
+                - rolling_win_rate: Decimal (over 10 sessions)
+
+        Returns:
+            Position size in USD (Decimal)
+
+        Rules (FR-005):
+            - Experience: Decimal("0") (paper trading)
+            - PoC: Decimal("100")
+            - Trial: Decimal("200")
+            - Scaling: Decimal("200") to Decimal("2000") based on consistency
+        """
+        ...
+
+    def enforce_trade_limit(self, phase: Phase, trade_date: date) -> None:
+        """
+        Enforce phase-specific daily trade limits.
+
+        Args:
+            phase: Current trading phase
+            trade_date: Date of trade attempt
+
+        Raises:
+            TradeLimitExceeded: If daily limit reached (PoC phase)
+
+        Rules (FR-003):
+            - Experience: No limit
+            - PoC: 1 trade/day
+            - Trial: No limit
+            - Scaling: No limit
+        """
+        ...
+```
+
+## Validator Protocol
+
+```python
+class PhaseValidatorProtocol(Protocol):
+    """Phase transition validator contract."""
+
+    def validate(
+        self,
+        from_phase: Phase,
+        to_phase: Phase,
+        session_count: int,
+        trade_count: int,
+        win_rate: Decimal,
+        avg_rr: Decimal,
+        max_drawdown: Optional[Decimal] = None
+    ) -> ValidationResult:
+        """
+        Validate phase transition criteria.
+
+        Args:
+            from_phase: Current phase
+            to_phase: Target phase
+            session_count: Number of trading sessions
+            trade_count: Total trades executed
+            win_rate: Win rate percentage (0.00-1.00)
+            avg_rr: Average risk-reward ratio
+            max_drawdown: Maximum drawdown percentage (optional)
+
+        Returns:
+            ValidationResult with detailed criteria breakdown
+
+        Criteria per transition (FR-002):
+            Experience → PoC: 20 sessions, 60% win, 1.5 R:R
+            PoC → Trial: 30 sessions, 50 trades, 65% win, 1.8 R:R
+            Trial → Scaling: 60 sessions, 100 trades, 70% win, 2.0 R:R, <5% drawdown
+        """
+        ...
+```
+
+## HistoryLogger Protocol
+
+```python
+class HistoryLoggerProtocol(Protocol):
+    """Phase history logging contract."""
+
+    def log_transition(self, transition: PhaseTransition) -> None:
+        """
+        Log phase transition to JSONL history file.
+
+        Args:
+            transition: PhaseTransition event
+
+        Side Effects:
+            - Appends to logs/phase/phase-history.jsonl
+            - Creates file if not exists
+
+        Format (JSONL):
+            {
+                "transition_id": "uuid",
+                "timestamp": "2025-10-21T14:30:00+00:00",
+                "from_phase": "experience",
+                "to_phase": "proof",
+                "trigger": "auto",
+                "validation_passed": true,
+                "metrics_snapshot": {...}
+            }
+        """
+        ...
+
+    def log_override_attempt(
+        self,
+        phase: Phase,
+        action: str,
+        blocked: bool,
+        reason: str,
+        operator_id: Optional[str] = None
+    ) -> None:
+        """
+        Log manual override attempts (FR-007).
+
+        Args:
+            phase: Current phase
+            action: Override action attempted
+            blocked: Whether attempt was blocked
+            reason: Block reason or success justification
+            operator_id: Operator identifier (optional)
+
+        Side Effects:
+            - Appends to logs/phase/phase-overrides.jsonl
+
+        Format (JSONL):
+            {
+                "timestamp": "2025-10-21T16:45:00+00:00",
+                "phase": "experience",
+                "action": "attempted_advance",
+                "blocked": true,
+                "reason": "Win rate 0.58 < required 0.60"
+            }
+        """
+        ...
+
+    def query_transitions(
+        self,
+        start_date: date,
+        end_date: date
+    ) -> list[PhaseTransition]:
+        """
+        Query phase transitions within date range.
+
+        Args:
+            start_date: Start of range (inclusive)
+            end_date: End of range (inclusive)
+
+        Returns:
+            List of PhaseTransition events sorted by timestamp
+
+        Performance:
+            - Target: <500ms for full history (NFR-001)
+            - Implementation: Sequential JSONL read with date filtering
+        """
+        ...
+```
+
+## Data Model Contracts (JSON Schema)
+
+### SessionMetrics Schema
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["session_date", "phase", "trades_executed", "win_rate", "average_rr", "total_pnl"],
+  "properties": {
+    "session_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Trading session date (YYYY-MM-DD)"
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["experience", "proof", "trial", "scaling"]
+    },
+    "trades_executed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_wins": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_losses": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "win_rate": {
+      "type": "string",
+      "pattern": "^0\\.[0-9]{2}$",
+      "description": "Decimal win rate (0.00-1.00)"
+    },
+    "average_rr": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]{2}$",
+      "description": "Decimal average R:R"
+    },
+    "total_pnl": {
+      "type": "string",
+      "pattern": "^-?[0-9]+\\.[0-9]{2}$",
+      "description": "Decimal P&L in USD"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp"
+    }
+  }
+}
+```
+
+### PhaseTransition Schema
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["transition_id", "timestamp", "from_phase", "to_phase", "trigger", "validation_passed"],
+  "properties": {
+    "transition_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "from_phase": {
+      "type": "string",
+      "enum": ["experience", "proof", "trial", "scaling"]
+    },
+    "to_phase": {
+      "type": "string",
+      "enum": ["experience", "proof", "trial", "scaling"]
+    },
+    "trigger": {
+      "type": "string",
+      "enum": ["auto", "manual"]
+    },
+    "validation_passed": {
+      "type": "boolean"
+    },
+    "metrics_snapshot": {
+      "type": "object",
+      "required": ["session_count", "win_rate", "avg_rr"],
+      "properties": {
+        "session_count": {"type": "integer"},
+        "win_rate": {"type": "string"},
+        "avg_rr": {"type": "string"},
+        "total_pnl": {"type": "string"}
+      }
+    },
+    "failure_reasons": {
+      "type": ["array", "null"],
+      "items": {"type": "string"}
+    }
+  }
+}
+```
+
+## Exception Contracts
+
+```python
+class PhaseValidationError(Exception):
+    """Raised when phase transition validation fails."""
+
+    def __init__(self, validation_result: ValidationResult):
+        self.result = validation_result
+        super().__init__(self._format_error())
+
+    def _format_error(self) -> str:
+        return f"Phase validation failed: {', '.join(self.result.missing_requirements)}"
+
+
+class TradeLimitExceeded(Exception):
+    """Raised when daily trade limit reached (PoC phase)."""
+
+    def __init__(self, phase: Phase, limit: int, next_allowed: datetime):
+        self.phase = phase
+        self.limit = limit
+        self.next_allowed = next_allowed
+        super().__init__(
+            f"Trade limit exceeded: {limit} trades allowed in {phase.value} phase. "
+            f"Next trade at: {next_allowed.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+        )
+
+
+class PhaseOverrideError(Exception):
+    """Raised when manual override attempt fails."""
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(f"Phase override failed: {reason}")
+```
+
+## Performance Contracts (NFR-001)
+
+```python
+from typing import TypedDict
+
+class PerformanceTarget(TypedDict):
+    """Performance targets for phase operations."""
+    phase_validation_ms: int  # ≤50 ms
+    session_calculation_ms: int  # ≤200 ms for 1,000 trades
+    history_export_ms: int  # ≤1,000 ms for full history
+    transition_validation_ms: int  # ≤500 ms
+```
+
+Performance targets:
+- `PhaseManager.validate_transition()`: ≤50 ms
+- `SessionMetrics` calculation (1,000 trades): ≤200 ms
+- `HistoryLogger.query_transitions()` (full history): ≤1,000 ms
+- `advance_phase()` validation: ≤500 ms
