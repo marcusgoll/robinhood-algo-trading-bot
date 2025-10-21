@@ -11,7 +11,7 @@ license = {text = "MIT"}
 
 dependencies = [
     "robin-stocks>=3.4.0",
-    "pandas==2.1.4",
+    "pandas==2.3.3",
     "numpy==1.26.3",
     "python-dotenv==1.0.0",
     "python-dateutil==2.8.2",
