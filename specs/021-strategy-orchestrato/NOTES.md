@@ -415,3 +415,65 @@ Standard (backend feature with measurable outcomes)
     - tasks.md T015: Create StrategyOrchestrator class skeleton
     - plan.md [STRUCTURE]: orchestrator.py module specification
   - Status: ✅ Complete (skeleton ready, implementation continues in T016-T018)
+
+✅ T016 [US1]: Implement __init__ with weight validation
+  - Evidence: StrategyOrchestrator.__init__() fully implemented with comprehensive validation - GREEN phase achieved
+  - Files:
+    - src/trading_bot/backtest/orchestrator.py (updated __init__ method - 80 lines)
+  - Implementation details:
+    - Weight validation (FR-002):
+      - Validates weights sum to ≤1.0 (≤100%)
+      - Raises ValueError with descriptive message if weights > 1.0
+      - Shows actual weight sum in error message (e.g., "1.01" for edge case)
+      - Validates individual weights are non-negative
+      - Supports partial allocation (e.g., 70% total)
+    - Capital allocation (FR-003):
+      - Creates unique strategy_id for each strategy (zero-indexed: "strategy_0", "strategy_1")
+      - Calculates allocated_capital = initial_capital × weight for each strategy
+      - Creates StrategyAllocation instance with strategy_id and allocated_capital
+      - Stores allocations in _allocations list (maintains insertion order)
+      - Stores strategies in _strategies dict (keyed by strategy_id)
+    - Validation checks:
+      - initial_capital > 0 (raises ValueError if ≤0)
+      - strategies_with_weights not empty (raises ValueError if empty)
+      - All weights non-negative (raises ValueError if any weight < 0)
+    - Structured logging:
+      - JSON formatter for structured logs (timestamp, level, logger, message)
+      - Logs strategy initialization: strategy_id, weight, allocated capital
+      - Logs orchestrator initialization summary: strategy count, total capital, total weight
+      - Respects config.logging_level setting
+  - Test results (GREEN phase):
+    - test_init_valid_weights_passes: ✅ PASSED (2 scenarios)
+      - Scenario 1: Weights sum to 1.0 (100%) - orchestrator created successfully
+      - Scenario 2: Weights sum to <1.0 (70%) - partial allocation accepted
+    - test_init_invalid_weights_raises_value_error: ✅ PASSED (2 scenarios)
+      - Scenario 1: Weights sum to 1.5 (150%) - ValueError raised with descriptive message
+      - Scenario 2: Weights sum to 1.01 (101%) - ValueError raised showing "1.01" in message
+    - test_capital_allocation_proportional: ✅ PASSED
+      - 3 strategies with weights [0.5, 0.3, 0.2] and $100k capital
+      - Allocations: [$50k, $30k, $20k] - all correct
+      - used_capital initialized to $0 for each strategy
+      - available_capital equals allocated_capital initially
+      - strategy_id values unique and correctly set
+      - Total allocated capital equals initial capital
+      - All allocations are StrategyAllocation instances
+  - Test run: 3/3 passed in 1.75s
+  - Bug fixes applied:
+    - Changed _allocations from dict to list (matches test expectations)
+    - Changed strategy_id indexing from 1-based to 0-based ("strategy_0", not "strategy_1")
+    - Changed weight type from float to Decimal throughout
+    - Fixed import path: trading_bot.backtest.models → src.trading_bot.backtest.models
+      - Resolved class identity issue (isinstance checks failing due to different import paths)
+  - Code quality:
+    - Type hints: list[tuple[IStrategy, Decimal]] for strategies_with_weights
+    - Default parameter: initial_capital=Decimal("100000.0")
+    - Comprehensive docstrings with FR references
+    - Error messages include context (actual values, limits, suggestions)
+    - Pattern follows BacktestEngine.__init__ validation approach
+  - Pattern followed: src/trading_bot/backtest/engine.py BacktestEngine.__init__ validation
+  - From:
+    - spec.md FR-002: Weight validation (sum ≤1.0)
+    - spec.md FR-003: Proportional capital allocation
+    - spec.md NFR-003: Fail-fast validation at initialization
+    - tasks.md T016: Implement __init__ with weight validation
+  - Status: ✅ Complete (GREEN phase - all T010, T011 tests passing)
