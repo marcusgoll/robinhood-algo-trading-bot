@@ -646,3 +646,260 @@ class TestSessionMetrics:
         # Assert - should fail because need minimum 20 sessions
         assert result.can_advance is False
         assert "session_count" in result.missing_requirements
+
+
+class TestPositionSizing:
+    """Test graduated position sizing (US4, T110-T116)."""
+
+    def test_experience_phase_zero_position_size(self):
+        """Experience phase should return $0 (paper trading) (T110)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="experience"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        size = manager.get_position_size(Phase.EXPERIENCE)
+
+        # Assert
+        assert size == Decimal("0")
+
+    def test_poc_phase_fixed_100_position_size(self):
+        """PoC phase should return fixed $100 (T110)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="proof"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        size = manager.get_position_size(Phase.PROOF_OF_CONCEPT)
+
+        # Assert
+        assert size == Decimal("100")
+
+    def test_trial_phase_fixed_200_position_size(self):
+        """Trial phase should return fixed $200 (T110)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="trial"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        size = manager.get_position_size(Phase.REAL_MONEY_TRIAL)
+
+        # Assert
+        assert size == Decimal("200")
+
+    def test_scaling_phase_base_position_size(self):
+        """Scaling phase should start at $200 base (T110)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        size = manager.get_position_size(Phase.SCALING)
+
+        # Assert
+        assert size == Decimal("200")
+
+    def test_scaling_phase_5_consecutive_wins_increases_to_300(self):
+        """Scaling phase: 5 consecutive wins should add $100 to base (T110)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        size = manager.get_position_size(
+            Phase.SCALING,
+            consecutive_wins=5
+        )
+
+        # Assert
+        assert size == Decimal("300")  # $200 base + $100 for 5 wins
+
+    def test_scaling_phase_10_consecutive_wins_increases_to_400(self):
+        """Scaling phase: 10 consecutive wins should add $200 to base (T110)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        size = manager.get_position_size(
+            Phase.SCALING,
+            consecutive_wins=10
+        )
+
+        # Assert
+        assert size == Decimal("400")  # $200 base + $200 (2 * $100)
+
+    def test_scaling_phase_70_percent_win_rate_adds_200(self):
+        """Scaling phase: 70% win rate should add $200 bonus (T110)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        size = manager.get_position_size(
+            Phase.SCALING,
+            consecutive_wins=0,
+            rolling_win_rate=Decimal("0.70")
+        )
+
+        # Assert
+        assert size == Decimal("400")  # $200 base + $200 for 70% win rate
+
+    def test_scaling_phase_combined_wins_and_win_rate(self):
+        """Scaling phase: Combined 5 wins + 70% win rate (T110)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        size = manager.get_position_size(
+            Phase.SCALING,
+            consecutive_wins=5,
+            rolling_win_rate=Decimal("0.72")
+        )
+
+        # Assert
+        assert size == Decimal("500")  # $200 base + $100 (5 wins) + $200 (70% rate)
+
+    def test_scaling_phase_10_wins_and_win_rate(self):
+        """Scaling phase: Combined 10 wins + 70% win rate (T110)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+
+        # Act
+        size = manager.get_position_size(
+            Phase.SCALING,
+            consecutive_wins=10,
+            rolling_win_rate=Decimal("0.72")
+        )
+
+        # Assert
+        assert size == Decimal("600")  # $200 base + $200 (10 wins) + $200 (70% rate)
+
+    def test_scaling_phase_max_cap_2000(self):
+        """Scaling phase: Position size should cap at $2,000 (T110)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+
+        # Act - 100 consecutive wins would exceed cap
+        size = manager.get_position_size(
+            Phase.SCALING,
+            consecutive_wins=100,
+            rolling_win_rate=Decimal("0.80")
+        )
+
+        # Assert
+        assert size == Decimal("2000")  # Capped at max
+
+    def test_scaling_phase_portfolio_cap_5_percent(self):
+        """Scaling phase: Position size should cap at 5% of portfolio if lower than $2,000 (T110)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+
+        # Act - Portfolio of $20,000, so 5% = $1,000 (lower than calculated $2,000)
+        size = manager.get_position_size(
+            Phase.SCALING,
+            consecutive_wins=100,
+            rolling_win_rate=Decimal("0.80"),
+            portfolio_value=Decimal("20000")
+        )
+
+        # Assert
+        assert size == Decimal("1000")  # 5% of $20,000
+
+    def test_scaling_phase_portfolio_cap_not_applied_if_higher(self):
+        """Scaling phase: Portfolio cap should not apply if higher than calculated size (T110)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+
+        # Act - Portfolio of $100,000, so 5% = $5,000 (higher than calculated $500)
+        size = manager.get_position_size(
+            Phase.SCALING,
+            consecutive_wins=5,
+            rolling_win_rate=Decimal("0.72"),
+            portfolio_value=Decimal("100000")
+        )
+
+        # Assert
+        assert size == Decimal("500")  # Not capped by portfolio, just by calculation
+
+    def test_scaling_phase_incremental_wins_calculation(self):
+        """Scaling phase: Each 5 wins adds $100 incrementally (T110)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="scaling"
+        )
+        manager = PhaseManager(config)
+
+        # Test various win counts
+        test_cases = [
+            (0, Decimal("200")),   # Base
+            (4, Decimal("200")),   # Not enough for bonus
+            (5, Decimal("300")),   # First bonus
+            (9, Decimal("300")),   # Still first bonus
+            (10, Decimal("400")),  # Second bonus
+            (14, Decimal("400")),  # Still second bonus
+            (15, Decimal("500")),  # Third bonus
+        ]
+
+        # Act & Assert
+        for wins, expected in test_cases:
+            size = manager.get_position_size(
+                Phase.SCALING,
+                consecutive_wins=wins
+            )
+            assert size == expected, f"Failed for {wins} wins: expected {expected}, got {size}"

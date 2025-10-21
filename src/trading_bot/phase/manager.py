@@ -268,3 +268,66 @@ class PhaseManager:
             TradeLimitExceeded: If daily limit exceeded for this phase
         """
         self.trade_limiter.check_limit(phase, trade_date)
+
+    def get_position_size(
+        self,
+        phase: Phase,
+        consecutive_wins: int = 0,
+        rolling_win_rate: Optional[Decimal] = None,
+        portfolio_value: Optional[Decimal] = None
+    ) -> Decimal:
+        """Calculate position size based on phase and consistency metrics.
+
+        Args:
+            phase: Current trading phase
+            consecutive_wins: Number of consecutive winning trades
+            rolling_win_rate: Win rate over last 10 sessions (for Scaling phase)
+            portfolio_value: Total portfolio value (for 5% cap)
+
+        Returns:
+            Position size in USD (Decimal)
+
+        Rules (FR-005):
+            - Experience: $0 (paper trading)
+            - PoC: $100 (fixed)
+            - Trial: $200 (fixed)
+            - Scaling: $200-$2,000 based on consistency
+              - Start: $200
+              - +$100 per 5 consecutive wins
+              - +$200 if 10-session win rate >=70%
+              - Max: $2,000 OR 5% of portfolio (whichever lower)
+        """
+        if phase == Phase.EXPERIENCE:
+            return Decimal("0")
+
+        if phase == Phase.PROOF_OF_CONCEPT:
+            return Decimal("100")
+
+        if phase == Phase.REAL_MONEY_TRIAL:
+            return Decimal("200")
+
+        if phase == Phase.SCALING:
+            # Start at base size
+            size = Decimal("200")
+
+            # Add $100 per 5 consecutive wins
+            if consecutive_wins >= 5:
+                increases = consecutive_wins // 5
+                size += Decimal("100") * increases
+
+            # Add $200 if win rate >=70%
+            if rolling_win_rate and rolling_win_rate >= Decimal("0.70"):
+                size += Decimal("200")
+
+            # Cap at $2,000
+            size = min(size, Decimal("2000"))
+
+            # Cap at 5% of portfolio if provided
+            if portfolio_value:
+                max_from_portfolio = portfolio_value * Decimal("0.05")
+                size = min(size, max_from_portfolio)
+
+            return size
+
+        # Default fallback
+        return Decimal("0")
