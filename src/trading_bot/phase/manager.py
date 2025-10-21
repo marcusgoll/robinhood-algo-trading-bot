@@ -13,7 +13,7 @@ from typing import Dict, Optional, Tuple
 from uuid import uuid4
 
 from trading_bot.config import Config
-from trading_bot.phase.models import Phase, PhaseTransition
+from trading_bot.phase.models import Phase, PhaseTransition, SessionMetrics
 from trading_bot.phase.trade_limiter import TradeLimiter
 from trading_bot.phase.validators import (
     ExperienceToPoCValidator,
@@ -116,11 +116,50 @@ class PhaseManager:
         """
         return self._metrics
 
-    def validate_transition(self, to_phase: Phase) -> ValidationResult:
+    def calculate_session_metrics(self, session_date: date) -> SessionMetrics:
+        """Calculate metrics for a trading session.
+
+        Note: In real implementation, this would call PerformanceTracker.
+        For now, returns mock data for testing.
+
+        Args:
+            session_date: Date of the trading session
+
+        Returns:
+            SessionMetrics with session performance data
+        """
+        # TODO: Replace with actual PerformanceTracker integration
+        # summary = self.performance_tracker.get_summary(
+        #     window="daily",
+        #     start_date=session_date,
+        #     end_date=session_date
+        # )
+
+        # Mock implementation for testing
+        return SessionMetrics(
+            session_date=session_date,
+            phase=self.config.current_phase,
+            trades_executed=5,
+            total_wins=3,
+            total_losses=2,
+            win_rate=Decimal("0.60"),
+            average_rr=Decimal("1.5"),
+            total_pnl=Decimal("100.00"),
+            position_sizes=[Decimal("100")] * 5,
+            circuit_breaker_trips=0,
+            created_at=datetime.now(timezone.utc)
+        )
+
+    def validate_transition(
+        self,
+        to_phase: Phase,
+        rolling_window: Optional[int] = None
+    ) -> ValidationResult:
         """Validate if current phase can transition to target phase.
 
         Args:
             to_phase: Target phase to validate transition to
+            rolling_window: Optional window size for rolling validation (10, 20, 50, 100)
 
         Returns:
             ValidationResult with can_advance, criteria_met, missing_requirements
@@ -153,14 +192,16 @@ class PhaseManager:
             return validator.validate(
                 session_count=metrics.get("session_count", 0),
                 win_rate=metrics.get("win_rate", Decimal("0")),
-                avg_rr=metrics.get("avg_rr", Decimal("0"))
+                avg_rr=metrics.get("avg_rr", Decimal("0")),
+                rolling_window=rolling_window
             )
         elif validator_key == ("proof", "trial"):
             return validator.validate(
                 session_count=metrics.get("session_count", 0),
                 trade_count=metrics.get("trade_count", 0),
                 win_rate=metrics.get("win_rate", Decimal("0")),
-                avg_rr=metrics.get("avg_rr", Decimal("0"))
+                avg_rr=metrics.get("avg_rr", Decimal("0")),
+                rolling_window=rolling_window
             )
         elif validator_key == ("trial", "scaling"):
             return validator.validate(
@@ -168,7 +209,8 @@ class PhaseManager:
                 trade_count=metrics.get("trade_count", 0),
                 win_rate=metrics.get("win_rate", Decimal("0")),
                 avg_rr=metrics.get("avg_rr", Decimal("0")),
-                max_drawdown=metrics.get("max_drawdown", Decimal("0"))
+                max_drawdown=metrics.get("max_drawdown", Decimal("0")),
+                rolling_window=rolling_window
             )
         else:
             raise ValueError(f"Unexpected validator key: {validator_key}")

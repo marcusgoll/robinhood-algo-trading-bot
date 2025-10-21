@@ -431,3 +431,218 @@ class TestTradeLimiterIntegration:
 
         # Assert - counter should be in TradeLimiter instance
         assert manager.trade_limiter._trade_counts[trade_date] == 1
+
+
+class TestSessionMetrics:
+    """Test session metrics calculation (T090-T097, US3)."""
+
+    def test_calculate_session_metrics_returns_session_metrics(self):
+        """Should return SessionMetrics with correct fields (T090)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="proof"
+        )
+        manager = PhaseManager(config)
+        session_date = date(2025, 1, 15)
+
+        # Act
+        metrics = manager.calculate_session_metrics(session_date)
+
+        # Assert - verify SessionMetrics structure
+        from trading_bot.phase.models import SessionMetrics
+        assert isinstance(metrics, SessionMetrics)
+        assert metrics.session_date == session_date
+        assert metrics.phase == "proof"
+        assert isinstance(metrics.trades_executed, int)
+        assert isinstance(metrics.total_wins, int)
+        assert isinstance(metrics.total_losses, int)
+        assert isinstance(metrics.win_rate, Decimal)
+        assert isinstance(metrics.average_rr, Decimal)
+        assert isinstance(metrics.total_pnl, Decimal)
+        assert isinstance(metrics.position_sizes, list)
+        assert isinstance(metrics.circuit_breaker_trips, int)
+        assert isinstance(metrics.created_at, datetime)
+
+    def test_calculate_session_metrics_decimal_precision(self):
+        """Should maintain Decimal precision for financial values (T091)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="trial"
+        )
+        manager = PhaseManager(config)
+        session_date = date(2025, 1, 15)
+
+        # Act
+        metrics = manager.calculate_session_metrics(session_date)
+
+        # Assert - verify Decimal types (no float conversion)
+        assert isinstance(metrics.win_rate, Decimal)
+        assert isinstance(metrics.average_rr, Decimal)
+        assert isinstance(metrics.total_pnl, Decimal)
+
+        # Verify position_sizes are all Decimals
+        for size in metrics.position_sizes:
+            assert isinstance(size, Decimal)
+
+    def test_calculate_session_metrics_utc_timestamp(self):
+        """Should use UTC timezone for created_at timestamp (T091)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="experience"
+        )
+        manager = PhaseManager(config)
+        session_date = date(2025, 1, 15)
+
+        # Act
+        metrics = manager.calculate_session_metrics(session_date)
+
+        # Assert - verify UTC timezone
+        assert metrics.created_at.tzinfo == timezone.utc
+
+    def test_validate_transition_with_rolling_window_10_sessions(self):
+        """Should validate using last 10 sessions when rolling_window=10 (T092)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="experience"
+        )
+        manager = PhaseManager(config)
+
+        # Mock metrics with rolling_window parameter
+        manager._metrics = {
+            "session_count": 10,  # Last 10 sessions
+            "win_rate": Decimal("0.62"),
+            "avg_rr": Decimal("1.6"),
+            "rolling_window": 10
+        }
+
+        # Act
+        result = manager.validate_transition(
+            Phase.PROOF_OF_CONCEPT,
+            rolling_window=10
+        )
+
+        # Assert - validation should fail (need 20 sessions minimum)
+        # But criteria should still check the 10 sessions provided
+        assert result.can_advance is False
+        assert "session_count" in result.missing_requirements
+
+    def test_validate_transition_with_rolling_window_20_sessions(self):
+        """Should validate using last 20 sessions when rolling_window=20 (T092)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="experience"
+        )
+        manager = PhaseManager(config)
+
+        # Mock metrics - last 20 sessions meet criteria
+        manager._metrics = {
+            "session_count": 20,
+            "win_rate": Decimal("0.65"),
+            "avg_rr": Decimal("1.7"),
+            "rolling_window": 20
+        }
+
+        # Act
+        result = manager.validate_transition(
+            Phase.PROOF_OF_CONCEPT,
+            rolling_window=20
+        )
+
+        # Assert
+        assert result.can_advance is True
+        assert all(result.criteria_met.values())
+
+    def test_validate_transition_with_rolling_window_50_sessions(self):
+        """Should validate using last 50 sessions when rolling_window=50 (T093)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="proof"
+        )
+        manager = PhaseManager(config)
+
+        # Mock metrics - last 50 sessions for PoC -> Trial
+        manager._metrics = {
+            "session_count": 50,
+            "trade_count": 100,
+            "win_rate": Decimal("0.68"),
+            "avg_rr": Decimal("1.9"),
+            "rolling_window": 50
+        }
+
+        # Act
+        result = manager.validate_transition(
+            Phase.REAL_MONEY_TRIAL,
+            rolling_window=50
+        )
+
+        # Assert
+        assert result.can_advance is True
+
+    def test_validate_transition_with_rolling_window_100_sessions(self):
+        """Should validate using last 100 sessions when rolling_window=100 (T094)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="trial"
+        )
+        manager = PhaseManager(config)
+
+        # Mock metrics - last 100 sessions for Trial -> Scaling
+        manager._metrics = {
+            "session_count": 100,
+            "trade_count": 200,
+            "win_rate": Decimal("0.72"),
+            "avg_rr": Decimal("2.1"),
+            "max_drawdown": Decimal("0.03"),
+            "rolling_window": 100
+        }
+
+        # Act
+        result = manager.validate_transition(
+            Phase.SCALING,
+            rolling_window=100
+        )
+
+        # Assert
+        assert result.can_advance is True
+
+    def test_rolling_window_edge_case_fewer_sessions_than_window(self):
+        """Should use all available sessions when history < window size (T094)."""
+        # Arrange
+        config = Config(
+            robinhood_username="test",
+            robinhood_password="test",
+            current_phase="experience"
+        )
+        manager = PhaseManager(config)
+
+        # Mock: Only 5 sessions available, but window requests 10
+        manager._metrics = {
+            "session_count": 5,  # Only 5 available
+            "win_rate": Decimal("0.70"),
+            "avg_rr": Decimal("1.8"),
+            "rolling_window": 10  # Requested 10, got 5
+        }
+
+        # Act
+        result = manager.validate_transition(
+            Phase.PROOF_OF_CONCEPT,
+            rolling_window=10
+        )
+
+        # Assert - should fail because need minimum 20 sessions
+        assert result.can_advance is False
+        assert "session_count" in result.missing_requirements

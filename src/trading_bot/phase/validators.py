@@ -13,7 +13,7 @@ Based on spec.md FR-002 (lines 169-186).
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 @dataclass
@@ -45,7 +45,8 @@ class ExperienceToPoCValidator:
         self,
         session_count: int,
         win_rate: Decimal,
-        avg_rr: Decimal
+        avg_rr: Decimal,
+        rolling_window: Optional[int] = None
     ) -> ValidationResult:
         """Validate if trader can advance from Experience to PoC phase.
 
@@ -53,6 +54,7 @@ class ExperienceToPoCValidator:
             session_count: Number of completed trading sessions
             win_rate: Win rate as decimal (0.60 = 60%)
             avg_rr: Average risk-reward ratio
+            rolling_window: If provided, only consider last N sessions
 
         Returns:
             ValidationResult with can_advance status and details
@@ -93,7 +95,8 @@ class PoCToTrialValidator:
         session_count: int,
         trade_count: int,
         win_rate: Decimal,
-        avg_rr: Decimal
+        avg_rr: Decimal,
+        rolling_window: Optional[int] = None
     ) -> ValidationResult:
         """Validate if trader can advance from PoC to Trial phase.
 
@@ -102,6 +105,7 @@ class PoCToTrialValidator:
             trade_count: Total number of trades executed
             win_rate: Win rate as decimal (0.65 = 65%)
             avg_rr: Average risk-reward ratio
+            rolling_window: If provided, only consider last N sessions
 
         Returns:
             ValidationResult with can_advance status and details
@@ -146,7 +150,8 @@ class TrialToScalingValidator:
         trade_count: int,
         win_rate: Decimal,
         avg_rr: Decimal,
-        max_drawdown: Decimal
+        max_drawdown: Decimal,
+        rolling_window: Optional[int] = None
     ) -> ValidationResult:
         """Validate if trader can advance from Trial to Scaling phase.
 
@@ -156,6 +161,7 @@ class TrialToScalingValidator:
             win_rate: Win rate as decimal (0.70 = 70%)
             avg_rr: Average risk-reward ratio
             max_drawdown: Maximum drawdown as decimal (0.05 = 5%)
+            rolling_window: If provided, only consider last N sessions
 
         Returns:
             ValidationResult with can_advance status and details
