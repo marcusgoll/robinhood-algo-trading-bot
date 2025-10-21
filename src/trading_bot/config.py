@@ -344,3 +344,86 @@ class Config:
         self.data_dir.mkdir(exist_ok=True)
         self.logs_dir.mkdir(exist_ok=True)
         self.backtest_dir.mkdir(exist_ok=True)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert configuration to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of configuration
+
+        Note:
+            Credentials are NOT included in serialization (they come from .env)
+        """
+        return {
+            "trading": {
+                "mode": "paper" if self.paper_trading else "live",
+                "hours": {
+                    "start_time": self.trading_start_time,
+                    "end_time": self.trading_end_time,
+                    "timezone": self.trading_timezone
+                }
+            },
+            "risk_management": {
+                "max_position_pct": self.max_position_pct,
+                "max_daily_loss_pct": self.max_daily_loss_pct,
+                "max_consecutive_losses": self.max_consecutive_losses,
+                "position_size_shares": self.position_size_shares,
+                "stop_loss_pct": self.stop_loss_pct,
+                "risk_reward_ratio": self.risk_reward_ratio
+            },
+            "phase_progression": {
+                "current_phase": self.current_phase,
+                self.current_phase: {
+                    "max_trades_per_day": None if self.max_trades_per_day == 999 else self.max_trades_per_day
+                }
+            },
+            "order_management": {
+                "offset_mode": self.order_management.offset_mode,
+                "buy_offset": self.order_management.buy_offset,
+                "sell_offset": self.order_management.sell_offset,
+                "max_slippage_pct": self.order_management.max_slippage_pct,
+                "poll_interval_seconds": self.order_management.poll_interval_seconds,
+                "strategy_overrides": self.order_management.strategy_overrides
+            }
+        }
+
+    def save(self) -> None:
+        """Persist configuration to disk with atomic write.
+
+        Uses write-then-rename pattern for atomicity:
+        1. Write to temporary file
+        2. Rename to target (atomic operation on POSIX/Windows)
+
+        Raises:
+            IOError: If file write fails
+            ValueError: If config_file_path not set
+
+        Side Effects:
+            - Creates/updates config.json file
+            - Uses atomic file operations (no partial writes)
+        """
+        if not hasattr(self, 'config_file_path') or not self.config_file_path:
+            # Default to config.json in current directory
+            self.config_file_path = Path("config.json")
+
+        config_path = Path(self.config_file_path)
+
+        # Write to temporary file first (atomic write pattern)
+        temp_path = config_path.with_suffix(".tmp")
+
+        try:
+            # Serialize config to JSON
+            config_dict = self.to_dict()
+
+            # Write to temp file
+            with open(temp_path, 'w') as f:
+                json.dump(config_dict, f, indent=2)
+
+            # Atomic rename (POSIX and Windows both support atomic rename)
+            temp_path.replace(config_path)
+
+        except Exception as e:
+            # Clean up temp file on failure
+            if temp_path.exists():
+                temp_path.unlink()
+            raise IOError(f"Failed to save config: {e}") from e

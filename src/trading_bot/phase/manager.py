@@ -309,10 +309,38 @@ class PhaseManager:
             override_password_used=force
         )
 
-        # Update config (in-memory only, not persisted in this task)
-        self.config.current_phase = to_phase.value
+        # ATOMIC TRANSACTION: All-or-nothing update
+        # If any step fails, rollback to original state
+        original_phase = from_phase.value  # Backup for rollback
 
-        return transition
+        try:
+            # Step 1: Update config in-memory
+            self.config.current_phase = to_phase.value
+
+            # Step 2: Persist config to disk (MUST succeed before logging)
+            if hasattr(self.config, 'save'):
+                self.config.save()
+
+            # Step 3: Log transition to history (append-only JSONL)
+            if hasattr(self, 'history_logger'):
+                self.history_logger.log_transition(transition)
+
+            return transition
+
+        except Exception as e:
+            # ROLLBACK: Restore original phase on any failure
+            self.config.current_phase = original_phase
+
+            # Revert disk file if save was called
+            if hasattr(self.config, 'save'):
+                try:
+                    self.config.save()  # Save rolled-back state to disk
+                except Exception:
+                    # If rollback save fails, log but continue with exception
+                    pass
+
+            # Re-raise original exception
+            raise
 
     def enforce_trade_limit(self, phase: Phase, trade_date: date) -> None:
         """Enforce daily trade limit for given phase.
