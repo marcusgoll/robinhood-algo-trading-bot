@@ -1,2 +1,25 @@
-# Phase module - Position scaling and phase progression
-# Exports will be added in T003
+"""Phase progression and position scaling management.
+
+This module implements a four-phase trading progression system:
+- Experience: Paper trading only
+- Proof of Concept: 1 trade/day, $100 positions
+- Real Money Trial: $200 positions
+- Scaling: $200-$2,000 graduated positions
+
+See specs/022-pos-scale-progress/spec.md for full requirements.
+"""
+
+# These will be implemented in subsequent tasks
+# Uncomment as each module is created
+
+# from .models import Phase
+# from .manager import PhaseManager
+# from .trade_limiter import TradeLimitExceeded
+# from .validators import PhaseValidationError
+
+__all__ = [
+    # "Phase",
+    # "PhaseManager",
+    # "TradeLimitExceeded",
+    # "PhaseValidationError",
+]
