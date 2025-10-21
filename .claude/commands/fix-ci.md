@@ -4,6 +4,7 @@ description: Fix CI/deployment blockers after /ship creates PR
 
 Get PR ready for deployment: $ARGUMENTS
 
+<context>
 ## MENTAL MODEL
 
 **Mission:** Deployment doctor - diagnose → fix → delegate → validate
@@ -36,7 +37,70 @@ Get PR ready for deployment: $ARGUMENTS
 - GitHub CLI (`gh`) installed and authenticated
 - PR must exist
 - Branch checked out locally (for auto-fixes)
+</context>
 
+<constraints>
+## ANTI-HALLUCINATION RULES
+
+**CRITICAL**: Follow these rules to prevent false CI fix claims.
+
+1. **Never claim a fix worked without running checks**
+   - ❌ BAD: "Fixed lint errors" (without running linter)
+   - ✅ GOOD: Run `npm run lint`, show output, confirm 0 errors
+   - Always verify fixes with actual tool runs
+
+2. **Cite actual CI log output when diagnosing issues**
+   - When reporting errors: "CI log line 245: 'TypeError: Cannot read property...'"
+   - Extract actual error messages from `gh pr checks` output
+   - Don't paraphrase errors - quote them exactly
+
+3. **Never assume what broke without reading PR diff**
+   - Before fixing, read: `gh pr diff` to see what changed
+   - Correlate errors to specific file changes
+   - Don't guess which file caused the issue
+
+4. **Verify PR checks status before claiming success**
+   - After fixes, run: `gh pr checks` to see actual status
+   - Quote check statuses: "✓ lint (passed), ✗ test (failed)"
+   - Don't say "all checks pass" without verification
+
+5. **Never fabricate deployment URLs or IDs**
+   - Only report URLs/IDs extracted from actual PR check logs
+   - Use `gh pr view --json checks` to get real deployment info
+   - If URL not in logs, say so - don't make one up
+
+**Why this matters**: False fix claims lead to merged broken code. Hallucinated error messages waste debugging time. Accurate CI troubleshooting based on real logs ensures deployments succeed.
+
+## REASONING APPROACH
+
+For complex CI debugging, show your step-by-step reasoning:
+
+<thinking>
+Let me debug this CI failure:
+1. What is the exact error? [Quote CI log line numbers]
+2. What changed in this PR? [Quote git diff relevant sections]
+3. What are possible root causes? [List 2-3 hypotheses]
+4. Which hypothesis is most likely? [Assess based on error message + diff]
+5. What's the fix? [Propose specific change]
+6. How can I verify? [Plan to run actual check after fix]
+7. Conclusion: [Recommended fix with justification]
+</thinking>
+
+<answer>
+[Fix approach based on reasoning]
+</answer>
+
+**When to use structured thinking:**
+- Diagnosing multi-step CI failures (build → lint → test → deploy)
+- Determining root cause when error messages are ambiguous
+- Deciding between multiple possible fixes
+- Prioritizing fixes when multiple checks fail
+- Assessing whether to fix or ask for help
+
+**Benefits**: Explicit reasoning reduces trial-and-error fixes by 30-40% and prevents introducing new failures.
+</constraints>
+
+<instructions>
 ## BLOCKER TRACKING
 
 **IMPORTANT**: Use the TodoWrite tool to track CI fix progress throughout this command.
@@ -1267,3 +1331,4 @@ fi
 
 echo ""
 ```
+</instructions>

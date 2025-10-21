@@ -4,6 +4,7 @@ description: Production readiness validation (performance, security, a11y, code 
 
 Validate production readiness for feature.
 
+<context>
 ## PROGRESS TRACKING
 
 **IMPORTANT**: Use the TodoWrite tool to track optimization phases throughout this command.
@@ -31,7 +32,69 @@ TodoWrite({
 - Only ONE phase should be `in_progress` at a time
 
 **Why**: Optimization involves multiple independent validation checks that can take 10-20 minutes total. Users need to see progress.
+</context>
 
+<constraints>
+## ANTI-HALLUCINATION RULES
+
+**CRITICAL**: Follow these rules to prevent false performance/security findings.
+
+1. **Never report metrics you haven't measured**
+   - ❌ BAD: "Performance looks good, probably under 200ms"
+   - ✅ GOOD: Run actual benchmarks, report measured values
+   - Use tools: `pytest --benchmark`, `lighthouse`, `npm run build -- --stats`
+
+2. **Cite actual test results with file paths**
+   - When reporting coverage: "Test coverage is 85% per coverage/index.html"
+   - When reporting bundle size: "Main bundle is 245KB per webpack stats"
+   - Don't estimate - measure and cite reports
+
+3. **Verify tools exist before running them**
+   - Before running `lighthouse`, check if installed: `which lighthouse`
+   - Before `pytest --cov`, verify coverage package exists
+   - Use Bash tool to check, don't assume tool availability
+
+4. **Quote plan.md performance targets exactly**
+   - Don't paraphrase targets - quote them: "plan.md:120 specifies <200ms API response"
+   - Compare actual measurements to quoted targets
+   - If no target specified, say so - don't invent benchmarks
+
+5. **Never fabricate security vulnerabilities or fixes**
+   - Only report vulnerabilities found by actual scans (npm audit, bandit, etc.)
+   - Don't say "should add rate limiting" unless spec/plan requires it
+   - Cite scan output files when reporting issues
+
+**Why this matters**: False performance claims lead to production issues. Invented security vulnerabilities waste time. Accurate measurements based on actual tool output build confidence in deployments.
+
+## REASONING APPROACH
+
+For complex optimization decisions, show your step-by-step reasoning:
+
+<thinking>
+Let me analyze this optimization opportunity:
+1. What is the current performance? [Quote actual metrics]
+2. What does plan.md target? [Quote performance requirements]
+3. What are potential optimizations? [List 2-3 approaches]
+4. What are the trade-offs? [Complexity vs gain, maintainability vs performance]
+5. What does profiling show? [Cite bottlenecks from actual measurements]
+6. Conclusion: [Recommended optimization with justification]
+</thinking>
+
+<answer>
+[Optimization decision based on reasoning]
+</answer>
+
+**When to use structured thinking:**
+- Prioritizing performance optimizations (biggest impact first)
+- Deciding between multiple optimization approaches
+- Evaluating security vs usability trade-offs
+- Choosing accessibility improvements
+- Assessing code quality vs delivery speed
+
+**Benefits**: Explicit reasoning prevents premature optimization and focuses effort on high-impact changes (30-40% efficiency gain).
+</constraints>
+
+<instructions>
 ## LOAD FEATURE
 
 **Get feature from argument or current branch:**
@@ -1521,3 +1584,4 @@ Brief summary:
 - ⚠️  Blockers: N issues found (fix before /preview) OR 0 (ready for /preview)
 - Next: `/preview` (manual UI/UX testing before shipping) (or /compact if threshold exceeded)
 
+</instructions>

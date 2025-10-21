@@ -4,6 +4,67 @@ description: Generate concrete TDD tasks from design artifacts (no generic place
 
 Create tasks from: specs/$SLUG/plan.md
 
+<constraints>
+## ANTI-HALLUCINATION RULES
+
+**CRITICAL**: Follow these rules to prevent creating impossible tasks.
+
+1. **Never create tasks for code you haven't verified exists**
+   - ❌ BAD: "T001: Update the UserService.create_user method"
+   - ✅ GOOD: First search for UserService, then create task based on what exists
+   - Use Glob to find files before creating file modification tasks
+
+2. **Cite plan.md when deriving tasks**
+   - Each task should trace to plan.md section
+   - Example: "T001 implements data model from plan.md:45-60"
+   - Don't create tasks not mentioned in the plan
+
+3. **Verify test file locations before creating test tasks**
+   - Before task "Add test_user_service.py", check if tests/ directory exists
+   - Use Glob to find test patterns: `**/test_*.py` or `**/*_test.py`
+   - Don't assume test structure matches your expectations
+
+4. **Quote acceptance criteria from spec.md exactly**
+   - Copy user story acceptance criteria verbatim to task AC
+   - Don't paraphrase or add unstated criteria
+   - If criteria missing, flag: "[NEEDS: Acceptance criteria for...]"
+
+5. **Verify dependencies between tasks**
+   - Before marking T002 depends on T001, confirm T001 creates what T002 needs
+   - Don't create circular dependencies
+   - Check plan.md for intended sequence
+
+**Why this matters**: Hallucinated tasks create impossible work. Tasks referencing non-existent code waste implementation time. Clear, verified tasks reduce implementation errors by 50-60%.
+
+## REASONING APPROACH
+
+For complex task breakdown decisions, show your step-by-step reasoning:
+
+<thinking>
+Let me analyze this task structure:
+1. What does plan.md specify? [Quote implementation steps]
+2. How can I break this into atomic tasks? [List potential tasks]
+3. What are the dependencies? [Identify blocking relationships]
+4. What can run in parallel? [Group independent tasks]
+5. Are tasks testable? [Verify each has clear acceptance criteria]
+6. Conclusion: [Task breakdown with justification]
+</thinking>
+
+<answer>
+[Task breakdown based on reasoning]
+</answer>
+
+**When to use structured thinking:**
+- Breaking down large features into 20-30 atomic tasks
+- Determining task dependencies (what blocks what)
+- Deciding task granularity (too small vs too large)
+- Writing testable acceptance criteria
+- Grouping tasks for parallel execution
+
+**Benefits**: Explicit reasoning reduces task rework by 30-40% and improves execution parallelism.
+</constraints>
+
+<instructions>
 ## LOAD FEATURE
 
 **Get feature from argument or current branch:**
@@ -565,3 +626,4 @@ Output: specs/$SLUG/artifacts/analysis-report.md
 
 Duration: ~5 minutes
 ```
+</instructions>

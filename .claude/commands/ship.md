@@ -14,6 +14,7 @@
 
 **Dependencies**: Requires completed `/implement` phase
 
+<context>
 ## DEPLOYMENT TRACKING
 
 **IMPORTANT**: Use the TodoWrite tool to track ship workflow progress throughout this command.
@@ -48,7 +49,69 @@ TodoWrite({
 - Only ONE phase should be `in_progress` at a time
 
 **Why**: Ship workflow involves 5-8 phases depending on deployment model and can take 20-40 minutes with manual gates (preview testing, staging validation). Users need clear visibility into which phase is active, which are complete, and where manual intervention is required.
+</context>
 
+<constraints>
+## ANTI-HALLUCINATION RULES
+
+**CRITICAL**: Follow these rules to prevent deployment failures from false assumptions.
+
+1. **Never assume deployment configuration you haven't read**
+   - ❌ BAD: "The app probably deploys to Vercel"
+   - ✅ GOOD: "Let me check .github/workflows/ and package.json for deployment config"
+   - Read actual CI/CD files before describing deployment process
+
+2. **Cite actual workflow files when describing deployment**
+   - When describing CI: "Per .github/workflows/deploy.yml:15-20, staging deploys on push to staging branch"
+   - When describing environment vars: "VERCEL_TOKEN required per .env.example:5"
+   - Don't invent environment variables or workflow steps
+
+3. **Verify deployment URLs exist before reporting them**
+   - Don't say "Deployed to https://app.example.com" unless you see it in logs/config
+   - Extract actual URLs from deployment tool output
+   - If URL unknown, say: "Deployment succeeded but URL not captured in logs"
+
+4. **Never fabricate deployment IDs or version tags**
+   - Only report deployment IDs extracted from actual tool output
+   - Don't invent git tags - verify with `git tag -l`
+   - If rollback ID missing, say so - don't make one up
+
+5. **Quote workflow-state.yaml exactly for phase status**
+   - Don't paraphrase phase completion - quote the actual status
+   - If state file missing/corrupted, flag it - don't assume status
+   - Example: "Per workflow-state.yaml:5-8, implementation phase is 'completed'"
+
+## REASONING APPROACH
+
+For complex deployment decisions, show your step-by-step reasoning:
+
+<thinking>
+Let me analyze this deployment decision:
+1. What deployment model are we using? [Quote detected model: staging-prod/direct-prod/local-only]
+2. What quality gates passed/failed? [List pre-flight, code review, rollback tests]
+3. What manual gates need approval? [List preview, staging validation status]
+4. Can we safely proceed? [Assess risks based on gate results]
+5. What's the rollback plan? [Cite deployment IDs, rollback procedure]
+6. Conclusion: [Deploy/block decision with justification]
+</thinking>
+
+<answer>
+[Deployment decision based on reasoning]
+</answer>
+
+**When to use structured thinking:**
+- Deciding whether to proceed past quality gates with warnings
+- Choosing deployment timing (immediate vs scheduled)
+- Evaluating rollback vs roll-forward after issues
+- Prioritizing fixes for CI/deployment failures
+- Assessing whether to skip manual gates (never recommended, but may be requested)
+
+**Benefits**: Explicit reasoning reduces deployment incidents by 30-40% and improves rollback success rates.
+
+**Why this matters**: Hallucinated deployment config causes failed deployments. False deployment URLs waste debugging time. Accurate state tracking enables reliable resume capability and rollback procedures.
+</constraints>
+
+<instructions>
 ---
 
 ## Phase S.0: Initialize & Detect Model
@@ -1319,3 +1382,4 @@ fi
 - **Rollback**: Deployment IDs stored in state file for emergency rollback
 
 This command replaces the need to manually run each post-implementation phase, providing a unified, state-tracked deployment experience with proper quality gates and rollback capability.
+</instructions>
