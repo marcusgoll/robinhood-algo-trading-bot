@@ -632,3 +632,122 @@ class TestSessionMetrics:
         assert metrics.total_wins + metrics.total_losses == metrics.trades_executed
         assert metrics.total_wins >= 0
         assert metrics.total_losses >= 0
+
+
+class TestPhaseTransition:
+    """Tests for PhaseTransition dataclass.
+
+    Feature: 022-pos-scale-progress
+    Task: T012 - Write tests for PhaseTransition dataclass (TDD RED phase)
+    """
+
+    def test_phase_transition_fields(self):
+        """Test PhaseTransition has all required fields.
+
+        Given: Complete PhaseTransition parameters
+        When: Creating a PhaseTransition instance
+        Then: Object is created with correct field values
+        """
+        # Given: Valid phase transition parameters
+        transition_id = str(uuid4())
+        now_utc = datetime.now(timezone.utc)
+
+        # When: Creating PhaseTransition instance
+        transition = PhaseTransition(
+            transition_id=transition_id,
+            timestamp=now_utc,
+            from_phase=Phase.EXPERIENCE,
+            to_phase=Phase.PROOF_OF_CONCEPT,
+            trigger="auto",
+            validation_passed=True,
+            metrics_snapshot={
+                "session_count": 20,
+                "win_rate": "0.65",
+                "avg_rr": "1.6"
+            },
+            failure_reasons=None,
+            operator_id=None,
+            override_password_used=False
+        )
+
+        # Then: All fields are set correctly
+        assert transition.transition_id == transition_id
+        assert transition.timestamp == now_utc
+        assert transition.from_phase == Phase.EXPERIENCE
+        assert transition.to_phase == Phase.PROOF_OF_CONCEPT
+        assert transition.trigger == "auto"
+        assert transition.validation_passed is True
+        assert transition.metrics_snapshot["session_count"] == 20
+        assert transition.failure_reasons is None
+        assert transition.operator_id is None
+        assert transition.override_password_used is False
+
+    def test_phase_transition_with_failure(self):
+        """Test PhaseTransition with validation failure.
+
+        Given: Phase transition that failed validation
+        When: Creating PhaseTransition with failure reasons
+        Then: Failure details are stored correctly
+        """
+        # Given: Failed transition parameters
+        transition_id = str(uuid4())
+        now_utc = datetime.now(timezone.utc)
+        failure_reasons = ["Session count 15 < required 20"]
+
+        # When: Creating failed transition
+        transition = PhaseTransition(
+            transition_id=transition_id,
+            timestamp=now_utc,
+            from_phase=Phase.EXPERIENCE,
+            to_phase=Phase.PROOF_OF_CONCEPT,
+            trigger="manual",
+            validation_passed=False,
+            metrics_snapshot={"session_count": 15},
+            failure_reasons=failure_reasons,
+            operator_id="test_operator",
+            override_password_used=False
+        )
+
+        # Then: Failure details stored correctly
+        assert transition.validation_passed is False
+        assert len(transition.failure_reasons) == 1
+        assert "Session count" in transition.failure_reasons[0]
+        assert transition.operator_id == "test_operator"
+
+    def test_phase_transition_metrics_snapshot(self):
+        """Test metrics_snapshot serialization.
+
+        Given: Phase transition with comprehensive metrics
+        When: Creating PhaseTransition with detailed metrics_snapshot
+        Then: All metrics are preserved as dictionary
+        """
+        # Given: Comprehensive metrics snapshot
+        transition_id = str(uuid4())
+        now_utc = datetime.now(timezone.utc)
+        metrics_snapshot = {
+            "session_count": 30,
+            "win_rate": "0.70",
+            "avg_rr": "1.9",
+            "total_pnl": "500.00"
+        }
+
+        # When: Creating transition with metrics
+        transition = PhaseTransition(
+            transition_id=transition_id,
+            timestamp=now_utc,
+            from_phase=Phase.PROOF_OF_CONCEPT,
+            to_phase=Phase.REAL_MONEY_TRIAL,
+            trigger="auto",
+            validation_passed=True,
+            metrics_snapshot=metrics_snapshot,
+            failure_reasons=None,
+            operator_id=None,
+            override_password_used=False
+        )
+
+        # Then: Metrics preserved correctly
+        assert isinstance(transition.metrics_snapshot, dict)
+        assert transition.metrics_snapshot["session_count"] == 30
+        assert transition.metrics_snapshot["win_rate"] == "0.70"
+        assert transition.metrics_snapshot["avg_rr"] == "1.9"
+        assert transition.metrics_snapshot["total_pnl"] == "500.00"
