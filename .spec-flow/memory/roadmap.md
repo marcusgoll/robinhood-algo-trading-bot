@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-20 (backtesting-engine v1.0.0 complete with 116/139 tests passing, 84.49% coverage)
+**Last updated**: 2025-10-21 (strategy-orchestrator v1.1.0 complete with 14/14 tests passing, 100% coverage for critical paths)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -613,6 +613,33 @@
   - Full Constitution v1.0.0 compliance (§Code_Quality, §Testing_Requirements, §Data_Integrity, §Safety_First)
   - Production-ready, local-only feature (merged to master branch)
   - Documentation: spec, plan, tasks, analysis-report, code-review-report, DEPLOYMENT.md
+
+### strategy-orchestrator
+- **Title**: Multi-strategy orchestration system
+- **Area**: infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-21
+- **Release**: v1.1.0 - Strategy Orchestrator MVP with multi-strategy execution, independent tracking, capital limits
+- **Spec**: specs/021-strategy-orchestrato/
+- **Delivered**:
+  - **StrategyOrchestrator**: Multi-strategy coordinator with weight validation, capital allocation, chronological execution
+  - **StrategyAllocation**: Real-time capital tracking with allocate()/release()/can_allocate() methods
+  - **OrchestratorConfig**: Configuration system with logging levels and validation toggles
+  - **OrchestratorResult**: Aggregated portfolio metrics + per-strategy results with comparison tables
+  - **Weight Validation**: Sum ≤ 1.0 enforcement (FR-002)
+  - **Proportional Capital Allocation**: Automatic capital distribution (FR-003)
+  - **Independent Tracking**: Per-strategy equity curves, trade tagging, metrics, comparison tables (US2)
+  - **Capital Limits**: Real-time enforcement, blocked entry logging, capital release on position close (US3)
+  - **Look-Ahead Bias Prevention**: Chronological bar-by-bar execution (FR-015)
+  - **Integration Tests**: 3 E2E tests validating US1/US2/US3 with real strategy implementations
+  - **Tests**: 14/14 passing (11 unit + 3 integration), 100% pass rate
+  - **Code Coverage**: 100% for critical paths (capital limits, allocations, weight validation)
+  - **Type Safety**: 100% mypy compliant with comprehensive type hints
+  - **Code Quality**: 0 lint errors, all integration tests passing
+  - Full Constitution v1.0.0 compliance (§Code_Quality, §Testing_Requirements, §Risk_Management, §Safety_First)
+  - Production-ready, local-only feature (merged to master branch)
+  - Documentation: spec, plan, tasks, analysis-report, IMPLEMENTATION_STATUS.md, workflow-state.yaml
 
 ## In Progress
 
