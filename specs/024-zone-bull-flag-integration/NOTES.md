@@ -139,3 +139,44 @@ Integration of ZoneDetector service with BullFlagDetector to dynamically adjust 
 
 ## Last Updated
 2025-10-21T00:00:00Z
+
+## Phase 2: Tasks (2025-10-21)
+
+**Summary**:
+- Total tasks: 28
+- User story tasks: 21
+- Parallel opportunities: 14
+- Setup tasks: 2
+- Task breakdown: US1 (9 tasks), US2 (5 tasks), US3 (7 tasks), Polish (5 tasks)
+- Task file: specs/024-zone-bull-flag-integration/tasks.md
+
+**Checkpoint**:
+- ✅ Tasks generated: 28 concrete tasks
+- ✅ User story organization: Complete (US2 → US1 → US3 sequence)
+- ✅ Dependency graph: Created (US2 blocks US1, US1 blocks US3)
+- ✅ MVP strategy: Defined (US2 + US1 + US3 for first release)
+- ✅ TDD approach: All tasks follow test-first pattern
+- ✅ REUSE identified: 9 existing components (BullFlagDetector, ProximityChecker, ZoneDetector, Zone, MomentumLogger, BullFlagPattern, Decimal, MomentumConfig, MarketDataService)
+- ✅ NEW components: 3 (TargetCalculation dataclass, _adjust_target_for_zones method, integration tests)
+- 📋 Ready for: /analyze
+
+**Task Distribution**:
+- Phase 1 (Setup): 2 tasks (T001-T002)
+- Phase 2 (US2 - TargetCalculation): 5 tasks (T005-T009)
+- Phase 3 (US1 - Zone integration): 9 tasks (T010-T018)
+- Phase 4 (US3 - Graceful degradation): 7 tasks (T020-T026)
+- Phase 5 (Polish): 5 tasks (T030-T034)
+
+**Parallel Execution Opportunities**:
+- US2: T005, T006, T007, T008 (TargetCalculation unit tests - different test cases)
+- US1: T010, T011, T012 (zone integration unit tests - different scenarios)
+- US3: T020, T021, T022 (error handling tests - independent scenarios)
+- Polish: T030, T031, T032 (performance + docs)
+
+**Key Task Decisions**:
+1. TDD approach: Write tests first (RED), then implementation (GREEN)
+2. Story sequence: US2 first (data model), then US1 (zone logic), then US3 (error handling)
+3. Backward compatibility: T033-T034 verify existing tests pass unchanged
+4. Coverage target: 90%+ per spec NFR-006 (enforced in test guardrails)
+5. Performance validation: T012, T030 measure <50ms zone detection, <100ms total
+
