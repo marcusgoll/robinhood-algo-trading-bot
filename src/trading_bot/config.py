@@ -228,6 +228,10 @@ class Config:
             config_data.get("risk_management")
         )
 
+        # Handle max_trades_per_day: None means unlimited (999 sentinel)
+        max_trades = phase_config.get("max_trades_per_day", 999)
+        max_trades_per_day = 999 if max_trades is None else int(max_trades)
+
         return cls(
             # Credentials from .env
             robinhood_username=username,
@@ -249,7 +253,7 @@ class Config:
             risk_reward_ratio=float(risk.get("risk_reward_ratio", 2.0)),
             # Phase progression
             current_phase=current_phase_name,
-            max_trades_per_day=int(phase_config.get("max_trades_per_day", 999)),
+            max_trades_per_day=max_trades_per_day,
             # Paths
             config_file=config_path,
             order_management=order_management_config,
