@@ -506,8 +506,8 @@ if [ "$TASK_FORMAT" = "user-story" ]; then
       # This is a manual gate - execution stops until user responds
       #
       # When user chooses 'ship', execute:
-      # source .spec-flow/scripts/bash/roadmap-manager.sh
-      # add_future_enhancements_to_roadmap "$FEATURE_DIR" "$SLUG"
+      # source .spec-flow/scripts/bash/github-roadmap-manager.sh
+      # add_future_enhancements_to_roadmap "$FEATURE_DIR" "$SLUG"  # NOTE: This function needs to be created for GitHub Issues
       # echo ""
       # echo "Next: /preview to validate MVP"
       # exit 0
@@ -519,9 +519,34 @@ fi
 ## COMPLETION SUMMARY
 
 ```bash
+# Source workflow state management functions
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+  source .spec-flow/scripts/bash/workflow-state.sh
+else
+  source .spec-flow/scripts/bash/workflow-state.sh
+fi
+
+# Calculate completion statistics
+TOTAL_TASKS=$(grep -c "^T[0-9]\{3\}" "$TASKS_FILE" 2>/dev/null || echo "0")
+COMPLETED_TASKS=$(grep -c "^✅ T[0-9]\{3\}" "$NOTES_FILE" 2>/dev/null || echo "0")
+FILES_CHANGED=$(git diff --name-only main 2>/dev/null | wc -l || echo "0")
+ERROR_COUNT=$(grep -c "❌\|⚠️" "$ERROR_LOG" 2>/dev/null || echo "0")
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ All tasks complete"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "Summary:"
+echo "  Tasks: $COMPLETED_TASKS/$TOTAL_TASKS completed"
+echo "  Files changed: $FILES_CHANGED"
+echo "  Errors logged: $ERROR_COUNT"
+echo ""
+
+# Update workflow state to signal completion
+update_workflow_phase "$FEATURE_DIR" "implement" "completed"
+
+echo "Next: /feature auto-continues to /optimize"
+echo ""
 ```
 
 ## IMPLEMENTATION EXECUTION (Claude Code)
@@ -549,9 +574,9 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
      - If user says "ship" or "A":
        ```bash
        # Load roadmap manager functions
-       source .spec-flow/scripts/bash/roadmap-manager.sh
+       source .spec-flow/scripts/bash/github-roadmap-manager.sh
 
-       # Add future enhancements to roadmap
+       # Add future enhancements to roadmap (NOTE: This function needs to be created for GitHub Issues)
        add_future_enhancements_to_roadmap "$FEATURE_DIR" "$SLUG"
 
        # Exit with next step

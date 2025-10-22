@@ -66,7 +66,6 @@ class BreakoutEvent:
         old_zone_type: Zone type before flip (RESISTANCE or SUPPORT)
         new_zone_type: Zone type after flip (opposite of old_zone_type)
         status: Current breakout status (PENDING/CONFIRMED/WHIPSAW)
-        symbol: Stock ticker symbol
         timeframe: Timeframe of the breakout (DAILY, FOUR_HOUR, etc.)
 
     Example:
@@ -81,7 +80,6 @@ class BreakoutEvent:
         ...     old_zone_type=ZoneType.RESISTANCE,
         ...     new_zone_type=ZoneType.SUPPORT,
         ...     status=BreakoutStatus.CONFIRMED,
-        ...     symbol="AAPL",
         ...     timeframe=Timeframe.DAILY
         ... )
     """
@@ -96,7 +94,6 @@ class BreakoutEvent:
     old_zone_type: ZoneType
     new_zone_type: ZoneType
     status: BreakoutStatus
-    symbol: str
     timeframe: Timeframe
 
     def __post_init__(self) -> None:
@@ -142,7 +139,6 @@ class BreakoutEvent:
             "old_zone_type": self.old_zone_type.value,
             "new_zone_type": self.new_zone_type.value,
             "status": self.status.value,
-            "symbol": self.symbol,
             "timeframe": self.timeframe.value,
         }
 

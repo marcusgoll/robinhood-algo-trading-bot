@@ -16,9 +16,11 @@ from .zone_detector import ZoneDetector
 from .zone_logger import ZoneLogger
 from .breakout_models import BreakoutEvent, BreakoutStatus, BreakoutSignal
 from .breakout_config import BreakoutConfig
+from .breakout_detector import BreakoutDetector
 
 __all__ = [
     "Zone", "ZoneTouch", "ProximityAlert", "ZoneType", "Timeframe", "TouchType",
     "ZoneDetector", "ProximityChecker", "ZoneLogger", "ZoneDetectionConfig",
     "BreakoutEvent", "BreakoutStatus", "BreakoutSignal", "BreakoutConfig",
+    "BreakoutDetector",
 ]
