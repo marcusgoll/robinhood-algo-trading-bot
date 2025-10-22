@@ -283,7 +283,7 @@
   - Contract compliance: 100% (27 fields, 10 methods verified)
   - KISS/DRY: No violations
   - Full Constitution v1.0.0 compliance (§Audit_Everything, §Data_Integrity, §Safety_First, §Testing)
-  - Production-ready, local-only feature (no staging/production deployment needed)
+  - Production-ready, remote-direct deployment (GitHub → local execution)
   - Documentation: spec, plan, tasks, contracts/api.yaml, analysis-report, optimization-report, code-review-report
 
 ### order-management
@@ -385,7 +385,7 @@
   - Code quality: Ruff linting (all checks passed)
   - Performance: ~100-200ms health check latency (target <2000ms)
   - Full Constitution v1.0.0 compliance (§Safety_First, §Risk_Management, §Audit_Everything)
-  - Production-ready, local-only feature (no staging/production deployment needed)
+  - Production-ready, remote-direct deployment (GitHub → local execution)
   - Documentation: spec, plan, tasks, analysis, optimization-report, PRODUCTION-READY.md
 
 ### stock-screener
@@ -415,7 +415,7 @@
   - Performance: P95 ~110ms (target <500ms, 78% margin)
   - All 8 Constitution principles verified (§Safety_First, §Code_Quality, §Risk_Management, §Testing_Requirements, §Audit_Everything, §Error_Handling, §Security, §Data_Integrity)
   - 15+ artifacts: spec, plan, data-model, tasks, analysis, code-review, optimization-report, preview-checklist, finalization-summary, contracts/api.yaml, etc.
-  - Production-ready, local-only feature (no staging/production deployment needed)
+  - Production-ready, remote-direct deployment (GitHub → local execution)
   - Simple 2-command rollback (git revert + restart)
 
 ### momentum-detection
@@ -443,7 +443,7 @@
   - Performance: <1s unit tests, <1s integration tests, <500ms p95 for single symbol scans
   - All 8 Constitution principles verified (§Safety_First, §Code_Quality, §Risk_Management, §Testing_Requirements, §Audit_Everything, §Error_Handling, §Security, §Data_Integrity)
   - 20+ artifacts: spec, plan, data-model, tasks, analysis, code-review, optimization-report, contracts/api.yaml, etc.
-  - Production-ready, local-only feature
+  - Production-ready, remote-direct deployment
   - Comprehensive documentation with API contracts and user guides
 
 ### status-dashboard
@@ -524,7 +524,7 @@
   - Security: 0 vulnerabilities (Bandit scan clean)
   - Critical issues fixed: 2 (CR-1: missing symbol field, CR-2: MACD signal line)
   - Full Constitution v1.0.0 compliance (§Code_Quality, §Testing_Requirements, §Data_Integrity, §Safety_First)
-  - Production-ready, local-only feature
+  - Production-ready, remote-direct deployment
   - Documentation: spec, plan, tasks, analysis-report, local-build-report, staging-ship-report
 
 ### entry-logic-bull-flag
@@ -564,7 +564,7 @@
     - CR-005: Test coverage (patterns module 96.4% coverage achieved)
     - CR-006: Quality score calibration (weight adjustments applied)
   - Full Constitution v1.0.0 compliance (§Code_Quality, §Testing_Requirements, §Risk_Management, §Data_Integrity, §Safety_First)
-  - Production-ready, local-only feature (composition with existing indicators service)
+  - Production-ready, remote-direct deployment (composition with existing indicators)
   - Documentation: spec, plan, tasks, analysis-report, code-review-report, optimization-report, NOTES.md
   - Artifacts: 11 files (5 implementation + 6 test files)
 
@@ -591,7 +591,7 @@
   - **Deployment**: Reversible migration with downgrade() function
   - **Quality**: No blockers, all quality gates passed, production-ready
   - Full Constitution v1.0.0 compliance (§Risk_Management, §Safety_First, §Testing_Requirements, §Audit_Everything, §Security, §Code_Quality, §Data_Integrity, §Error_Handling)
-  - Production-ready, local-only feature (requires GitHub remote for staging deployment)
+  - Production-ready, remote-direct deployment (version controlled on GitHub)
   - Documentation: spec, plan, tasks (36 total, 15 MVP completed), analysis-report, IMPLEMENTATION_SUMMARY.md
 
 ### backtesting-engine
@@ -616,7 +616,7 @@
   - **Performance**: <2s for 1-year backtest (target <5s)
   - **Documentation**: Complete README section, API documentation, usage examples
   - Full Constitution v1.0.0 compliance (§Code_Quality, §Testing_Requirements, §Data_Integrity, §Safety_First)
-  - Production-ready, local-only feature (merged to master branch)
+  - Production-ready, remote-direct deployment (merged to main branch)
   - Documentation: spec, plan, tasks, analysis-report, code-review-report, DEPLOYMENT.md
 
 ### strategy-orchestrator
@@ -643,7 +643,7 @@
   - **Type Safety**: 100% mypy compliant with comprehensive type hints
   - **Code Quality**: 0 lint errors, all integration tests passing
   - Full Constitution v1.0.0 compliance (§Code_Quality, §Testing_Requirements, §Risk_Management, §Safety_First)
-  - Production-ready, local-only feature (merged to master branch)
+  - Production-ready, remote-direct deployment (merged to main branch)
   - Documentation: spec, plan, tasks, analysis-report, IMPLEMENTATION_STATUS.md, workflow-state.yaml
 
 ### daily-profit-goal-ma
@@ -672,7 +672,7 @@
   - **Architecture**: Dependency injection, fail-safe design, immutable dataclasses, event-driven logging
   - Full Constitution v1.0.0 compliance (§Safety_First, §Code_Quality, §Risk_Management, §Testing_Requirements, §Audit_Everything)
   - Backward compatible, opt-in feature (disabled by default when target = $0)
-  - Production-ready, local-only feature (merged to main branch)
+  - Production-ready, remote-direct deployment (merged to main branch)
   - Documentation: spec, plan, tasks, analysis-report, code-review, optimization-report, optimization-performance, optimization-security, optimization-coverage, ship-report, quickstart
 
 ## In Progress

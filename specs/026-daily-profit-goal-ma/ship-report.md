@@ -2,7 +2,7 @@
 
 **Date**: 2025-10-22
 **Feature**: daily-profit-goal-ma (specs/026-daily-profit-goal-ma)
-**Deployment Type**: Local-only trading bot (no web deployment)
+**Deployment Type**: Remote-direct (GitHub → local trading environment)
 **Status**: ✅ **READY FOR MERGE TO MAIN**
 
 ---
@@ -11,7 +11,7 @@
 
 The daily profit goal management feature is **production-ready** and fully optimized. All quality gates passed with zero blocking issues. Feature is backward-compatible and opt-in (disabled by default).
 
-**Deployment Model**: Local-only Python module
+**Deployment Model**: Remote-direct (version controlled, locally executed)
 **No web deployment needed**: This is a trading bot feature that runs locally only.
 
 ---

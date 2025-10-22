@@ -287,7 +287,7 @@ Daily profit goal management feature for automated profit protection. System tra
 
 ## Phase 8: Ship to Production (2025-10-22)
 
-**Deployment Type**: Local-only trading bot (no web deployment)
+**Deployment Type**: Remote-direct (GitHub → local trading environment)
 
 **Status**: ✅ **READY FOR MERGE TO MAIN**
 
