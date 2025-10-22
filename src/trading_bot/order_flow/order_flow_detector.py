@@ -79,16 +79,43 @@ class OrderFlowDetector:
             >>> for alert in alerts:
             ...     print(f"{alert.symbol}: {alert.order_size} shares at ${alert.price_level}")
         """
-        # TODO: T014 - Implement large seller detection logic
-        # Algorithm:
-        # 1. Scan snapshot.bids for orders where size > config.large_order_size_threshold
-        # 2. For each large order, create OrderFlowAlert with:
-        #    - alert_type="large_seller"
-        #    - severity="warning" (or "critical" if order_size > 2x threshold)
-        #    - order_size, price_level, timestamp_utc
-        # 3. Append to alert_history
-        # 4. Log alert event
-        raise NotImplementedError("T014: detect_large_sellers() not yet implemented")
+        alerts = []
+
+        # Scan bids for large orders
+        for price_level, order_size in snapshot.bids:
+            if order_size >= self.config.large_order_size_threshold:
+                # Calculate severity
+                severity = self._calculate_alert_severity(order_size)
+
+                # Create alert
+                alert = OrderFlowAlert(
+                    symbol=snapshot.symbol,
+                    alert_type="large_seller",
+                    severity=severity,
+                    order_size=order_size,
+                    price_level=price_level,
+                    volume_ratio=None,  # Not applicable for large_seller
+                    timestamp_utc=snapshot.timestamp_utc
+                )
+
+                alerts.append(alert)
+
+                # Append to alert_history for exit signal evaluation
+                self.alert_history.append(alert)
+
+                # Log alert event
+                _logger.warning(
+                    "Large seller detected",
+                    extra={
+                        "symbol": snapshot.symbol,
+                        "order_size": order_size,
+                        "price_level": str(price_level),
+                        "severity": severity,
+                        "alert_type": "large_seller"
+                    }
+                )
+
+        return alerts
 
     def should_trigger_exit(self) -> bool:
         """
@@ -103,12 +130,37 @@ class OrderFlowDetector:
             >>> if detector.should_trigger_exit():
             ...     print("EXIT SIGNAL: Multiple large sellers detected")
         """
-        # TODO: T026 - Implement exit signal logic
-        # Algorithm:
-        # 1. Filter alert_history for large_seller alerts within alert_window_seconds
-        # 2. Count alerts in window
-        # 3. Return True if count >= 3, False otherwise
-        raise NotImplementedError("T026: should_trigger_exit() not yet implemented")
+        from datetime import timedelta, UTC
+
+        # Get current time
+        now = datetime.now(UTC)
+
+        # Calculate window start time
+        window_start = now - timedelta(seconds=self.config.alert_window_seconds)
+
+        # Filter alert_history for large_seller alerts within window
+        recent_large_seller_alerts = [
+            alert for alert in self.alert_history
+            if alert.alert_type == "large_seller" and alert.timestamp_utc >= window_start
+        ]
+
+        # Count alerts in window
+        alert_count = len(recent_large_seller_alerts)
+
+        # Return True if 3+ alerts
+        should_exit = alert_count >= 3
+
+        if should_exit:
+            _logger.critical(
+                "Exit signal triggered",
+                extra={
+                    "alert_count": alert_count,
+                    "window_seconds": self.config.alert_window_seconds,
+                    "trigger_threshold": 3
+                }
+            )
+
+        return should_exit
 
     def _calculate_alert_severity(self, order_size: int) -> str:
         """
@@ -120,6 +172,6 @@ class OrderFlowDetector:
         Returns:
             "warning" or "critical"
         """
-        # Critical if order_size > 2x threshold
+        # Critical if order_size >= 2x threshold
         threshold = self.config.large_order_size_threshold
-        return "critical" if order_size > (threshold * 2) else "warning"
+        return "critical" if order_size >= (threshold * 2) else "warning"

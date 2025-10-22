@@ -298,10 +298,24 @@ Integrate Level 2 order book data and Time & Sales (tape) data to provide real-t
 - ✅ T006: Created validators module (validate_level2_data, validate_tape_data, validate_order_flow_config)
 - ✅ T007: Created PolygonClient with stub methods (get_level2_snapshot, get_time_and_sales, normalization helpers)
 
+### Batch 4: US1 Tests (Completed)
+- ✅ T008: Created test_config.py with OrderFlowConfig validation tests (16 test cases, all passing)
+- ✅ T009: Created test_polygon_client.py with normalization tests (7 unit tests + 3 integration tests)
+- ✅ T010: Created test_order_flow_detector.py with large seller detection + exit signal tests (10 test cases)
+- Fixed import error in validators.py (OrderFlowConfig import from wrong module)
+
+### Batch 5: US1 Implementation (Completed)
+- ✅ T011: Implemented PolygonClient.get_level2_snapshot() - Full API integration with requests library
+- ✅ T012: Implemented PolygonClient._normalize_level2_response() - Convert raw API dict to OrderBookSnapshot
+- ✅ T013: OrderFlowDetector class already created in Batch 3 (stub architecture)
+- ✅ T014: Implemented OrderFlowDetector.detect_large_sellers() - Scan bids, create alerts, append to history
+- ✅ T026: Implemented OrderFlowDetector.should_trigger_exit() - Count 3+ alerts within window (implemented early)
+- All 30 unit tests passing (TDD GREEN phase achieved)
+
 ### Implementation Status Summary
 
-**Completed: 3/17 batches (7/40 tasks)**
-**Progress: 17.5% (foundational architecture complete)**
+**Completed: 5/17 batches (14/40 tasks)**
+**Progress: 35% (US1 Large seller detection complete with passing tests)**
 
 **What's Complete:**
 - ✅ Project structure (directories, __init__ files)

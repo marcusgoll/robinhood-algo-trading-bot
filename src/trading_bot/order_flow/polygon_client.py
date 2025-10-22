@@ -73,10 +73,41 @@ class PolygonClient:
             >>> len(snapshot.bids)  # Number of bid levels
             10
         """
-        # TODO: T011 - Implement actual API call
-        # Endpoint: GET /v2/snapshot/locale/us/markets/stocks/tickers/{symbol}
-        # Headers: { "Authorization": f"Bearer {self.config.polygon_api_key}" }
-        raise NotImplementedError("T011: get_level2_snapshot() not yet implemented")
+        import requests
+
+        # Log the request
+        _logger.info(
+            "Fetching Level 2 snapshot",
+            extra={"symbol": symbol, "data_source": self.config.data_source}
+        )
+
+        # Construct API endpoint
+        url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/{symbol}"
+        headers = {"Authorization": f"Bearer {self.config.polygon_api_key}"}
+
+        # Make API request
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()  # Raises HTTPError for 4xx/5xx responses
+
+        # Parse JSON response
+        raw_response = response.json()
+
+        # Normalize to OrderBookSnapshot
+        snapshot = self._normalize_level2_response(raw_response)
+
+        # Validate data integrity
+        validate_level2_data(snapshot)
+
+        _logger.info(
+            "Level 2 snapshot fetched",
+            extra={
+                "symbol": symbol,
+                "bid_levels": len(snapshot.bids),
+                "ask_levels": len(snapshot.asks)
+            }
+        )
+
+        return snapshot
 
     def _normalize_level2_response(self, raw_response: dict) -> OrderBookSnapshot:
         """
@@ -94,11 +125,46 @@ class PolygonClient:
         Raises:
             DataValidationError: If response is malformed or validation fails
         """
-        # TODO: T012 - Implement normalization logic
-        # Extract: ticker.bids, ticker.asks, ticker.updated
-        # Convert: updated (unix ms) → datetime UTC
-        # Map: {"p": price, "s": size} → (Decimal, int) tuples
-        raise NotImplementedError("T012: _normalize_level2_response() not yet implemented")
+        from trading_bot.market_data.exceptions import DataValidationError
+
+        # Extract ticker symbol
+        ticker = raw_response.get("ticker")
+        if not ticker:
+            raise DataValidationError("Missing 'ticker' field in Polygon.io response")
+
+        # Extract timestamp (Unix milliseconds)
+        updated_ms = raw_response.get("updated")
+        if not updated_ms:
+            raise DataValidationError("Missing 'updated' field in Polygon.io response")
+
+        # Convert Unix milliseconds to datetime UTC
+        timestamp_utc = datetime.fromtimestamp(updated_ms / 1000.0, tz=UTC)
+
+        # Extract and normalize bids
+        raw_bids = raw_response.get("bids", [])
+        bids = []
+        for bid in raw_bids:
+            price = Decimal(str(bid["p"]))
+            size = int(bid["s"])
+            bids.append((price, size))
+
+        # Extract and normalize asks
+        raw_asks = raw_response.get("asks", [])
+        asks = []
+        for ask in raw_asks:
+            price = Decimal(str(ask["p"]))
+            size = int(ask["s"])
+            asks.append((price, size))
+
+        # Create OrderBookSnapshot (will validate in __post_init__)
+        snapshot = OrderBookSnapshot(
+            symbol=ticker,
+            bids=bids,
+            asks=asks,
+            timestamp_utc=timestamp_utc
+        )
+
+        return snapshot
 
     @with_retry(policy=DEFAULT_POLICY)
     def get_time_and_sales(

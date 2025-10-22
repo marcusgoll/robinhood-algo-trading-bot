@@ -12,7 +12,8 @@ from decimal import Decimal
 from trading_bot.logger import TradingLogger
 from trading_bot.market_data.exceptions import DataValidationError
 
-from .data_models import OrderBookSnapshot, OrderFlowConfig, TimeAndSalesRecord
+from .config import OrderFlowConfig
+from .data_models import OrderBookSnapshot, TimeAndSalesRecord
 
 # Get logger for validation warnings
 _logger = TradingLogger.get_logger(__name__)
