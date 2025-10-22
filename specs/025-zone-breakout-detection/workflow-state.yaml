@@ -11,7 +11,7 @@ feature:
   github_issue: 30
   created_at: 2025-10-21T00:00:00Z
   updated_at: 2025-10-21T00:00:00Z
-  roadmap_status: in-progress
+  roadmap_status: planning-complete
 
 deployment:
   model: remote-direct  # staging-prod, direct-prod, or local-only
@@ -27,25 +27,25 @@ deployment:
     deployed_at: null
 
 workflow:
-  phase: spec-flow
-  status: in_progress
+  phase: planning_complete
+  status: completed
   phases:
     spec-flow:
-      status: in_progress
+      status: completed
       started_at: 2025-10-21T00:00:00Z
-      completed_at: null
+      completed_at: 2025-10-21T00:00:00Z
     clarify:
-      status: not_started
+      status: skipped
       started_at: null
       completed_at: null
     plan:
-      status: not_started
-      started_at: null
-      completed_at: null
+      status: completed
+      started_at: 2025-10-21T00:00:00Z
+      completed_at: 2025-10-21T00:00:00Z
     tasks:
-      status: not_started
-      started_at: null
-      completed_at: null
+      status: completed
+      started_at: 2025-10-21T00:00:00Z
+      completed_at: 2025-10-21T00:00:00Z
     design_workflow:
       enabled: false
       phases:
@@ -53,11 +53,11 @@ workflow:
         functional: not_started
         polish: not_started
     analyze:
-      status: not_started
-      started_at: null
-      completed_at: null
+      status: completed
+      started_at: 2025-10-21T00:00:00Z
+      completed_at: 2025-10-21T00:00:00Z
     implement:
-      status: not_started
+      status: ready
       started_at: null
       completed_at: null
     optimize:
@@ -100,10 +100,10 @@ quality_gates:
     verified_at: null
 
 artifacts:
-  spec: null
-  plan: null
-  tasks: null
-  analysis_report: null
+  spec: specs/025-zone-breakout-detection/spec.md
+  plan: specs/025-zone-breakout-detection/plan.md
+  tasks: specs/025-zone-breakout-detection/tasks.md
+  analysis_report: specs/025-zone-breakout-detection/analysis.md
   optimization_report: null
   code_review_report: null
   release_notes: null
