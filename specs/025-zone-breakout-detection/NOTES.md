@@ -159,6 +159,14 @@ Status: Complete - Models ready for implementation
 - T022-T023: Zone flipping implementation - COMPLETE (immutability preserved)
 Status: Complete - Breakout detection and zone flipping working
 
+### Batch 4: Phase 5 US3 Event Logging (Complete 5/5 tasks)
+- T030: Write test for log_breakout_event - PASS (test_zone_logger.py)
+- T031: BreakoutEvent.to_jsonl_line() - COMPLETE (already in breakout_models.py)
+- T032: Extend ZoneLogger with log_breakout_event() - COMPLETE (thread-safe, daily rotation)
+- T033: Implement to_jsonl_line serialization - COMPLETE (already done)
+- T034: Update detect_breakout to log events - COMPLETE (logger called on detection)
+Status: Complete - All breakouts logged to breakouts-YYYY-MM-DD.jsonl
+
 ## Checkpoints
 - Phase 0 (Spec-flow): 2025-10-21 ✅
 - Phase 1 (Plan): 2025-10-21 ✅

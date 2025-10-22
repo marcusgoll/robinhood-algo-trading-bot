@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from .models import ProximityAlert, Zone
+from .breakout_models import BreakoutEvent
 
 
 class ZoneLogger:
@@ -212,3 +213,55 @@ class ZoneLogger:
             import json
             with file_path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(log_entry) + "\n")
+
+    def log_breakout_event(self, event: BreakoutEvent) -> None:
+        """Log structured breakout event to dedicated breakout JSONL file.
+
+        Thread-safe write to daily breakout-specific JSONL file (separate from
+        general zone logs). Designed for feature 025 breakout detection with
+        volume confirmation.
+
+        File pattern: logs/zones/breakouts-YYYY-MM-DD.jsonl
+
+        Args:
+            event: BreakoutEvent object with complete breakout metadata
+
+        Example:
+            >>> logger = ZoneLogger()
+            >>> event = BreakoutEvent(
+            ...     event_id="evt_abc123",
+            ...     zone_id="resistance_155.00_daily",
+            ...     timestamp=datetime.now(UTC),
+            ...     breakout_price=Decimal("155.00"),
+            ...     close_price=Decimal("156.60"),
+            ...     volume=Decimal("1500000"),
+            ...     volume_ratio=Decimal("1.4"),
+            ...     old_zone_type=ZoneType.RESISTANCE,
+            ...     new_zone_type=ZoneType.SUPPORT,
+            ...     status=BreakoutStatus.CONFIRMED,
+            ...     timeframe=Timeframe.DAILY
+            ... )
+            >>> logger.log_breakout_event(event)
+
+        Notes:
+            - Separate file from zone detection logs for easier querying
+            - Uses event.to_jsonl_line() for consistent serialization
+            - Graceful degradation: Logs error to stderr on write failure
+        """
+        with self._lock:
+            # Daily breakout log file (separate from zone logs)
+            today = datetime.now(UTC).date().isoformat()
+            file_path = self.log_dir / f"breakouts-{today}.jsonl"
+
+            try:
+                # Write event using its serialization method
+                import json
+                with file_path.open("a", encoding="utf-8") as f:
+                    f.write(event.to_jsonl_line() + "\n")
+            except OSError as e:
+                # Graceful degradation: Log to stderr, don't crash
+                import sys
+                print(
+                    f"WARNING: Failed to write breakout event {event.event_id} to {file_path}: {e}",
+                    file=sys.stderr
+                )

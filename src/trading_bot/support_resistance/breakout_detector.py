@@ -208,6 +208,9 @@ class BreakoutDetector:
             timeframe=zone.timeframe,
         )
 
+        # Log event (T034)
+        self.logger.log_breakout_event(event)
+
         # Flip zone
         flipped_zone = self.flip_zone(zone, event)
 

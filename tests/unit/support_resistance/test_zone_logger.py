@@ -18,6 +18,10 @@ from src.trading_bot.support_resistance.models import (
     Timeframe,
     ProximityAlert
 )
+from src.trading_bot.support_resistance.breakout_models import (
+    BreakoutEvent,
+    BreakoutStatus
+)
 
 
 class TestZoneLogger:
@@ -235,3 +239,44 @@ class TestZoneLogger:
             date_part = file_path.stem.replace("-zones", "")
             assert len(date_part) == 10  # YYYY-MM-DD
             assert date_part.count("-") == 2
+
+    def test_log_breakout_event_creates_jsonl_file(self):
+        """Test log_breakout_event writes to breakouts-YYYY-MM-DD.jsonl file (T030)."""
+        with TemporaryDirectory() as tmpdir:
+            log_dir = Path(tmpdir) / "zones"
+            logger = ZoneLogger(log_dir=log_dir)
+
+            # Create breakout event
+            event = BreakoutEvent(
+                event_id="evt_test123",
+                zone_id="resistance_155.00_daily",
+                timestamp=datetime(2025, 10, 21, 12, 0, 0, tzinfo=UTC),
+                breakout_price=Decimal("155.00"),
+                close_price=Decimal("156.60"),
+                volume=Decimal("1500000"),
+                volume_ratio=Decimal("1.4"),
+                old_zone_type=ZoneType.RESISTANCE,
+                new_zone_type=ZoneType.SUPPORT,
+                status=BreakoutStatus.CONFIRMED,
+                timeframe=Timeframe.DAILY
+            )
+
+            # Log event
+            logger.log_breakout_event(event)
+
+            # Verify file exists
+            today = datetime.now(UTC).date().isoformat()
+            file_path = log_dir / f"breakouts-{today}.jsonl"
+            assert file_path.exists()
+
+            # Verify contents
+            with file_path.open("r") as f:
+                line = f.readline()
+                entry = json.loads(line)
+
+            assert entry["event_id"] == "evt_test123"
+            assert entry["zone_id"] == "resistance_155.00_daily"
+            assert entry["breakout_price"] == "155.00"  # Decimal as string
+            assert entry["old_zone_type"] == "resistance"  # lowercase
+            assert entry["status"] == "confirmed"
+            assert entry["timestamp"] == "2025-10-21T12:00:00+00:00"  # ISO format
