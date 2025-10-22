@@ -22,6 +22,25 @@ A day trader running the trading bot wants to monitor real-time order flow to de
 - How to distinguish between genuine selling pressure and market maker hedging?
 - What happens during market-wide selloffs vs stock-specific events?
 
+## Clarifications
+
+### Session 2025-10-22
+
+**Q1: Does Robinhood API provide Level 2 order book data? If not, what alternative data sources are available?**
+- **Answer**: Robinhood API does not provide Level 2 data. Use Polygon.io API for professional-grade Level 2 order book data ($99/month starter plan). This provides reliable, retail-accessible data with good documentation.
+- **Impact**: Adds Polygon.io API dependency and subscription cost. Requires API integration beyond existing robin_stocks usage.
+- **Decision**: Proceed with Polygon.io as primary data source for Level 2 order book data.
+
+**Q2: Does Robinhood API provide Time & Sales data? If not, what alternative is most cost-effective?**
+- **Answer**: Use Polygon.io API for Time & Sales data (same provider as Level 2). This minimizes API complexity by using single provider and bundles costs effectively.
+- **Impact**: No additional cost beyond Level 2 subscription. Simplifies API integration with consistent authentication and error handling.
+- **Decision**: Use Polygon.io for both Level 2 and Time & Sales data.
+
+**Q3: Should order flow monitoring be active only during active positions, or continuously for watchlist symbols?**
+- **Answer**: Monitor order flow only for symbols with active positions. This reduces API usage/costs and focuses monitoring on risk management (exits) rather than entry signal generation.
+- **Impact**: Lower API call volume, reduced costs, aligns with defensive trading strategy. May miss entry opportunities from order flow analysis.
+- **Decision**: Active positions only. Can expand to watchlist monitoring in future enhancement if needed.
+
 ## User Stories (Prioritized)
 
 > **Purpose**: Break down feature into independently deliverable stories for MVP-first delivery.
@@ -32,23 +51,23 @@ A day trader running the trading bot wants to monitor real-time order flow to de
 **Priority 1 (MVP) 🎯**
 - **US1** [P1]: As a trading bot, I want to detect large sell orders in the Level 2 order book so that I can identify institutional selling pressure before price drops
   - **Acceptance**:
-    - System fetches Level 2 order book data from Robinhood API (or alternative data source)
+    - System fetches Level 2 order book data from Polygon.io API (professional-grade data, $99/month starter plan)
     - Identifies sell orders >10,000 shares at bid or below
     - Logs alert with symbol, order size, price level, timestamp (UTC)
     - Returns OrderFlowAlert dataclass with alert type and severity
   - **Independent test**: Can fetch Level 2 data and identify large sellers standalone
-  - **Effort**: L (8-16 hours) - API research required
-  - **[NEEDS CLARIFICATION: Does Robinhood API provide Level 2 order book data? If not, what alternative data sources are available (Polygon.io, Alpaca, IBKR)?]**
+  - **Effort**: L (8-16 hours) - API integration required
+  - **Clarified**: Robinhood API does not provide Level 2 data. Using Polygon.io API for reliable, retail-accessible Level 2 order book data
 
 - **US2** [P1]: As a trading bot, I want to monitor Time & Sales tape for volume spikes so that I can detect red burst patterns indicating panic selling
   - **Acceptance**:
-    - System fetches real-time Time & Sales data (tick-by-tick trades)
+    - System fetches real-time Time & Sales data from Polygon.io API (same source as Level 2, bundled cost)
     - Calculates 5-minute rolling average volume
     - Detects volume spikes >300% of average with >60% sell-side volume
     - Logs "red burst" alert with magnitude, sell ratio, timestamp
   - **Independent test**: Can analyze Time & Sales data and detect volume spikes independently
   - **Effort**: M (4-8 hours)
-  - **[NEEDS CLARIFICATION: Does Robinhood API provide Time & Sales data? If not, what alternative is most cost-effective for retail trader usage?]**
+  - **Clarified**: Using Polygon.io API for Time & Sales data (same provider as Level 2). Minimizes API complexity and cost
 
 - **US3** [P1]: As a trading bot, I want order flow alerts integrated with risk management so that I can trigger exits when selling pressure is detected
   - **Acceptance**:
@@ -156,8 +175,7 @@ A day trader running the trading bot wants to monitor real-time order flow to de
 - **FR-011**: System MUST validate Time & Sales data sequence (chronological order) and price bounds
 - **FR-012**: System MUST gracefully degrade when Level 2/Tape data unavailable (log gap, continue with reduced monitoring)
 
-*Mark ambiguities:*
-- **FR-013**: [NEEDS CLARIFICATION: Should order flow monitoring be active only during active positions, or continuously for watchlist symbols?]
+- **FR-013**: System MUST monitor order flow only for symbols with active positions (not continuous watchlist monitoring). This reduces API usage and aligns with defensive risk management strategy
 
 ### Non-Functional
 
@@ -188,19 +206,20 @@ A day trader running the trading bot wants to monitor real-time order flow to de
 - None (local Python execution, not Railway-hosted)
 
 **Dependencies**:
-- **CRITICAL**: robin_stocks library (check if Level 2/Tape supported)
-- **Alternative**: Polygon.io SDK (polygon-api-client), Alpaca SDK (alpaca-trade-api), or IBKR API
-- **New**: pandas-market-calendars (for market hours validation)
+- **NEW**: Polygon.io SDK (polygon-api-client) - Level 2 order book and Time & Sales data
+- **CLARIFIED**: robin_stocks library does NOT support Level 2/Tape data
+- **NEW**: pandas-market-calendars (for market hours validation)
 
 ### Environment Variables
 
 **New Required Variables**:
-- `ORDER_FLOW_DATA_SOURCE`: Data provider (robinhood|polygon|alpaca|ibkr) - default: robinhood
-- `ORDER_FLOW_API_KEY`: API key for Level 2/Tape data provider (if not Robinhood)
+- `ORDER_FLOW_DATA_SOURCE`: Data provider - default: polygon (clarified: must be polygon, robinhood not supported)
+- `POLYGON_API_KEY`: API key for Polygon.io Level 2/Time & Sales data (required, no default)
 - `ORDER_FLOW_LARGE_ORDER_SIZE`: Threshold for large order detection (default: 10000 shares)
 - `ORDER_FLOW_VOLUME_SPIKE_THRESHOLD`: Multiplier for volume spike detection (default: 3.0x)
 - `ORDER_FLOW_RED_BURST_THRESHOLD`: Critical volume spike threshold (default: 4.0x)
 - `ORDER_FLOW_ALERT_WINDOW_SECONDS`: Time window for consecutive alert detection (default: 120 seconds)
+- `ORDER_FLOW_MONITORING_MODE`: Monitoring scope - default: positions_only (clarified: not continuous watchlist)
 
 **Changed Variables**:
 - None
@@ -304,9 +323,9 @@ A day trader running the trading bot wants to monitor real-time order flow to de
 ## Quality Gates *(Must pass before `/plan`)*
 
 ### Core (Always Required)
-- [ ] Requirements testable, max 3 [NEEDS CLARIFICATION] markers (currently 3 markers)
-- [ ] Constitution aligned (§Data_Integrity, §Audit_Everything, §Safety_First, §Risk_Management)
-- [ ] No implementation details (tech stack, APIs, code)
+- [x] Requirements testable, max 3 [NEEDS CLARIFICATION] markers (0 markers remaining - all clarified)
+- [x] Constitution aligned (§Data_Integrity, §Audit_Everything, §Safety_First, §Risk_Management)
+- [x] No implementation details (tech stack, APIs, code)
 
 ### Conditional: Success Metrics (Required - measurable feature)
 - [ ] HEART metrics defined with Claude Code-measurable sources (logs, trade data)
@@ -322,8 +341,8 @@ A day trader running the trading bot wants to monitor real-time order flow to de
 
 ## Assumptions
 
-1. **Data Availability**: Assumes Level 2 and Time & Sales data available from Robinhood API or alternative provider. If Robinhood does not support, will use Polygon.io or Alpaca.
+1. **Data Availability** [CLARIFIED]: Robinhood API does NOT support Level 2/Time & Sales data. Using Polygon.io API ($99/month starter plan) as confirmed data source.
 2. **Latency Tolerance**: Assumes 2-second alert latency acceptable for day trading use case (sub-second not required).
-3. **Position Context**: Assumes order flow monitoring active only during active positions (not continuous watchlist monitoring).
+3. **Position Context** [CLARIFIED]: Order flow monitoring active ONLY during active positions (not continuous watchlist monitoring). Reduces API costs and aligns with risk management focus.
 4. **Market Hours**: Assumes order flow detection operates during regular trading hours (7am-10am EST per Constitution).
 5. **Exit Authority**: Assumes order flow alerts are recommendations to risk management, not automatic exits (human-in-loop for now).

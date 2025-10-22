@@ -69,6 +69,38 @@ Integrate Level 2 order book data and Time & Sales (tape) data to provide real-t
 
 ## Checkpoints
 - Phase 0 (Spec-flow): 2025-10-22
+- Phase 0.5 (Clarify): 2025-10-22
 
 ## Last Updated
 2025-10-22T00:00:00Z
+
+## Phase 0.5: Clarify (2025-10-22)
+
+**Summary**:
+- Questions answered: 3/3
+- Questions skipped: 0
+- Ambiguities remaining: 0
+- Session: 2025-10-22
+- Status: All clarifications resolved
+
+**Clarifications**:
+1. **Data Source for Level 2**: Robinhood API does NOT support Level 2 order book data. Confirmed Polygon.io API as primary data source ($99/month starter plan). Requires polygon-api-client SDK integration.
+2. **Data Source for Time & Sales**: Using Polygon.io API for Time & Sales data (same provider as Level 2). Single API provider minimizes complexity and bundles costs effectively.
+3. **Monitoring Scope**: Order flow monitoring will be active ONLY for symbols with active positions (not continuous watchlist monitoring). Reduces API costs and aligns with defensive risk management strategy.
+
+**Impact**:
+- Adds Polygon.io API dependency (new SDK: polygon-api-client)
+- Requires POLYGON_API_KEY environment variable
+- Additional monthly cost: $99 for Polygon.io starter plan
+- Removed ambiguity around robin_stocks capabilities (does NOT support Level 2/Tape)
+- ORDER_FLOW_MONITORING_MODE defaults to "positions_only"
+
+**Updated Artifacts**:
+- spec.md: Added Clarifications section, updated US1/US2/FR-013, updated Dependencies, updated Environment Variables, updated Assumptions
+- Quality Gates: All [NEEDS CLARIFICATION] markers resolved (0 remaining)
+
+**Checkpoint**:
+- Status: Ready for /plan
+- All critical ambiguities resolved
+- Dependencies clarified
+- Cost implications documented
