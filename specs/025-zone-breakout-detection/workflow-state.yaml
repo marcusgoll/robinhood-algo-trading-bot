@@ -1,0 +1,119 @@
+# Workflow State for Zone breakout detection with volume confirmation
+# Feature: 025-zone-breakout-detection
+# Created: 2025-10-21
+
+feature:
+  slug: zone-breakout-detection
+  number: "025"
+  title: Zone breakout detection with volume confirmation
+  description: Zone breakout detection with volume confirmation
+  branch_name: feature/025-zone-breakout-detection
+  github_issue: 30
+  created_at: 2025-10-21T00:00:00Z
+  updated_at: 2025-10-21T00:00:00Z
+  roadmap_status: in-progress
+
+deployment:
+  model: remote-direct  # staging-prod, direct-prod, or local-only
+  staging:
+    deployed: false
+    url: null
+    deployment_id: null
+    deployed_at: null
+  production:
+    deployed: false
+    url: null
+    deployment_id: null
+    deployed_at: null
+
+workflow:
+  phase: spec-flow
+  status: in_progress
+  phases:
+    spec-flow:
+      status: in_progress
+      started_at: 2025-10-21T00:00:00Z
+      completed_at: null
+    clarify:
+      status: not_started
+      started_at: null
+      completed_at: null
+    plan:
+      status: not_started
+      started_at: null
+      completed_at: null
+    tasks:
+      status: not_started
+      started_at: null
+      completed_at: null
+    design_workflow:
+      enabled: false
+      phases:
+        variations: not_started
+        functional: not_started
+        polish: not_started
+    analyze:
+      status: not_started
+      started_at: null
+      completed_at: null
+    implement:
+      status: not_started
+      started_at: null
+      completed_at: null
+    optimize:
+      status: not_started
+      started_at: null
+      completed_at: null
+    preview:
+      status: not_started
+      started_at: null
+      completed_at: null
+      approved: false
+    ship-staging:
+      status: not_started
+      started_at: null
+      completed_at: null
+    validate-staging:
+      status: not_started
+      started_at: null
+      completed_at: null
+      approved: false
+    ship-prod:
+      status: not_started
+      started_at: null
+      completed_at: null
+    finalize:
+      status: not_started
+      started_at: null
+      completed_at: null
+
+quality_gates:
+  pre_flight:
+    passed: false
+    checked_at: null
+  code_review:
+    passed: false
+    critical_issues: 0
+    reviewed_at: null
+  rollback_ready:
+    capable: false
+    verified_at: null
+
+artifacts:
+  spec: null
+  plan: null
+  tasks: null
+  analysis_report: null
+  optimization_report: null
+  code_review_report: null
+  release_notes: null
+  ship_summary: null
+
+token_budget:
+  phase: spec-flow
+  current: 0
+  limit: 75000
+  compaction_threshold: 60000
+  compacted: false
+
+phase_summaries: []
