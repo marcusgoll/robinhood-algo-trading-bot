@@ -104,9 +104,33 @@ Required compliance:
 - Architecture pattern: Composition over inheritance (Decision 1)
 - Estimated effort: 16-24 hours (MVP US1-US3)
 
+### Phase 2: Tasks (Complete)
+- Total tasks: 41
+- User story tasks: 8 (US1), 4 (US2), 5 (US3), 2 (US4), 2 (US5), 1 (US6)
+- Parallel opportunities: 21 tasks marked [P]
+- Setup tasks: 2 (verify structure, verify parent feature)
+- Foundational tasks: 4 (models, config, exports)
+- Test tasks: 15 (TDD approach with tests-first)
+- Polish tasks: 11 (validation, documentation, quality gates)
+
+**Task Breakdown by Phase**:
+- Phase 1 (Setup): 2 tasks
+- Phase 2 (Foundational): 4 tasks - blocking models and config
+- Phase 3 (US1 - Breakout Detection): 8 tasks (4 tests + 4 implementation)
+- Phase 4 (US2 - Zone Flipping): 4 tasks (2 tests + 2 implementation)
+- Phase 5 (US3 - Event Logging): 5 tasks (2 tests + 3 implementation)
+- Phase 6-8 (US4-US6 Optional): 7 tasks (enhancement features)
+- Phase 9 (Polish): 11 tasks (validation, quality, documentation)
+
+**MVP Scope** (US1-US3): 23 tasks
+**Optional Enhancements** (US4-US6): 7 tasks
+**Infrastructure** (Setup + Foundational): 6 tasks
+**Quality Gates** (Polish): 11 tasks
+
 ## Checkpoints
 - Phase 0 (Spec-flow): 2025-10-21 ✅
 - Phase 1 (Plan): 2025-10-21 ✅
+- Phase 2 (Tasks): 2025-10-21 ✅
 
 ## Last Updated
 2025-10-21
