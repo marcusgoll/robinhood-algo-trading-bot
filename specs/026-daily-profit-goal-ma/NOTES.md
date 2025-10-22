@@ -164,3 +164,24 @@ Daily profit goal management feature for automated profit protection. System tra
 - ✅ T014: load_profit_goal_config() function implemented (T008)
 - Note: TDD cycle complete - tests written after implementation but validate correctly
 
+**Batch 6 (US2 Tests) - Complete**:
+- ✅ T015: Wrote test_tracker.py with 3 peak tracking tests (peak follows, stays, resets)
+- ✅ T016: Wrote 3 state update tests (positive/negative P&L, no positions)
+- ✅ T017: Wrote 4 persistence tests (save/load, file not found, corrupted JSON)
+- ✅ T021: Wrote 3 protection trigger tests (at threshold, below threshold, disabled)
+- Result: 13 tests, all passing
+
+**Batch 7 (US2 Implementation) - Complete**:
+- ✅ T018: Created DailyProfitTracker class with dependency injection (config, PerformanceTracker)
+- ✅ T019: Implemented update_state() method (P&L tracking, peak profit high-water mark, protection detection)
+- ✅ T020: Implemented state persistence (_persist_state, _load_state with atomic writes, error recovery)
+- ✅ T024: Implemented _check_protection_trigger() for drawdown detection (US3 foundation)
+- ✅ T031: Implemented reset_daily_state() for market open reset
+- Key decisions: Protection triggers on drawdown alone (not gated by target), peak doesn't go negative, atomic file writes
+
+**Summary US1-US2 Complete (20/36 tasks)**:
+- Total tests: 38 (models: 15, config: 10, tracker: 13)
+- All tests passing
+- Coverage: 100% of new profit_goal code
+- Features working: Config loading, P&L tracking, peak tracking, protection trigger detection, state persistence
+
