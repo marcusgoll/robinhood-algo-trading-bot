@@ -201,3 +201,91 @@ Integrate Level 2 order book data and Time & Sales (tape) data to provide real-t
 - ✅ MVP strategy: Defined (US1-US3 only for first release)
 - ✅ Parallel opportunities: 19 tasks identified for concurrent execution
 - 📋 Ready for: /analyze
+
+## Phase 4: Implementation (2025-10-22)
+
+**Batch Execution Plan**:
+
+**Batch 1 (Setup - all independent):**
+- T001: Create directory structure
+- T002: Install polygon-api-client
+- T003: Add .env.example variables
+
+**Batch 2 (Foundation - sequential start):**
+- T004: OrderFlowConfig dataclass (blocking prerequisite)
+
+**Batch 3 (Foundation - parallel after T004):**
+- T005: Data models
+- T006: Validators
+- T007: PolygonClient
+
+**Batch 4 (US1 Tests - parallel):**
+- T008: Test OrderFlowConfig validation
+- T009: Test PolygonClient Level 2 normalization
+- T010: Test OrderFlowDetector large seller detection
+
+**Batch 5 (US1 Implementation - sequential):**
+- T011: PolygonClient.get_level2_snapshot()
+- T012: PolygonClient._normalize_level2_response()
+- T013: OrderFlowDetector class
+- T014: OrderFlowDetector.detect_large_sellers()
+
+**Batch 6 (US1 Integration):**
+- T015: Integration test with real API
+
+**Batch 7 (US2 Tests - parallel):**
+- T016: Test TapeMonitor rolling average
+- T017: Test TapeMonitor red burst detection
+
+**Batch 8 (US2 Implementation - sequential):**
+- T018: PolygonClient.get_time_and_sales()
+- T019: PolygonClient._normalize_tape_response()
+- T020: TapeMonitor class
+- T021: TapeMonitor.calculate_rolling_average()
+- T022: TapeMonitor.detect_red_burst()
+
+**Batch 9 (US2 Integration):**
+- T023: Integration test for Time & Sales
+
+**Batch 10 (US3 Tests - parallel):**
+- T024: Test should_trigger_exit() logic
+- T025: Test exit signal for red burst
+
+**Batch 11 (US3 Implementation - sequential):**
+- T026: OrderFlowDetector.should_trigger_exit()
+- T027: Risk management integration
+- T028: Position monitoring logic
+
+**Batch 12 (US4 Tests - parallel):**
+- T029: Test config threshold validation
+- T030: Test config.from_env()
+
+**Batch 13 (US4 Implementation):**
+- T031: Config file persistence
+
+**Batch 14 (US5 Tests - parallel):**
+- T032: Test validate_level2_data()
+- T033: Test validate_tape_data()
+
+**Batch 15 (US5 Implementation):**
+- T034: Enhanced validator logging
+
+**Batch 16 (Polish - parallel):**
+- T035: Graceful degradation
+- T036: Rate limit handling
+- T037: Health check
+
+**Batch 17 (Documentation & Performance - parallel):**
+- T038: Rollback documentation
+- T039: Performance benchmarks
+- T040: Structured logging
+
+**Total Batches**: 17
+**Estimated Speedup**: 2.5x (19 parallel tasks vs 40 sequential)
+
+**Progress Tracking**:
+
+### Batch 1: Setup (Completed)
+- ✅ T001: Created order_flow directory structure (src/trading_bot/order_flow/, tests/order_flow/, logs/order_flow/)
+- ✅ T002: Added polygon-api-client==1.12.5 to requirements.txt
+- ✅ T003: Added ORDER_FLOW_* environment variables to .env.example (8 variables)
