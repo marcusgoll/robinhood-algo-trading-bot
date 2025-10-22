@@ -23,14 +23,14 @@ Example:
     ... )
 """
 
-from dataclasses import dataclass, field
+import json
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Any
-import json
 
-from .models import ZoneType, Timeframe
+from .models import Timeframe, ZoneType
 
 
 class BreakoutStatus(Enum):
