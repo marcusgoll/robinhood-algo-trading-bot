@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Bull Flag Profit Target Integration with Resistance Zones** (PR #32)
+  - Zone-adjusted profit targets: Automatically adjusts to 90% of nearest resistance zone when closer than 2:1 R:R target
+  - TargetCalculation dataclass: Immutable metadata preservation for backtesting analysis
+  - Graceful degradation: Optional ZoneDetector dependency with fallback to standard 2:1 targets
+  - JSONL logging: Full audit trail of target adjustment decisions
+  - 4 fallback scenarios: zone_detector=None, timeout (>50ms), exceptions, no zone found
+
+### Performance
+- Zone detection: <50ms P95 (verified)
+- Total target calculation: <100ms P95 (verified)
+- 91.43% test coverage (exceeds 90% target)
+
+### Security
+- 0 vulnerabilities (Bandit scan: 764 lines)
+- Comprehensive input validation
+- Backward compatible (no breaking changes)
+
 ## [1.3.0] - 2025-10-21
 
 ### Added
