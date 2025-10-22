@@ -157,3 +157,47 @@ Integrate Level 2 order book data and Time & Sales (tape) data to provide real-t
 - All components mapped to spec requirements
 - No critical unknowns remaining
 - Zero architectural novelty (reduces implementation risk)
+
+## Phase 2: Tasks (2025-10-22)
+
+**Summary**:
+- Total tasks: 40
+- User story tasks: 27 (US1: 8, US2: 8, US3: 5, US4: 3, US5: 3)
+- Parallel opportunities: 19 tasks marked [P]
+- Setup tasks: 3 (project structure, dependencies, env vars)
+- Foundational tasks: 4 (config, data models, validators, API client)
+- Test tasks: 11 (unit tests for all detector logic)
+- Polish tasks: 5 (error handling, deployment, observability)
+- Task file: specs/028-level-2-order-flow-i/tasks.md
+
+**Task Breakdown by Phase**:
+- Phase 1 (Setup): T001-T003 (3 tasks)
+- Phase 2 (Foundational): T004-T007 (4 tasks, blocks all user stories)
+- Phase 3 (US1 - Large seller detection): T008-T015 (8 tasks)
+- Phase 4 (US2 - Red burst detection): T016-T023 (8 tasks)
+- Phase 5 (US3 - Risk management integration): T024-T028 (5 tasks)
+- Phase 6 (US4 - Configurable thresholds): T029-T031 (3 tasks)
+- Phase 7 (US5 - Data validation): T032-T034 (3 tasks)
+- Phase 8 (Polish): T035-T040 (6 tasks)
+
+**MVP Strategy**:
+- Scope: Phase 3-5 (US1-US3) = Core order flow monitoring with exit signals
+- Incremental delivery: US1 → staging validation → US2 → US3 → full integration
+- Testing: TDD required (11 test tasks), optional integration tests (requires POLYGON_API_KEY)
+
+**Reuse Markers**:
+- CatalystDetector pattern (detector architecture with alert history)
+- MarketDataService patterns (API wrapper, @with_retry usage, validation)
+- @with_retry decorator (exponential backoff, rate limit handling)
+- DEFAULT_POLICY (3 retries, 1s/2s/4s delays)
+- TradingLogger (structured JSONL logging)
+- MomentumConfig pattern (frozen dataclass, from_env() class method)
+- Validator patterns (fail-fast validation from market_data/validators.py)
+
+**Checkpoint**:
+- ✅ Tasks generated: 40 (concrete, no placeholders)
+- ✅ User story organization: Complete (US1-US5 broken into phases)
+- ✅ Dependency graph: Created (foundational → user stories → polish)
+- ✅ MVP strategy: Defined (US1-US3 only for first release)
+- ✅ Parallel opportunities: 19 tasks identified for concurrent execution
+- 📋 Ready for: /analyze
