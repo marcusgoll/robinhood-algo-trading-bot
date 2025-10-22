@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-21 (position-scaling v1.0.0 complete with 172/172 tests passing, 2/3 critical issues resolved)
+**Last updated**: 2025-10-22 (daily-profit-goal-ma v1.5.0 shipped with 45/45 tests passing, 97.7% coverage, zero vulnerabilities)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -646,6 +646,35 @@
   - Production-ready, local-only feature (merged to master branch)
   - Documentation: spec, plan, tasks, analysis-report, IMPLEMENTATION_STATUS.md, workflow-state.yaml
 
+### daily-profit-goal-ma
+- **Title**: Daily profit goal management
+- **Area**: strategy
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-22
+- **Release**: v1.5.0 - Daily Profit Goal Management with automated profit protection
+- **Spec**: specs/026-daily-profit-goal-ma/
+- **Delivered**:
+  - **DailyProfitTracker**: Core tracking logic with P&L monitoring and peak profit high-water mark
+  - **ProfitGoalConfig**: Configuration dataclass with validation (target $0-$10k, threshold 0.10-0.90)
+  - **DailyProfitState**: State tracking dataclass with 8 fields (P&L, peak, protection status, timestamps)
+  - **ProfitProtectionEvent**: Event dataclass with JSONL logging for audit trail
+  - **SafetyChecks Integration**: Blocks new BUY orders when protected, allows SELL orders
+  - **State Persistence**: Atomic file writes with crash recovery and corrupted state handling
+  - **Event Logging**: Structured JSONL logging with daily rotation
+  - **Daily Reset**: Automatic reset at 4:00 AM EST (market open)
+  - **Configuration**: `PROFIT_TARGET_DAILY`, `PROFIT_GIVEBACK_THRESHOLD` environment variables
+  - **Performance**: P&L calc 0.29ms (343x faster), State persist 0.08ms (125x faster), Event log 0.33ms (15x faster)
+  - **Tests**: 45/45 passing (100% success rate)
+  - **Coverage**: 97.7% overall (tracker 95.96%, config 100%, models 100%, __init__ 100%)
+  - **Type Safety**: 100% type hints, mypy --strict: 0 errors
+  - **Security**: 0 critical/high vulnerabilities, Decimal precision, atomic writes
+  - **Architecture**: Dependency injection, fail-safe design, immutable dataclasses, event-driven logging
+  - Full Constitution v1.0.0 compliance (§Safety_First, §Code_Quality, §Risk_Management, §Testing_Requirements, §Audit_Everything)
+  - Backward compatible, opt-in feature (disabled by default when target = $0)
+  - Production-ready, local-only feature (merged to main branch)
+  - Documentation: spec, plan, tasks, analysis-report, code-review, optimization-report, optimization-performance, optimization-security, optimization-coverage, ship-report, quickstart
+
 ## In Progress
 
 <!-- Currently implementing -->
@@ -697,20 +726,6 @@
   - Force simulator mode after daily loss limit hit (§Safety_First)
   - [BLOCKED: safety-checks, mode-switcher]
   - [MERGED: position-size-reducer]
-
-### profit-goal-manager
-- **Title**: Daily profit goal management
-- **Area**: strategy
-- **Role**: all
-- **Intra**: No
-- **Impact**: 4 | **Effort**: 2 | **Confidence**: 0.8 | **Score**: 1.60
-- **Requirements**:
-  - Set daily profit target
-  - Track progress to goal
-  - Detect when half of profit given back
-  - Trigger exit rule when threshold hit
-  - Reset daily at market open (§Risk_Management)
-  - [BLOCKED: performance-tracking, safety-checks]
 
 ### support-resistance-mapping
 - **Title**: Support/resistance zone mapping
