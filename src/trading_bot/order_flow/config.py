@@ -7,8 +7,10 @@ Provides defaults from spec.md and environment variable loading.
 Pattern: Follows MomentumConfig pattern from momentum/config.py
 """
 
+import json
 import os
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import ClassVar
 
 
@@ -134,3 +136,48 @@ class OrderFlowConfig:
             ),
             monitoring_mode=os.getenv("ORDER_FLOW_MONITORING_MODE", "positions_only"),
         )
+
+    def save(self, config_path: str | Path = "config/order_flow_config.json") -> None:
+        """
+        Save configuration to JSON file.
+
+        Args:
+            config_path: Path to config file (default: config/order_flow_config.json)
+
+        Example:
+            >>> config = OrderFlowConfig.from_env()
+            >>> config.save()  # Saves to config/order_flow_config.json
+        """
+        config_path = Path(config_path)
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+
+        config_dict = asdict(self)
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(config_dict, f, indent=2)
+
+    @classmethod
+    def load(cls, config_path: str | Path = "config/order_flow_config.json") -> "OrderFlowConfig":
+        """
+        Load configuration from JSON file.
+
+        Falls back to from_env() if file does not exist.
+
+        Args:
+            config_path: Path to config file (default: config/order_flow_config.json)
+
+        Returns:
+            OrderFlowConfig instance loaded from file or environment
+
+        Example:
+            >>> config = OrderFlowConfig.load()  # Loads from file or falls back to env
+        """
+        config_path = Path(config_path)
+
+        if not config_path.exists():
+            # Fall back to environment variables if file doesn't exist
+            return cls.from_env()
+
+        with open(config_path, "r", encoding="utf-8") as f:
+            config_dict = json.load(f)
+
+        return cls(**config_dict)

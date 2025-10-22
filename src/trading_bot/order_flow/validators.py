@@ -44,6 +44,17 @@ def validate_level2_data(snapshot: OrderBookSnapshot) -> None:
     age_seconds = (now - snapshot.timestamp_utc).total_seconds()
 
     if age_seconds > 30:
+        _logger.error(
+            "Level 2 validation failed: stale data",
+            extra={
+                "error_type": "STALE_DATA",
+                "error_code": "LEVEL2_STALE",
+                "symbol": snapshot.symbol,
+                "age_seconds": age_seconds,
+                "threshold_seconds": 30,
+                "timestamp_utc": snapshot.timestamp_utc.isoformat(),
+            },
+        )
         raise DataValidationError(
             f"Level 2 data too stale: {age_seconds:.1f}s old (max 30s allowed)"
         )
@@ -52,9 +63,12 @@ def validate_level2_data(snapshot: OrderBookSnapshot) -> None:
         _logger.warning(
             "Level 2 data aging",
             extra={
+                "error_type": "AGING_DATA",
+                "error_code": "LEVEL2_AGING",
                 "symbol": snapshot.symbol,
                 "age_seconds": age_seconds,
                 "threshold_seconds": 10,
+                "timestamp_utc": snapshot.timestamp_utc.isoformat(),
             },
         )
 
@@ -62,6 +76,18 @@ def validate_level2_data(snapshot: OrderBookSnapshot) -> None:
     if len(snapshot.bids) > 1:
         for i in range(len(snapshot.bids) - 1):
             if snapshot.bids[i][0] < snapshot.bids[i + 1][0]:
+                _logger.error(
+                    "Level 2 validation failed: bids not sorted",
+                    extra={
+                        "error_type": "SORT_ORDER",
+                        "error_code": "LEVEL2_BID_SORT",
+                        "symbol": snapshot.symbol,
+                        "position": i,
+                        "current_price": str(snapshot.bids[i][0]),
+                        "next_price": str(snapshot.bids[i + 1][0]),
+                        "expected_order": "descending",
+                    },
+                )
                 raise DataValidationError(
                     f"Level 2 bids not sorted descending: "
                     f"{snapshot.bids[i][0]} < {snapshot.bids[i+1][0]}"
@@ -71,6 +97,18 @@ def validate_level2_data(snapshot: OrderBookSnapshot) -> None:
     if len(snapshot.asks) > 1:
         for i in range(len(snapshot.asks) - 1):
             if snapshot.asks[i][0] > snapshot.asks[i + 1][0]:
+                _logger.error(
+                    "Level 2 validation failed: asks not sorted",
+                    extra={
+                        "error_type": "SORT_ORDER",
+                        "error_code": "LEVEL2_ASK_SORT",
+                        "symbol": snapshot.symbol,
+                        "position": i,
+                        "current_price": str(snapshot.asks[i][0]),
+                        "next_price": str(snapshot.asks[i + 1][0]),
+                        "expected_order": "ascending",
+                    },
+                )
                 raise DataValidationError(
                     f"Level 2 asks not sorted ascending: "
                     f"{snapshot.asks[i][0]} > {snapshot.asks[i+1][0]}"
@@ -103,6 +141,20 @@ def validate_tape_data(records: list[TimeAndSalesRecord]) -> None:
     # Check chronological sequence
     for i in range(len(records) - 1):
         if records[i].timestamp_utc > records[i + 1].timestamp_utc:
+            _logger.error(
+                "Tape validation failed: chronological violation",
+                extra={
+                    "error_type": "CHRONOLOGICAL_VIOLATION",
+                    "error_code": "TAPE_CHRONOLOGY",
+                    "symbol": records[i].symbol,
+                    "tick_index": i,
+                    "current_timestamp": records[i].timestamp_utc.isoformat(),
+                    "next_timestamp": records[i + 1].timestamp_utc.isoformat(),
+                    "time_delta_seconds": (
+                        records[i].timestamp_utc - records[i + 1].timestamp_utc
+                    ).total_seconds(),
+                },
+            )
             raise DataValidationError(
                 f"Time & Sales data not chronological: "
                 f"{records[i].timestamp_utc} > {records[i+1].timestamp_utc} "
@@ -113,10 +165,32 @@ def validate_tape_data(records: list[TimeAndSalesRecord]) -> None:
     # (Note: individual record validation already done in TimeAndSalesRecord.__post_init__)
     for idx, record in enumerate(records):
         if record.price <= 0:
+            _logger.error(
+                "Tape validation failed: invalid price",
+                extra={
+                    "error_type": "INVALID_PRICE",
+                    "error_code": "TAPE_PRICE",
+                    "symbol": record.symbol,
+                    "tick_index": idx,
+                    "price": str(record.price),
+                    "minimum_required": "0.01",
+                },
+            )
             raise DataValidationError(
                 f"Time & Sales record {idx} has invalid price: {record.price} (must be >$0)"
             )
         if record.size <= 0:
+            _logger.error(
+                "Tape validation failed: invalid size",
+                extra={
+                    "error_type": "INVALID_SIZE",
+                    "error_code": "TAPE_SIZE",
+                    "symbol": record.symbol,
+                    "tick_index": idx,
+                    "size": record.size,
+                    "minimum_required": 1,
+                },
+            )
             raise DataValidationError(
                 f"Time & Sales record {idx} has invalid size: {record.size} (must be >0 shares)"
             )

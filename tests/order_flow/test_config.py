@@ -316,3 +316,89 @@ class TestOrderFlowConfigFromEnv:
 
         with pytest.raises(ValueError, match="large_order_size_threshold.*must be >= 1000"):
             OrderFlowConfig.from_env()
+
+
+class TestOrderFlowConfigPersistence:
+    """Test suite for OrderFlowConfig save/load functionality (T031)."""
+
+    def test_save_creates_config_file(self, tmp_path):
+        """Test that save() creates a JSON config file."""
+        # Given: OrderFlowConfig instance
+        config = OrderFlowConfig(
+            polygon_api_key="test_key_save",
+            large_order_size_threshold=15_000,
+            volume_spike_threshold=3.5
+        )
+
+        # When: Saving config to temp path
+        config_path = tmp_path / "test_config.json"
+        config.save(config_path)
+
+        # Then: File should exist and contain valid JSON
+        assert config_path.exists()
+        with open(config_path, "r") as f:
+            data = f.read()
+            assert "test_key_save" in data
+            assert "15000" in data
+
+    def test_load_reads_config_from_file(self, tmp_path):
+        """Test that load() reads config from JSON file."""
+        # Given: Saved config file
+        config_path = tmp_path / "test_config.json"
+        original_config = OrderFlowConfig(
+            polygon_api_key="test_key_load",
+            large_order_size_threshold=20_000,
+            volume_spike_threshold=4.5,
+            red_burst_threshold=5.5
+        )
+        original_config.save(config_path)
+
+        # When: Loading config from file
+        loaded_config = OrderFlowConfig.load(config_path)
+
+        # Then: Should match original config
+        assert loaded_config.polygon_api_key == "test_key_load"
+        assert loaded_config.large_order_size_threshold == 20_000
+        assert loaded_config.volume_spike_threshold == 4.5
+        assert loaded_config.red_burst_threshold == 5.5
+
+    @patch.dict(os.environ, {"POLYGON_API_KEY": "env_key_fallback"})
+    def test_load_falls_back_to_env_when_file_missing(self, tmp_path):
+        """Test that load() falls back to from_env() when file doesn't exist."""
+        # Given: Non-existent config file
+        config_path = tmp_path / "missing_config.json"
+        assert not config_path.exists()
+
+        # When: Loading config from missing file
+        config = OrderFlowConfig.load(config_path)
+
+        # Then: Should use environment variables
+        assert config.polygon_api_key == "env_key_fallback"
+        assert config.large_order_size_threshold == 10_000  # Default
+
+    def test_save_load_round_trip_preserves_all_fields(self, tmp_path):
+        """Test that save() followed by load() preserves all config fields."""
+        # Given: OrderFlowConfig with non-default values
+        config_path = tmp_path / "round_trip_config.json"
+        original_config = OrderFlowConfig(
+            data_source="polygon",
+            polygon_api_key="test_key_round_trip",
+            large_order_size_threshold=25_000,
+            volume_spike_threshold=5.0,
+            red_burst_threshold=6.0,
+            alert_window_seconds=180,
+            monitoring_mode="watchlist"
+        )
+
+        # When: Save and then load
+        original_config.save(config_path)
+        loaded_config = OrderFlowConfig.load(config_path)
+
+        # Then: All fields should match
+        assert loaded_config.data_source == original_config.data_source
+        assert loaded_config.polygon_api_key == original_config.polygon_api_key
+        assert loaded_config.large_order_size_threshold == original_config.large_order_size_threshold
+        assert loaded_config.volume_spike_threshold == original_config.volume_spike_threshold
+        assert loaded_config.red_burst_threshold == original_config.red_burst_threshold
+        assert loaded_config.alert_window_seconds == original_config.alert_window_seconds
+        assert loaded_config.monitoring_mode == original_config.monitoring_mode

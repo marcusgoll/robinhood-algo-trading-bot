@@ -257,3 +257,70 @@ class OrderFlowDetector:
         # Critical if order_size >= 2x threshold
         threshold = self.config.large_order_size_threshold
         return "critical" if order_size >= (threshold * 2) else "warning"
+
+    def health_check(self) -> dict:
+        """
+        Perform health check for order flow monitoring system (T037).
+
+        Returns:
+            Health check status with connectivity and last alert timestamp
+
+        Example:
+            >>> health = detector.health_check()
+            >>> health["status"]
+            "ok"
+            >>> health["dependencies"]["polygon_api"]
+            "ok"
+        """
+        import requests
+        from datetime import datetime, UTC
+
+        health_status = {
+            "status": "ok",
+            "timestamp_utc": datetime.now(UTC).isoformat(),
+            "last_alert_count": len(self.alert_history),
+            "last_alert_timestamp": None,
+            "dependencies": {
+                "polygon_api": "unknown"
+            }
+        }
+
+        # Check last alert timestamp
+        if self.alert_history:
+            latest_alert = self.alert_history[-1]
+            health_status["last_alert_timestamp"] = latest_alert.timestamp_utc.isoformat()
+
+        # Check Polygon.io API connectivity (simple ping with test symbol)
+        try:
+            url = "https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/AAPL"
+            headers = {"Authorization": f"Bearer {self.config.polygon_api_key}"}
+            response = requests.get(url, headers=headers, timeout=5)
+
+            if response.status_code == 200:
+                health_status["dependencies"]["polygon_api"] = "ok"
+            elif response.status_code == 429:
+                health_status["dependencies"]["polygon_api"] = "rate_limited"
+            else:
+                health_status["dependencies"]["polygon_api"] = f"error_{response.status_code}"
+
+        except requests.exceptions.Timeout:
+            health_status["dependencies"]["polygon_api"] = "timeout"
+            health_status["status"] = "degraded"
+        except requests.exceptions.ConnectionError:
+            health_status["dependencies"]["polygon_api"] = "unreachable"
+            health_status["status"] = "degraded"
+        except Exception as e:
+            health_status["dependencies"]["polygon_api"] = f"error: {str(e)}"
+            health_status["status"] = "degraded"
+
+        # Log health check result
+        _logger.info(
+            "Order flow health check",
+            extra={
+                "status": health_status["status"],
+                "polygon_api": health_status["dependencies"]["polygon_api"],
+                "alert_count": health_status["last_alert_count"]
+            }
+        )
+
+        return health_status
