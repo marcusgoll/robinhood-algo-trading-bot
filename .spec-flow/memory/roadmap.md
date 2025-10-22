@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-22 (daily-profit-goal-ma v1.5.0 shipped with 45/45 tests passing, 97.7% coverage, zero vulnerabilities)
+**Last updated**: 2025-10-22 (emotional-control-me v1.6.0 shipped with 68/68 tests passing, 89.39% core coverage, zero vulnerabilities)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -675,6 +675,37 @@
   - Production-ready, remote-direct deployment (merged to main branch)
   - Documentation: spec, plan, tasks, analysis-report, code-review, optimization-report, optimization-performance, optimization-security, optimization-coverage, ship-report, quickstart
 
+### emotional-control-me
+- **Title**: Emotional control mechanisms
+- **Area**: strategy
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-22
+- **Release**: v1.6.0 - Emotional Control Mechanisms with automated position sizing safeguards
+- **Spec**: specs/027-emotional-control-me/
+- **Delivered**:
+  - **EmotionalControl**: Core tracker with activation/recovery logic and position multiplier (0.25 or 1.00)
+  - **EmotionalControlState**: State tracking with is_active, trigger_reason, consecutive counters, timestamps
+  - **EmotionalControlEvent**: Event dataclass with factory method for UUID generation and JSONL logging
+  - **EmotionalControlConfig**: Configuration with default() and from_env() factories (thresholds: 3% loss, 3 streaks)
+  - **RiskManager Integration**: Position multiplier applied to calculate_position_with_stop (reduces to 25% when active)
+  - **Activation Triggers**: Single loss ≥3% of account OR 3 consecutive losses
+  - **Recovery Triggers**: 3 consecutive wins OR manual admin reset with confirmation
+  - **State Persistence**: Atomic file writes (temp + rename pattern) with fail-safe recovery
+  - **Event Logging**: Structured JSONL logging with daily rotation and Decimal serialization
+  - **CLI Commands**: status, reset, events (with admin confirmation for manual reset)
+  - **Fail-Safe Design**: State corruption defaults to ACTIVE (conservative 25% sizing)
+  - **Performance**: update_state() <10ms P95, get_position_multiplier() <1ms
+  - **Tests**: 68/68 passing (58 unit + 8 integration + 2 performance)
+  - **Coverage**: 89.39% tracker (core logic), 100% models, 100% config
+  - **Type Safety**: Full type hints with dataclass validation
+  - **Security**: 0 vulnerabilities, Decimal precision, input validation, defensive programming
+  - **Architecture**: Follows DailyProfitTracker v1.5.0 pattern, dependency injection, immutable dataclasses
+  - Full Constitution v1.0.0 compliance (§Safety_First, §Code_Quality, §Risk_Management, §Testing_Requirements)
+  - Backward compatible, opt-in feature (EMOTIONAL_CONTROL_ENABLED flag)
+  - Production-ready, local-only deployment (merged to main branch)
+  - Documentation: spec, plan, tasks, analysis-report, optimization-report, ship-summary, quickstart
+
 ## In Progress
 
 <!-- Currently implementing -->
@@ -711,21 +742,6 @@
 
 <!-- All ideas sorted by ICE score (Impact × Confidence ÷ Effort) -->
 <!-- Higher score = higher priority -->
-
-### emotional-controls
-- **Title**: Emotional control mechanisms
-- **Area**: strategy
-- **Role**: all
-- **Intra**: No
-- **Impact**: 4 | **Effort**: 2 | **Confidence**: 0.8 | **Score**: 1.60
-- **Requirements**:
-  - Detect significant loss (define threshold)
-  - Auto-reduce position size to 25% of normal
-  - Require manual reset after recovery period
-  - Log all size adjustments
-  - Force simulator mode after daily loss limit hit (§Safety_First)
-  - [BLOCKED: safety-checks, mode-switcher]
-  - [MERGED: position-size-reducer]
 
 ### support-resistance-mapping
 - **Title**: Support/resistance zone mapping
