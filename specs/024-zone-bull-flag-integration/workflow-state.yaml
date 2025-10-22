@@ -14,9 +14,9 @@ deployment:
   model: remote-direct  # staging-prod | direct-prod | local-only
 
 workflow:
-  phase: production_deployment
+  phase: finalized
   status: completed
-  phases_completed: [spec, plan, tasks, analyze, implement, optimize, preview, production_deployment]
+  phases_completed: [spec, plan, tasks, analyze, implement, optimize, preview, production_deployment, finalize]
   phases_failed: []
 
 manual_gates:
@@ -41,11 +41,11 @@ deployment_state:
     deployment_id: null
     timestamp: null
   production:
-    deployed: pending  # PR #32 created, awaiting merge
+    deployed: true  # PR #32 merged to main
     url: https://github.com/marcusgoll/robinhood-algo-trading-bot/pull/32
     deployment_id: PR-32
-    timestamp: 2025-10-21T00:00:00Z
-    version: null  # Will be set after merge
+    timestamp: 2025-10-22T01:57:15Z
+    version: main  # Direct to main deployment
 
 artifacts:
   spec: specs/024-zone-bull-flag-integration/spec.md
