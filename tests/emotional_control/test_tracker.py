@@ -50,7 +50,7 @@ class TestLoadStateFailSafe:
 
         # Then: State is ACTIVE (fail-safe default per spec.md FR-013)
         assert tracker._state.is_active is True
-        assert tracker._state.trigger_reason == "CORRUPTION_DETECTED"
+        assert tracker._state.trigger_reason == "STREAK_LOSS"  # Fail-safe trigger
 
     def test_load_state_returns_active_state_when_required_fields_missing(self, tmp_path):
         """Test _load_state defaults to ACTIVE when JSON missing required fields."""
@@ -65,7 +65,7 @@ class TestLoadStateFailSafe:
 
         # Then: State is ACTIVE (fail-safe default)
         assert tracker._state.is_active is True
-        assert tracker._state.trigger_reason == "CORRUPTION_DETECTED"
+        assert tracker._state.trigger_reason == "STREAK_LOSS"  # Fail-safe trigger
 
     def test_load_state_successfully_loads_valid_inactive_state(self, tmp_path):
         """Test _load_state loads valid INACTIVE state from file."""
@@ -383,7 +383,7 @@ class TestRecoveryTriggers:
 
         # When: Manual reset without confirmation
         # Then: ValueError raised
-        with pytest.raises(ValueError, match="Manual reset requires explicit confirmation"):
+        with pytest.raises(ValueError, match="Manual reset requires confirm=True"):
             tracker.reset_manual(admin_id="trader1", reset_reason="Test", confirm=False)
 
 
