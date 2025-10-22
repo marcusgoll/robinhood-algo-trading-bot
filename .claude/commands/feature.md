@@ -9,13 +9,16 @@ Orchestrate feature delivery through isolated phase agents for maximum efficienc
 
 **Architecture**: Orchestrator-Workers with Phase Isolation
 - **Orchestrator** (`/feature`): Lightweight state tracking, phase progression
-- **Phase Agents**: Isolated contexts, call slash commands, return summaries
-- **Implementation**: `/implement` called directly (spawns worker agents: backend-dev, frontend-shipper, etc.)
-  - Note: Phase 4 bypasses phase agent due to sub-agent spawning limits
+- **Phase Agents**: Isolated contexts, fresh token budget, parallel execution
+- **Implementation**: `implement-phase-agent` with intelligent task batching
+  - Analyzes task dependencies
+  - Groups independent tasks into parallel batches
+  - Executes batches sequentially with parallel Task() calls per batch
 
 **Benefits**:
 - 67% token reduction (240k → 80k per feature)
 - 2-3x faster (isolated contexts, no /compact overhead)
+- 2x faster implementation (parallel task batching)
 - Same quality (slash commands unchanged)
 
 ## WORKFLOW TRACKING
@@ -512,15 +515,15 @@ echo ""
 
 # Source roadmap management functions
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
-  source .spec-flow/scripts/bash/roadmap-manager.sh 2>/dev/null || {
+  source .spec-flow/scripts/bash/github-roadmap-manager.sh 2>/dev/null || {
     echo "⚠️  Roadmap management not available on Windows (use PowerShell)"
   }
 else
-  source .spec-flow/scripts/bash/roadmap-manager.sh
+  source .spec-flow/scripts/bash/github-roadmap-manager.sh
 fi
 
-# Mark feature as in progress in roadmap
-mark_feature_in_progress "$SLUG" 2>/dev/null || {
+# Mark feature as in progress in roadmap (GitHub Issues)
+mark_issue_in_progress "$SLUG" 2>/dev/null || {
   echo "Note: Could not update roadmap (feature may not be in roadmap yet)"
 }
 echo ""
@@ -917,277 +920,231 @@ Refer to your agent brief for full instructions.
 
 ### Phase 4: Implementation (EXECUTION)
 
-**Call /implement directly (cannot use phase agent due to sub-agent spawning limits):**
-
-```bash
-# Update state (start phase 4)
-# Set current_phase = 4, status = "in_progress", record start timestamp
-
-# Execute /implement slash command directly
-# This command spawns parallel worker agents internally
-# Cannot use implement-phase-agent because sub-agents can't spawn sub-agents
-echo "⏳ Phase 4: Implementation"
-echo ""
-```
-
-**Execute in sequence:**
-
-1. **Run /implement command:**
-   - INVOKE: `/implement` (use SlashCommand tool)
-   - WAIT: For completion
-   - NOTE: This command handles parallel worker agents (backend-dev, frontend-shipper, etc.)
-   - VERIFY: All tasks completed
-
-2. **Extract implementation statistics:**
-   ```bash
-   FEATURE_DIR="specs/$SLUG"
-   NOTES_FILE="$FEATURE_DIR/NOTES.md"
-   TASKS_FILE="$FEATURE_DIR/tasks.md"
-   ERROR_LOG="$FEATURE_DIR/error-log.md"
-
-   # Detect task format (user-story vs tdd-phase)
-   TASK_FORMAT="tdd-phase"  # default
-   grep -q "\[US[0-9]\]" "$TASKS_FILE" && TASK_FORMAT="user-story"
-
-   if [ "$TASK_FORMAT" = "user-story" ]; then
-     # Track by priority/user story
-     P1_TOTAL=$(grep -c "\[P1\]" "$TASKS_FILE" 2>/dev/null || echo 0)
-     P1_COMPLETE=$(grep -c "✅.*\[P1\]" "$NOTES_FILE" 2>/dev/null || echo 0)
-     P2_TOTAL=$(grep -c "\[P2\]" "$TASKS_FILE" 2>/dev/null || echo 0)
-     P2_COMPLETE=$(grep -c "✅.*\[P2\]" "$NOTES_FILE" 2>/dev/null || echo 0)
-     P3_TOTAL=$(grep -c "\[P3\]" "$TASKS_FILE" 2>/dev/null || echo 0)
-     P3_COMPLETE=$(grep -c "✅.*\[P3\]" "$NOTES_FILE" 2>/dev/null || echo 0)
-
-     COMPLETED_COUNT=$((P1_COMPLETE + P2_COMPLETE + P3_COMPLETE))
-     TOTAL_TASKS=$((P1_TOTAL + P2_TOTAL + P3_TOTAL))
-   else
-     # Track by total tasks (TDD format)
-     COMPLETED_COUNT=$(grep -c "^✅ T[0-9]\{3\}" "$NOTES_FILE" || echo "0")
-     TOTAL_TASKS=$(grep -c "^T[0-9]\{3\}" "$TASKS_FILE" || echo "0")
-   fi
-
-   # Get files changed
-   FILES_CHANGED=$(git diff --name-only main | wc -l)
-
-   # Check for errors
-   ERROR_COUNT=$(grep -c "❌\|⚠️" "$ERROR_LOG" 2>/dev/null || echo "0")
-   ```
-
-3. **Create phase summary:**
-   ```bash
-   if [ "$TASK_FORMAT" = "user-story" ]; then
-     SUMMARY="Implemented P1: $P1_COMPLETE/$P1_TOTAL, P2: $P2_COMPLETE/$P2_TOTAL, P3: $P3_COMPLETE/$P3_TOTAL. Changed $FILES_CHANGED files."
-   else
-     SUMMARY="Implemented $COMPLETED_COUNT/$TOTAL_TASKS tasks. Changed $FILES_CHANGED files."
-   fi
-   ```
-   - Extract key decisions from NOTES.md
-   - Store in workflow-state.json phase_summaries
-   - Include task_format in phase metadata
-
-4. **Check for blockers:**
-   - IF COMPLETED_COUNT < TOTAL_TASKS:
-     - LOG: "❌ Implementation incomplete: {COMPLETED_COUNT}/{TOTAL_TASKS} tasks completed"
-     - LOG: "Review: {ERROR_LOG}"
-     - PAUSE: Exit workflow, return control to user
-   - ELSE:
-     - LOG: "✅ Implementation complete ({COMPLETED_COUNT}/{TOTAL_TASKS} tasks)"
-     - CONTINUE to Phase 5 (no user input needed)
-
-5. **Update state (complete phase 4):**
-   - Add 4 to phases_completed
-   - Record end timestamp
-   - Update last_updated
-
-### Phase 5: Optimization (QUALITY)
-
-**Invoke phase agent:**
+**Use implement-phase-agent for fresh context and parallel task execution:**
 
 ```
 Task(
-  subagent_type="phase/optimize",
-  description="Phase 5: Code Review & Optimization",
+  subagent_type="implement-phase-agent",
+  description="Phase 4: Execute Implementation",
   prompt=f"""
-Execute Phase 5: Optimization in isolated context.
+Execute Phase 4: Implementation in isolated context with intelligent task batching.
 
+Feature Directory: {FEATURE_DIR}
 Feature Slug: {SLUG}
-Previous Phase Summary: {IMPLEMENT_SUMMARY}
+Project Type: {PROJECT_TYPE}
+
+Previous Phase Summaries:
+- Spec: {SPEC_SUMMARY}
+- Plan: {PLAN_SUMMARY}
+- Tasks: {TASKS_SUMMARY}
+
+IMPORTANT CONTEXT:
+- Feature directory exists: {FEATURE_DIR}
+- Workflow state initialized: {FEATURE_DIR}/workflow-state.yaml
+- Tasks defined: {FEATURE_DIR}/tasks.md
+- Implementation notes: {FEATURE_DIR}/NOTES.md
 
 Your task:
-1. Call /optimize slash command
-2. Extract quality metrics and critical findings
-3. Return structured JSON summary
+1. Read workflow context from NOTES.md, workflow-state.yaml, tasks.md
+2. Analyze task dependencies to identify parallel batching opportunities
+3. Group independent tasks into batches
+4. Execute each batch using parallel Task() calls
+5. Wait for batch completion before starting dependent batches
+6. Update NOTES.md with progress after each batch
+7. Return structured summary with completion stats
 
-Refer to your agent brief for full instructions.
+Expected output format:
+{{
+  "status": "completed" | "failed" | "blocked",
+  "summary": "Brief completion summary with stats",
+  "stats": {{
+    "total_tasks": <number>,
+    "completed_tasks": <number>,
+    "files_changed": <number>,
+    "error_count": <number>,
+    "batches_executed": <number>
+  }},
+  "blockers": ["List of blocking issues if status != completed"],
+  "key_decisions": ["Key implementation decisions made"]
+}}
+
+Refer to your agent brief (.claude/agents/phase/implement.md) for full instructions including:
+- Dependency analysis algorithm
+- Batch execution strategy
+- Error handling and recovery
+- Progress tracking format
+
+CRITICAL: Use fresh context by reading from files - do not assume context from previous phases.
   """
 )
-
-# Check for critical issues (block if found)
-# Validate, store summary, log progress with metrics
 ```
 
-### MANUAL GATE 1: Preview (USER VALIDATION)
-
-**Pause for user validation:**
+**Validate phase completion:**
 
 ```bash
+# Parse agent result
+AGENT_RESULT=$(cat /tmp/implement-agent-result.json 2>/dev/null || echo '{}')
+STATUS=$(echo "$AGENT_RESULT" | jq -r '.status // "unknown"')
+SUMMARY=$(echo "$AGENT_RESULT" | jq -r '.summary // "No summary"')
+COMPLETED=$(echo "$AGENT_RESULT" | jq -r '.stats.completed_tasks // 0')
+TOTAL=$(echo "$AGENT_RESULT" | jq -r '.stats.total_tasks // 0')
+ERRORS=$(echo "$AGENT_RESULT" | jq -r '.stats.error_count // 0')
+BATCHES=$(echo "$AGENT_RESULT" | jq -r '.stats.batches_executed // 0')
+
+echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🎨 MANUAL GATE: PREVIEW"
+echo "📊 Implementation Results"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "Next: /preview"
-echo ""
-echo "Action required:"
-echo "1. Run /preview to start local dev server"
-echo "2. Test UI/UX flows manually"
-echo "3. Verify acceptance criteria from spec"
-echo "4. When satisfied, continue: /feature continue"
+echo "Summary: $SUMMARY"
+echo "Tasks: $COMPLETED/$TOTAL completed"
+echo "Batches: $BATCHES executed"
+echo "Errors: $ERRORS logged"
 echo ""
 
-# Update workflow-state.yaml status to "awaiting_preview"
-# Save and exit (user will run /feature continue after testing)
-```
-
-### Phase 6: Ship to Staging (DEPLOYMENT)
-
-**Check project type (skip for local-only):**
-
-```bash
-PROJECT_TYPE=$(yq eval '.deployment_model' "$STATE_FILE")
-
-if [ "$PROJECT_TYPE" = "local-only" ]; then
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "📦 Local-only project detected"
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check for blockers
+if [ "$STATUS" != "completed" ]; then
+  echo "❌ Implementation blocked"
   echo ""
-  echo "Skipping staging deployment (no remote repository configured)."
+  echo "Blockers:"
+  echo "$AGENT_RESULT" | jq -r '.blockers[]'
   echo ""
-  echo "✅ Feature implementation complete!"
+  echo "Error log: $FEATURE_DIR/error-log.md"
   echo ""
-  echo "Next steps (manual deployment):"
-  echo "  1. Review changes: git diff main"
-  echo "  2. Merge to main: git checkout main && git merge \$FEATURE_BRANCH"
-  echo "  3. Tag release: git tag v1.0.0"
-  echo "  4. Deploy manually to your environment"
+  echo "Options:"
+  echo "  1. Fix blockers manually and run: /feature continue"
+  echo "  2. Review agent output above for guidance"
   echo ""
 
-  # Mark workflow complete and exit
-  exit 0
+  update_workflow_phase "$FEATURE_DIR" "implement" "failed"
+  exit 1
 fi
-```
 
-**For remote projects, invoke phase agent:**
+# Check completion threshold
+if [ "$COMPLETED" -lt "$TOTAL" ]; then
+  COMPLETION_RATE=$(echo "scale=2; $COMPLETED * 100 / $TOTAL" | bc)
+  echo "⚠️  Incomplete: $COMPLETION_RATE% of tasks completed"
+  echo ""
+  echo "Fix remaining tasks and run: /feature continue"
+  update_workflow_phase "$FEATURE_DIR" "implement" "failed"
+  exit 1
+fi
 
-```
-Task(
-  subagent_type="phase/ship-staging",
-  description="Phase 6: Deploy to Staging",
-  prompt=f"""
-Execute Phase 6: Ship to Staging in isolated context.
-
-Feature Slug: {SLUG}
-Project Type: {PROJECT_TYPE}
-
-Your task:
-1. Call /phase-1-ship slash command
-2. Extract deployment status and PR info
-3. Return structured JSON summary
-
-Refer to your agent brief for full instructions.
-  """
-)
-
-# Validate, store summary, log progress with PR/URL info
-```
-
-### MANUAL GATE 2: Validate Staging (USER VALIDATION)
-
-**Pause for staging validation:**
-
-```bash
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🧪 MANUAL GATE: STAGING VALIDATION"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo "Next: /validate-staging"
-echo ""
-echo "Action required:"
-echo "1. Test feature on staging environment"
-echo "2. Verify E2E tests passed (GitHub Actions)"
-echo "3. Check Lighthouse CI scores"
-echo "4. When approved, continue: /feature continue"
+echo "✅ Implementation complete ($COMPLETED/$TOTAL tasks, $BATCHES batches)"
 echo ""
 
-# Update workflow-state.yaml status to "awaiting_staging_validation"
-# Save and exit
+# Store phase summary
+yq eval -i ".workflow.phases.implement.summary = \"$SUMMARY\"" "$FEATURE_DIR/workflow-state.yaml"
+yq eval -i ".workflow.phases.implement.stats = {}" "$FEATURE_DIR/workflow-state.yaml"
+yq eval -i ".workflow.phases.implement.stats.completed = $COMPLETED" "$FEATURE_DIR/workflow-state.yaml"
+yq eval -i ".workflow.phases.implement.stats.total = $TOTAL" "$FEATURE_DIR/workflow-state.yaml"
+yq eval -i ".workflow.phases.implement.stats.batches = $BATCHES" "$FEATURE_DIR/workflow-state.yaml"
+
+update_workflow_phase "$FEATURE_DIR" "implement" "completed"
 ```
 
-### Phase 7: Ship to Production (DEPLOYMENT)
+**Auto-continue to Phase 5 (Optimization):**
+   ```bash
+   echo ""
+   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+   echo "🔧 Auto-continuing to Phase 5: Optimization"
+   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+   echo ""
 
-**Invoke phase agent:**
+   # Call /optimize directly (handles parallel execution internally)
+   /optimize
 
-```
-Task(
-  subagent_type="phase/ship-prod",
-  description="Phase 7: Deploy to Production",
-  prompt=f"""
-Execute Phase 7: Ship to Production in isolated context.
+   # Check if optimization completed successfully
+   if ! test_phase_completed "$FEATURE_DIR" "optimize"; then
+     echo "❌ Optimization failed. Review issues and run: /feature continue"
+     exit 1
+   fi
 
-Feature Slug: {SLUG}
-Project Type: {PROJECT_TYPE}
+   # Check for critical code review issues
+   CRITICAL_ISSUES=0
+   if [ -f "$FEATURE_DIR/code-review.md" ]; then
+     CRITICAL_ISSUES=$(grep -c "Severity: CRITICAL" "$FEATURE_DIR/code-review.md" 2>/dev/null || echo 0)
+   fi
 
-Your task:
-1. Call /phase-2-ship slash command
-2. Extract deployment status and release version
-3. Return structured JSON summary
+   if [ "$CRITICAL_ISSUES" -gt 0 ]; then
+     echo ""
+     echo "❌ $CRITICAL_ISSUES critical code review issues found"
+     echo "Review: $FEATURE_DIR/code-review.md"
+     echo ""
+     echo "Options:"
+     echo "  1. Fix issues manually and run: /feature continue"
+     echo "  2. Re-run /optimize with auto-fix enabled"
+     echo ""
+     exit 1
+   fi
 
-Refer to your agent brief for full instructions.
-  """
-)
+   echo "✅ Optimization complete - no critical issues"
+   ```
 
-# Validate, store summary, log progress with release/URL info
-```
+6. **Auto-continue to Phase 6 (Ship):**
+   ```bash
+   echo ""
+   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+   echo "🚀 Auto-continuing to Phase 6: Ship"
+   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+   echo ""
 
-### Phase 7.5: Finalize (DOCUMENTATION)
+   # Call /ship directly (handles all deployment phases and manual gates)
+   /ship
 
-**Invoke phase agent:**
-
-```
-Task(
-  subagent_type="phase/finalize",
-  description="Phase 7.5: Finalize Documentation",
-  prompt=f"""
-Execute Phase 7.5: Finalization in isolated context.
-
-Feature Slug: {SLUG}
-Project Type: {PROJECT_TYPE}
-
-Your task:
-1. Call /finalize slash command
-2. Extract documentation updates
-3. Return structured JSON summary
-
-Refer to your agent brief for full instructions.
-  """
-)
-
-# Validate, store summary, mark workflow complete
-```
+   # If /ship completes, workflow is done
+   echo ""
+   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+   echo "🎉 Feature Workflow Complete!"
+   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+   echo ""
+   echo "Feature: $SLUG"
+   echo "Summary: $FEATURE_DIR/ship-summary.md"
+   echo ""
+   ```
 
 ### Completion
 
+The `/feature` command now automatically continues from implementation through optimization to deployment, stopping only at:
+- **Blocking errors**: Build failures, critical code review issues, deployment failures
+- **Manual gates**: MVP gate (during implement), pre-flight approval, preview testing, staging validation (all handled by respective commands)
+
+To resume after a manual gate or fix blocking errors:
 ```bash
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🎉 Feature Workflow Complete!"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo "Feature: $SLUG"
-echo "Status: Shipped to Production"
-echo ""
-echo "Summary:"
-# Print phase summaries from workflow-state.yaml
-echo ""
-echo "Workflow state saved to specs/$SLUG/workflow-state.yaml"
+/feature continue
+```
+
+### Old Phases (Removed)
+
+The following phase descriptions are removed as they're now handled by auto-continue:
+- Phase 5: Optimization (handled by `/optimize` call)
+- Manual Gates: Preview, Staging Validation (handled by `/ship` command)
+- Phase 6 & 7: Deployment phases (handled by `/ship` command)
+
+## Resume After Manual Gates or Errors
+
+If the workflow stops at a manual gate or encounters an error, you can resume with:
+
+```bash
+/feature continue
+```
+
+This will:
+- Load the most recent feature from `workflow-state.yaml`
+- Determine which phase was in progress or failed
+- Resume from that phase automatically
+
+**Resume conditions:**
+- If implementation incomplete → Retry `/implement`
+- If optimization failed → Retry `/optimize`
+- If critical issues found → Fix then retry
+- If at manual gate → Continue to next phase
+
+**Example:**
+```bash
+# Workflow stopped after preview manual gate
+/feature continue
+# → Continues to /ship deployment phases
 ```
 
 ## ERROR HANDLING
