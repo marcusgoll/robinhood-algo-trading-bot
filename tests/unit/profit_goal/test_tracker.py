@@ -417,3 +417,129 @@ class TestProtectionTrigger:
         # Protection should NOT trigger (feature disabled)
         state = tracker.get_current_state()
         assert state.protection_active is False
+
+
+class TestProtectionEventLogging:
+    """Test protection event logging to JSONL (T023 - US3)."""
+
+    # =========================================================================
+    # T023 [US3]: Test ProfitProtectionLogger writes JSONL events
+    # =========================================================================
+
+    def test_protection_event_logged_to_jsonl(self, tmp_path: Path) -> None:
+        """Should log protection event to daily JSONL file (T023).
+
+        Given protection trigger occurs
+        When protection event is created
+        Then event should be written to logs/profit-protection/YYYY-MM-DD.jsonl
+        """
+        log_dir = tmp_path / "profit-protection"
+        config = ProfitGoalConfig(target=Decimal("500"), threshold=Decimal("0.50"))
+        perf_tracker = Mock()
+        tracker = DailyProfitTracker(
+            config=config,
+            performance_tracker=perf_tracker,
+            state_file=tmp_path / "test-state.json",
+            log_dir=log_dir,
+        )
+
+        # Reach peak: $600
+        perf_tracker.get_summary.return_value = Mock(
+            realized_pnl=Decimal("600"),
+            unrealized_pnl=Decimal("0"),
+        )
+        tracker.update_state()
+
+        # Trigger protection: drop to $300
+        perf_tracker.get_summary.return_value = Mock(
+            realized_pnl=Decimal("300"),
+            unrealized_pnl=Decimal("0"),
+        )
+        tracker.update_state()
+
+        # Verify event logged to JSONL
+        state = tracker.get_current_state()
+        log_file = log_dir / f"{state.session_date}.jsonl"
+
+        assert log_file.exists(), "Event log file should be created"
+
+        # Verify JSONL content
+        with open(log_file) as f:
+            lines = f.readlines()
+
+        assert len(lines) == 1, "Should have one event logged"
+
+        event = json.loads(lines[0])
+        assert event["peak_profit"] == "600"
+        assert event["current_profit"] == "300"
+        assert event["session_date"] == state.session_date
+        assert "event_id" in event
+        assert "timestamp" in event
+
+    def test_protection_event_includes_drawdown_metadata(self, tmp_path: Path) -> None:
+        """Should include drawdown percentage and threshold in event (T023).
+
+        Given protection triggers at 50% drawdown
+        When event is logged
+        Then event should include drawdown_percent and threshold fields
+        """
+        log_dir = tmp_path / "profit-protection"
+        config = ProfitGoalConfig(target=Decimal("500"), threshold=Decimal("0.50"))
+        perf_tracker = Mock()
+        tracker = DailyProfitTracker(
+            config=config,
+            performance_tracker=perf_tracker,
+            state_file=tmp_path / "test-state.json",
+            log_dir=log_dir,
+        )
+
+        # Trigger protection
+        perf_tracker.get_summary.return_value = Mock(realized_pnl=Decimal("800"), unrealized_pnl=Decimal("0"))
+        tracker.update_state()
+
+        perf_tracker.get_summary.return_value = Mock(realized_pnl=Decimal("400"), unrealized_pnl=Decimal("0"))
+        tracker.update_state()
+
+        # Read event
+        state = tracker.get_current_state()
+        log_file = log_dir / f"{state.session_date}.jsonl"
+
+        with open(log_file) as f:
+            event = json.loads(f.readline())
+
+        assert "drawdown_percent" in event
+        assert "threshold" in event
+        assert event["threshold"] == "0.50"
+
+    def test_logging_failure_does_not_crash_tracker(self, tmp_path: Path) -> None:
+        """Should handle logging errors gracefully (T023, T035).
+
+        Given log directory is read-only or inaccessible
+        When protection event triggers
+        Then tracker should log error but not crash
+        """
+        log_dir = tmp_path / "readonly-dir"
+        log_dir.mkdir()
+        log_dir.chmod(0o444)  # Read-only
+
+        config = ProfitGoalConfig(target=Decimal("500"), threshold=Decimal("0.50"))
+        perf_tracker = Mock()
+        tracker = DailyProfitTracker(
+            config=config,
+            performance_tracker=perf_tracker,
+            state_file=tmp_path / "test-state.json",
+            log_dir=log_dir,
+        )
+
+        # Trigger protection (should not crash even if logging fails)
+        perf_tracker.get_summary.return_value = Mock(realized_pnl=Decimal("600"), unrealized_pnl=Decimal("0"))
+        tracker.update_state()
+
+        perf_tracker.get_summary.return_value = Mock(realized_pnl=Decimal("300"), unrealized_pnl=Decimal("0"))
+        tracker.update_state()  # Should not raise exception
+
+        # Verify protection still triggered
+        assert tracker.is_protection_active() is True
+
+        # Cleanup
+        log_dir.chmod(0o755)

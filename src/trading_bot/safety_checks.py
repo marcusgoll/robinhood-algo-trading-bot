@@ -141,12 +141,14 @@ class SafetyChecks:
         action: str,  # "BUY" or "SELL"
         quantity: int,
         price: float,
-        current_buying_power: float | None = None
+        current_buying_power: float | None = None,
+        profit_tracker: Any | None = None
     ) -> SafetyResult:
         """
         Validate trade against all safety checks.
 
         T052: Fetch buying power from AccountData if not provided.
+        T027: Profit protection integration (daily-profit-goal-ma feature).
 
         Orchestrates all validation checks in fail-safe sequence.
 
@@ -156,6 +158,7 @@ class SafetyChecks:
             quantity: Number of shares
             price: Price per share
             current_buying_power: Available buying power (fetched from AccountData if None)
+            profit_tracker: Optional DailyProfitTracker for profit protection checks
 
         Returns:
             SafetyResult with is_safe, reason, circuit_breaker_triggered
@@ -165,7 +168,7 @@ class SafetyChecks:
 
         From: spec.md Requirements FR-001 through FR-007
         Pattern: Fail-safe (any failure blocks trade)
-        Task: T026 [GREEN→T016,T017], T039 (input validation), T052 (AccountData integration)
+        Task: T026 [GREEN→T016,T017], T027 [US3], T039 (input validation), T052 (AccountData integration)
         """
         # T052: Fetch buying power from AccountData if not provided
         if current_buying_power is None and self.account_data is not None:
@@ -197,6 +200,15 @@ class SafetyChecks:
                 reason="Circuit breaker active - manual reset required",
                 circuit_breaker_triggered=True
             )
+
+        # T027: Check profit protection (US3 - daily-profit-goal-ma)
+        # Only block BUY orders when protection active (allow exits)
+        if profit_tracker and action == "BUY":
+            if profit_tracker.is_protection_active():
+                return SafetyResult(
+                    is_safe=False,
+                    reason="Profit protection active - new entries blocked (50% profit giveback detected)"
+                )
 
         # Check trading hours
         if not self.check_trading_hours():
