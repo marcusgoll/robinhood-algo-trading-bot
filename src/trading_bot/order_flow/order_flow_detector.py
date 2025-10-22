@@ -12,7 +12,7 @@ from datetime import datetime
 from trading_bot.logger import TradingLogger
 
 from .config import OrderFlowConfig
-from .data_models import OrderFlowAlert, OrderBookSnapshot
+from .data_models import OrderBookSnapshot, OrderFlowAlert
 from .polygon_client import PolygonClient
 
 # Get logger
@@ -130,7 +130,7 @@ class OrderFlowDetector:
             >>> if detector.should_trigger_exit():
             ...     print("EXIT SIGNAL: Multiple large sellers detected")
         """
-        from datetime import timedelta, UTC
+        from datetime import UTC, timedelta
 
         # Get current time
         now = datetime.now(UTC)
@@ -272,8 +272,9 @@ class OrderFlowDetector:
             >>> health["dependencies"]["polygon_api"]
             "ok"
         """
+        from datetime import UTC, datetime
+
         import requests
-        from datetime import datetime, UTC
 
         health_status = {
             "status": "ok",

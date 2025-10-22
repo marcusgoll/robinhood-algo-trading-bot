@@ -1,0 +1,30 @@
+C:\Users\Marcus Gollahon\AppData\Local\Programs\Python\Python311\Lib\site-packages\pytest_asyncio\plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+......................................sss.............s.................
+ERROR: Coverage failure: total of 55.81 is less than fail-under=90.00
+                                                                         [100%]
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.11.3-final-0 _______________
+
+Name                                                Stmts   Miss   Cover   Missing
+----------------------------------------------------------------------------------
+src\trading_bot\order_flow\__init__.py                  7      0 100.00%
+src\trading_bot\order_flow\config.py                   48      1  97.92%   53
+src\trading_bot\order_flow\data_models.py              63     13  79.37%   55, 61, 68, 73, 80, 117, 123, 130, 134, 141, 145, 184, 202
+src\trading_bot\order_flow\order_flow_detector.py      80     40  50.00%   62, 180, 220-245, 275-326
+src\trading_bot\order_flow\polygon_client.py           99     33  66.67%   76-110, 138, 198-246, 269, 277, 282, 290, 296, 340, 355
+src\trading_bot\order_flow\tape_monitor.py             62     10  83.87%   68-71, 94, 106, 140-143, 208
+src\trading_bot\order_flow\validators.py               46     10  78.26%   168-179, 183-194, 225-239
+src\trading_bot\order_management\__init__.py            5      0 100.00%
+src\trading_bot\order_management\calculator.py         50     41  18.00%   18-27, 41-55, 63-92, 96-103
+src\trading_bot\order_management\exceptions.py         10      3  70.00%   26-30
+src\trading_bot\order_management\gateways.py          127    109  14.17%   34-58, 78-102, 117-157, 163-180, 184-203, 217-230, 234-239, 243-245, 249-251
+src\trading_bot\order_management\manager.py           105     71  32.38%   36-38, 54-76, 93, 102-126, 139-171, 174-199, 217-223, 232-263, 269-273, 276, 279-284, 289
+src\trading_bot\order_management\models.py             47      0 100.00%
+----------------------------------------------------------------------------------
+TOTAL                                                 749    331  55.81%
+Coverage HTML written to dir htmlcov
+FAIL Required test coverage of 90% not reached. Total coverage: 55.81%
+68 passed, 4 skipped in 1.50s

@@ -371,3 +371,132 @@ class TestPolygonClientIntegration:
             # Then: Should handle rate limits gracefully (retry or log)
             # This test documents expected behavior (may need adjustment based on actual API limits)
             assert "rate limit" in str(e).lower() or "429" in str(e)
+
+
+class TestPolygonClientAPIMocked:
+    """Test suite for PolygonClient API methods with mocked HTTP responses."""
+
+    @patch('requests.get')
+    def test_get_level2_snapshot_success(self, mock_get):
+        """Test get_level2_snapshot() with successful mocked HTTP response."""
+        # Given: PolygonClient instance
+        config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
+        client = PolygonClient(config)
+
+        # Given: Mocked successful HTTP response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "OK",
+            "ticker": "AAPL",
+            "updated": 1698768000000,
+            "bids": [{"p": 175.50, "s": 10000}],
+            "asks": [{"p": 175.51, "s": 3000}]
+        }
+        mock_get.return_value = mock_response
+
+        # When: Fetching Level 2 snapshot
+        snapshot = client.get_level2_snapshot("AAPL")
+
+        # Then: Should call API with correct parameters
+        mock_get.assert_called_once()
+        call_args = mock_get.call_args
+        assert "AAPL" in call_args[0][0]  # URL contains symbol
+        assert call_args[1]["headers"]["Authorization"] == "Bearer test_key_1234567890"
+
+        # Then: Should return valid OrderBookSnapshot
+        assert snapshot.symbol == "AAPL"
+        assert len(snapshot.bids) == 1
+        assert len(snapshot.asks) == 1
+
+    @patch('requests.get')
+    def test_get_level2_snapshot_http_error(self, mock_get):
+        """Test get_level2_snapshot() handles HTTP errors."""
+        # Given: PolygonClient instance
+        config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
+        client = PolygonClient(config)
+
+        # Given: Mocked HTTP error response (401 Unauthorized)
+        import requests
+        mock_response = Mock()
+        mock_response.status_code = 401
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("401 Unauthorized")
+        mock_get.return_value = mock_response
+
+        # When/Then: Should raise HTTPError
+        with pytest.raises(requests.exceptions.HTTPError):
+            client.get_level2_snapshot("AAPL")
+
+    @patch('requests.get')
+    def test_get_time_and_sales_success(self, mock_get):
+        """Test get_time_and_sales() with successful mocked HTTP response."""
+        # Given: PolygonClient instance
+        config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
+        client = PolygonClient(config)
+
+        # Given: Mocked successful HTTP response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "OK",
+            "ticker": "AAPL",
+            "results": [
+                {
+                    "T": "AAPL",
+                    "t": 1698768000000,
+                    "p": 175.50,
+                    "s": 100,
+                    "c": [0]  # Condition code
+                },
+                {
+                    "T": "AAPL",
+                    "t": 1698768001000,
+                    "p": 175.51,
+                    "s": 200,
+                    "c": [1]
+                }
+            ]
+        }
+        mock_get.return_value = mock_response
+
+        # When: Fetching Time & Sales
+        from datetime import timedelta
+        start_time = datetime.now(UTC) - timedelta(minutes=5)
+        records = client.get_time_and_sales("AAPL", start_time)
+
+        # Then: Should call API with correct parameters
+        mock_get.assert_called_once()
+        call_args = mock_get.call_args
+        assert "AAPL" in call_args[0][0]  # URL contains symbol
+
+        # Then: Should return list of TimeAndSalesRecord
+        assert len(records) == 2
+        assert all(isinstance(r, TimeAndSalesRecord) for r in records)
+        assert records[0].symbol == "AAPL"
+        assert records[0].price == Decimal("175.50")
+        assert records[0].size == 100
+
+    @patch('requests.get')
+    def test_get_time_and_sales_empty_results(self, mock_get):
+        """Test get_time_and_sales() handles empty results gracefully."""
+        # Given: PolygonClient instance
+        config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
+        client = PolygonClient(config)
+
+        # Given: Mocked response with no results
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "OK",
+            "ticker": "AAPL",
+            "results": []
+        }
+        mock_get.return_value = mock_response
+
+        # When: Fetching Time & Sales
+        from datetime import timedelta
+        start_time = datetime.now(UTC) - timedelta(minutes=5)
+        records = client.get_time_and_sales("AAPL", start_time)
+
+        # Then: Should return empty list
+        assert records == []

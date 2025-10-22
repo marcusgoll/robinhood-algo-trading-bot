@@ -11,12 +11,12 @@ Components:
 - OrderFlowConfig: Configuration management with validation
 """
 
-from .order_flow_detector import OrderFlowDetector
-from .tape_monitor import TapeMonitor
-from .polygon_client import PolygonClient
 from .config import OrderFlowConfig
-from .data_models import OrderFlowAlert, OrderBookSnapshot, TimeAndSalesRecord
-from .validators import validate_level2_data, validate_tape_data, validate_order_flow_config
+from .data_models import OrderBookSnapshot, OrderFlowAlert, TimeAndSalesRecord
+from .order_flow_detector import OrderFlowDetector
+from .polygon_client import PolygonClient
+from .tape_monitor import TapeMonitor
+from .validators import validate_level2_data, validate_order_flow_config, validate_tape_data
 
 __all__ = [
     "OrderFlowDetector",

@@ -7,7 +7,6 @@ Pattern: Follows market_data/validators.py pattern with fail-fast validation
 """
 
 from datetime import UTC, datetime
-from decimal import Decimal
 
 from trading_bot.logger import TradingLogger
 from trading_bot.market_data.exceptions import DataValidationError

@@ -177,7 +177,7 @@ class OrderFlowConfig:
             # Fall back to environment variables if file doesn't exist
             return cls.from_env()
 
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config_dict = json.load(f)
 
         return cls(**config_dict)
