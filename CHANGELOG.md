@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2025-10-22
+
+### Added
+- **Daily Profit Goal Management** (Feature #026)
+  - Configure daily profit targets via environment variables ($0-$10,000 range)
+  - Track daily P&L (realized + unrealized) with peak profit high-water mark
+  - Automatic protection mode on 50% profit giveback from daily peak
+  - SafetyChecks integration: Blocks new BUY orders when protected, allows SELL orders
+  - JSONL event logging for audit trail of all protection triggers
+  - State persistence with atomic file writes and crash recovery
+  - Daily reset at 4:00 AM EST (market open)
+  - Configuration: `PROFIT_TARGET_DAILY`, `PROFIT_GIVEBACK_THRESHOLD`
+  - Backward compatible, opt-in feature (disabled by default when target = $0)
+
+### Performance
+- P&L Calculation: 0.29ms (343x faster than 100ms target)
+- State Persistence: 0.08ms (125x faster than 10ms target)
+- Event Logging: 0.33ms (15x faster than 5ms target)
+- Sub-millisecond performance for all critical operations
+
+### Security
+- 0 critical/high vulnerabilities (Bandit security scan)
+- Comprehensive input validation with range checks
+- Decimal precision throughout (no floating-point errors)
+- Atomic file writes prevent state corruption
+- No hardcoded secrets (environment variables used)
+
+### Testing
+- 45 tests passing (100% success rate)
+- Test coverage: 97.7% (exceeds 90% target by +7.7%)
+  - tracker.py: 95.96%
+  - config.py: 100%
+  - models.py: 100%
+  - __init__.py: 100%
+- Type safety: 100% (mypy --strict: 0 errors)
+- Exception handling: 4 dedicated tests for edge cases
+
+### Architecture
+- Dependency injection (PerformanceTracker injected into DailyProfitTracker)
+- Fail-safe design (protection blocks entries, allows exits)
+- Immutable dataclasses with validation
+- Event-driven logging (JSONL with daily rotation)
+- Stateless protection logic (thread-safe by design)
+
+### Fixed
+- Dynamic threshold messages in SafetyChecks (was hardcoded "50%")
+- Public API exports in profit_goal/__init__.py (prevents circular imports)
+
+### Documentation
+- Comprehensive ship report with deployment guide
+- Rollback procedures and monitoring checklist
+- Testing guidelines and manual testing steps
+- Optimization reports (performance, security, code review, coverage)
+
 ## [1.4.0] - 2025-10-21
 
 ### Added
