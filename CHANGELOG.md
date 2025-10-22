@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2025-10-21
+
+### Added
+- **Zone Breakout Detection with Volume Confirmation** (Feature #025)
+  - Automated breakout detection when price closes above resistance zones by >1% with volume >1.3x average
+  - Zone flipping: Converts resistance zones to support zones upon confirmed breakouts with strength bonuses
+  - Event logging: Structured JSONL logging of all breakout events with full context
+  - BreakoutDetector service class with detect_breakout() and flip_zone() methods
+  - BreakoutEvent dataclass with full breakout metadata (price, volume ratio, timestamp, zone info)
+  - BreakoutConfig dataclass with configurable thresholds (price, volume, validation bars, strength bonus)
+  - Configuration: `BREAKOUT_PRICE_THRESHOLD_PCT`, `BREAKOUT_VOLUME_THRESHOLD`, `BREAKOUT_VALIDATION_BARS`, `BREAKOUT_STRENGTH_BONUS`
+  - Pure library addition with no breaking changes
+
+### Performance
+- Zone breakout detection: 0.0155ms single check (12,903x faster than <200ms target)
+- Bulk breakout checks: 0.2839ms for 10 zones (3,523x faster than <1s target)
+- Performance exceeds targets by 3-4 orders of magnitude
+
+### Security
+- **Updated pyarrow from 15.0.0 to 17.0.0** to fix PYSEC-2024-161 vulnerability
+- 0 vulnerabilities in breakout detection code (Bandit scan: 471 lines)
+- Comprehensive input validation with null/range/type checks
+- Decimal precision throughout (no float arithmetic)
+- No hardcoded secrets (environment variables used)
+
+### Testing
+- 9 tests passing (100% success rate)
+- Test coverage: 84.68% (exceeds 80% target)
+  - breakout_detector.py: 90.20%
+  - breakout_models.py: 86.96%
+  - breakout_config.py: 70.37%
+- Type safety: 100% (mypy --strict: 0 errors)
+- Linting: 0 errors (ruff check)
+
+### Architecture
+- Composition over inheritance (BreakoutDetector composes with Zone, no inheritance)
+- Dependency injection (constructor injection for all dependencies)
+- Stateless service (no mutable state, thread-safe by design)
+- Immutability (zone flipping creates new Zone instances)
+- Structured logging (JSONL with daily rotation, thread-safe)
+
+### Documentation
+- Complete feature specification: specs/025-zone-breakout-detection/spec.md
+- Implementation plan: specs/025-zone-breakout-detection/plan.md
+- Task breakdown: specs/025-zone-breakout-detection/tasks.md (41 tasks)
+- Code review report: specs/025-zone-breakout-detection/code-review.md
+- Optimization report: specs/025-zone-breakout-detection/optimization-report.md
+- Ship report: specs/025-zone-breakout-detection/ship-report.md
+
 ## [1.3.0] - 2025-10-21
 
 ### Added
