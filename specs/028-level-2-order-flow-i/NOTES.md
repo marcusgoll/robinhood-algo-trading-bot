@@ -292,3 +292,8 @@ Integrate Level 2 order book data and Time & Sales (tape) data to provide real-t
 
 ### Batch 2: Foundation - Config (Completed)
 - ✅ T004: Created OrderFlowConfig dataclass following MomentumConfig pattern (frozen, validated, from_env())
+
+### Batch 3: Foundation - Parallel Components (Completed)
+- ✅ T005: Created data models (OrderFlowAlert, OrderBookSnapshot, TimeAndSalesRecord) with __post_init__ validation
+- ✅ T006: Created validators module (validate_level2_data, validate_tape_data, validate_order_flow_config)
+- ✅ T007: Created PolygonClient with stub methods (get_level2_snapshot, get_time_and_sales, normalization helpers)
