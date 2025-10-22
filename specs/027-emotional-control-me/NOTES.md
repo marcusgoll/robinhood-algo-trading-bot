@@ -213,3 +213,10 @@ N/A - Backend-only feature (no UI components needed)
 - Implemented reset_manual with confirmation check and admin audit trail
 - Pattern: Followed DailyProfitTracker.py orchestration structure
 - Performance: In-memory operations optimized for <10ms updates
+
+### Batch 6: RiskManager Integration (T016-T017) - COMPLETED
+- Added emotional_control_tracker parameter to RiskManager.__init__ (optional, backward compatible)
+- Applied multiplier in calculate_position_with_stop after position plan creation
+- Logic: If multiplier < 1.00, reduce quantity with safeguard (minimum 1 share)
+- Pattern: Optional dependency injection with null check before application
+- Integration: Multiplier applied after calculate_position_plan, before logging
