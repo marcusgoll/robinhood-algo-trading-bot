@@ -1,0 +1,262 @@
+openapi: 3.0.0
+info:
+  title: Polygon.io Market Data API (Level 2 & Time and Sales)
+  version: 1.0.0
+  description: |
+    External API contract for Polygon.io Level 2 order book and Time & Sales data integration.
+    Used by OrderFlowDetector and TapeMonitor for real-time order flow analysis.
+
+servers:
+  - url: https://api.polygon.io
+    description: Polygon.io production API
+
+security:
+  - apiKey: []
+
+paths:
+  /v2/snapshot/locale/us/markets/stocks/tickers/{ticker}:
+    get:
+      summary: Get Level 2 order book snapshot
+      description: Fetches Level 2 bid/ask depth for a symbol
+      operationId: getLevel2Snapshot
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+            example: AAPL
+        - name: apiKey
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Level 2 snapshot retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: OK
+                  ticker:
+                    type: object
+                    properties:
+                      ticker:
+                        type: string
+                        example: AAPL
+                      bids:
+                        type: array
+                        description: Bid orders (price, size) sorted descending
+                        items:
+                          type: object
+                          properties:
+                            p:
+                              type: number
+                              format: double
+                              description: Price level
+                            s:
+                              type: integer
+                              description: Size in shares
+                      asks:
+                        type: array
+                        description: Ask orders (price, size) sorted ascending
+                        items:
+                          type: object
+                          properties:
+                            p:
+                              type: number
+                              format: double
+                              description: Price level
+                            s:
+                              type: integer
+                              description: Size in shares
+                      updated:
+                        type: integer
+                        format: int64
+                        description: Unix timestamp (milliseconds)
+        400:
+          description: Bad request (invalid ticker)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Unauthorized (invalid API key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        429:
+          description: Rate limit exceeded
+          headers:
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+                format: int64
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v3/trades/{ticker}:
+    get:
+      summary: Get Time & Sales data (trade ticks)
+      description: Fetches tick-by-tick trade data for volume analysis
+      operationId: getTimeAndSales
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+            example: AAPL
+        - name: timestamp.gte
+          in: query
+          description: Trades >= this timestamp (Unix ms)
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: timestamp.lte
+          in: query
+          description: Trades <= this timestamp (Unix ms)
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          description: Max results (1-50000, default 5000)
+          required: false
+          schema:
+            type: integer
+            default: 5000
+            minimum: 1
+            maximum: 50000
+        - name: apiKey
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Time & Sales data retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: OK
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        t:
+                          type: integer
+                          format: int64
+                          description: Unix timestamp (nanoseconds)
+                        p:
+                          type: number
+                          format: double
+                          description: Trade price
+                        s:
+                          type: integer
+                          description: Trade size (shares)
+                        c:
+                          type: array
+                          items:
+                            type: integer
+                          description: Condition codes (e.g., [0, 12] for regular sale)
+                        x:
+                          type: integer
+                          description: Exchange ID
+                        i:
+                          type: string
+                          description: Trade ID
+                  next_url:
+                    type: string
+                    description: URL for pagination (if more results exist)
+        400:
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        429:
+          description: Rate limit exceeded
+          headers:
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+                format: int64
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: query
+      name: apiKey
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ERROR
+        error:
+          type: string
+          description: Error message
+        request_id:
+          type: string
+          description: Request ID for support
+
+# Rate Limits (Polygon.io Starter Plan $99/month):
+# - 5 requests per second
+# - Unlimited monthly requests
+# - Real-time data updates
+#
+# Error Handling Strategy:
+# - HTTP 429: Exponential backoff with retry_after header (use @with_retry decorator)
+# - HTTP 401: Fail fast, log error, raise DataValidationError
+# - HTTP 400: Invalid ticker, skip monitoring for that symbol
+# - HTTP 500: Retry up to 3 times, then graceful degradation (skip alert generation)
+#
+# Staleness Policy (spec FR-010):
+# - Data timestamp >10 seconds old: Log warning, use data with caution
+# - Data timestamp >30 seconds old: Reject data, raise DataValidationError

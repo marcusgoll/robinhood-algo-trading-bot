@@ -70,6 +70,7 @@ Integrate Level 2 order book data and Time & Sales (tape) data to provide real-t
 ## Checkpoints
 - Phase 0 (Spec-flow): 2025-10-22
 - Phase 0.5 (Clarify): 2025-10-22
+- Phase 1 (Plan): 2025-10-22
 
 ## Last Updated
 2025-10-22T00:00:00Z
@@ -104,3 +105,55 @@ Integrate Level 2 order book data and Time & Sales (tape) data to provide real-t
 - All critical ambiguities resolved
 - Dependencies clarified
 - Cost implications documented
+
+## Phase 1: Plan (2025-10-22)
+
+**Summary**:
+- Research depth: 126 lines (research.md)
+- Key decisions: 6 architectural decisions documented
+- Components to reuse: 5 (MarketDataService patterns, @with_retry, TradingLogger, config patterns, DEFAULT_POLICY)
+- New components: 6 (OrderFlowDetector, TapeMonitor, PolygonClient, validators, data models, config)
+- Migration needed: No (file-based logging, no database schema)
+
+**Architecture Decisions**:
+1. **Data Provider**: Polygon.io API ($99/month) for Level 2 and Time & Sales data (Robinhood API does NOT support)
+2. **Pattern**: Detector pattern following CatalystDetector architecture (proven real-time scanning pattern)
+3. **Monitoring Scope**: Active positions only (not continuous watchlist) to reduce API costs
+4. **Logging**: File-based JSONL (logs/order_flow/*.jsonl), no database schema
+5. **Configuration**: Frozen dataclass with from_env() class method (MomentumConfig pattern)
+6. **Type System**: Full Python type hints with dataclasses for all data models
+
+**Reuse Analysis**:
+- MarketDataService: @with_retry patterns, validation patterns, logging integration, _determine_market_state() logic
+- @with_retry decorator: Exponential backoff, jitter, rate limit detection (HTTP 429), retry callbacks
+- DEFAULT_POLICY: 3 retries, 1s/2s/4s delays with jitter
+- TradingLogger: Structured JSONL logging with UTC timestamps, Constitution §Audit_Everything compliance
+- MomentumConfig pattern: Frozen dataclass, from_env() class method, __post_init__ validation
+
+**New Components Needed**:
+1. OrderFlowDetector (order_flow_detector.py): Analyzes Level 2 order book for large sellers (>10k shares at bid)
+2. TapeMonitor (tape_monitor.py): Tracks Time & Sales data, detects red burst patterns (>300% volume spike)
+3. PolygonClient (polygon_client.py): Wrapper for Polygon.io API with authentication, rate limiting, error handling
+4. OrderFlowConfig (config.py): Configuration dataclass with threshold validation
+5. Data Models (data_models.py): OrderFlowAlert, OrderBookSnapshot, TimeAndSalesRecord dataclasses
+6. Validators (validators.py): validate_level2_data(), validate_tape_data() for data integrity
+
+**Performance Targets**:
+- Alert latency: <2 seconds from data arrival to alert logged (P95)
+- Memory usage: <50MB additional overhead
+- Rate limits: 5 req/sec (Polygon.io starter plan)
+
+**Artifacts Created**:
+- research.md: Research decisions + component reuse analysis (126 lines)
+- data-model.md: Entity definitions + relationships (4 entities, no DB schema)
+- quickstart.md: Integration scenarios (5 scenarios: setup, validation, manual testing, performance, production)
+- plan.md: Consolidated architecture + design (comprehensive implementation plan)
+- contracts/polygon-api.yaml: OpenAPI specs for Polygon.io Level 2 and Time & Sales APIs
+- error-log.md: Initialized for error tracking during implementation
+
+**Checkpoint**:
+- Status: Ready for /tasks
+- Architecture decisions grounded in existing codebase patterns
+- All components mapped to spec requirements
+- No critical unknowns remaining
+- Zero architectural novelty (reduces implementation risk)
