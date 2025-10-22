@@ -205,9 +205,10 @@ class SafetyChecks:
         # Only block BUY orders when protection active (allow exits)
         if profit_tracker and action == "BUY":
             if profit_tracker.is_protection_active():
+                threshold_pct = int(profit_tracker.config.threshold * 100)
                 return SafetyResult(
                     is_safe=False,
-                    reason="Profit protection active - new entries blocked (50% profit giveback detected)"
+                    reason=f"Profit protection active - new entries blocked ({threshold_pct}% profit giveback detected)"
                 )
 
         # Check trading hours

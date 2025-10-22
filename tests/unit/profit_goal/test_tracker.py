@@ -543,3 +543,160 @@ class TestProtectionEventLogging:
 
         # Cleanup
         log_dir.chmod(0o755)
+
+
+class TestExceptionHandling:
+    """Test exception handling in tracker (H1: Close coverage gap)."""
+
+    # =========================================================================
+    # Exception Handling Tests - Close 0.09% coverage gap to ~95%
+    # =========================================================================
+
+    def test_update_state_handles_performance_tracker_exception(self, tmp_path: Path) -> None:
+        """Should handle PerformanceTracker.get_summary() exceptions gracefully.
+
+        Covers lines 143-144 in tracker.py (exception handler in update_state).
+
+        Given PerformanceTracker.get_summary() raises an exception
+        When update_state() is called
+        Then tracker should log error and maintain previous state
+        And should not crash or raise exception
+        """
+        config = ProfitGoalConfig(target=Decimal("500"), threshold=Decimal("0.50"))
+        perf_tracker = Mock()
+        tracker = DailyProfitTracker(
+            config=config,
+            performance_tracker=perf_tracker,
+            state_file=tmp_path / "test-state.json",
+        )
+
+        # Establish initial state
+        perf_tracker.get_summary.return_value = Mock(
+            realized_pnl=Decimal("300"), unrealized_pnl=Decimal("0")
+        )
+        tracker.update_state()
+        previous_state = tracker.get_current_state()
+
+        # Simulate PerformanceTracker failure
+        perf_tracker.get_summary.side_effect = RuntimeError("Performance tracker failure")
+
+        # Should not crash
+        tracker.update_state()
+
+        # State should be preserved (not updated)
+        current_state = tracker.get_current_state()
+        assert current_state.daily_pnl == previous_state.daily_pnl
+        assert current_state.peak_profit == previous_state.peak_profit
+
+    def test_persist_state_handles_file_write_exception(self, tmp_path: Path) -> None:
+        """Should handle file write failures during state persistence.
+
+        Covers lines 329-330 in tracker.py (exception handler in _persist_state).
+
+        Given state file directory is read-only
+        When state persistence is attempted
+        Then tracker should log error and continue without crashing
+        """
+        # Create read-only directory
+        readonly_dir = tmp_path / "readonly"
+        readonly_dir.mkdir()
+        state_file = readonly_dir / "state.json"
+        readonly_dir.chmod(0o444)  # Make read-only
+
+        config = ProfitGoalConfig(target=Decimal("500"), threshold=Decimal("0.50"))
+        perf_tracker = Mock()
+        perf_tracker.get_summary.return_value = Mock(
+            realized_pnl=Decimal("300"), unrealized_pnl=Decimal("0")
+        )
+
+        tracker = DailyProfitTracker(
+            config=config,
+            performance_tracker=perf_tracker,
+            state_file=state_file,
+        )
+
+        # Should not crash even if persistence fails
+        tracker.update_state()
+
+        # State should still be available in memory
+        state = tracker.get_current_state()
+        assert state.daily_pnl == Decimal("300")
+
+        # Cleanup
+        readonly_dir.chmod(0o755)
+
+    def test_load_state_handles_missing_required_fields(self, tmp_path: Path) -> None:
+        """Should handle state files with missing required fields.
+
+        Covers lines 360-361 in tracker.py (missing fields validation in _load_state).
+
+        Given state file exists but is missing required fields
+        When tracker loads state
+        Then should return fresh state with warning logged
+        """
+        state_file = tmp_path / "malformed-state.json"
+
+        # Write malformed state (missing required fields)
+        with open(state_file, "w") as f:
+            json.dump({"session_date": "2025-10-22", "daily_pnl": "100.00"}, f)  # Missing many fields
+
+        config = ProfitGoalConfig(target=Decimal("500"), threshold=Decimal("0.50"))
+        perf_tracker = Mock()
+        perf_tracker.get_summary.return_value = Mock(
+            realized_pnl=Decimal("0"), unrealized_pnl=Decimal("0")
+        )
+
+        tracker = DailyProfitTracker(
+            config=config,
+            performance_tracker=perf_tracker,
+            state_file=state_file,
+        )
+
+        # Should create fresh state (not crash)
+        state = tracker.get_current_state()
+        assert state.daily_pnl == Decimal("0")
+        assert state.peak_profit == Decimal("0")
+        assert state.protection_active is False
+
+    def test_protection_does_not_retrigger_when_already_active(self, tmp_path: Path) -> None:
+        """Should not re-trigger protection when already active.
+
+        Covers line 219 in tracker.py (early return guard in _check_protection_trigger).
+
+        Given protection is already active
+        When drawdown threshold is met again
+        Then should not log duplicate protection event
+        """
+        config = ProfitGoalConfig(target=Decimal("500"), threshold=Decimal("0.50"))
+        perf_tracker = Mock()
+
+        log_dir = tmp_path / "logs"
+        tracker = DailyProfitTracker(
+            config=config,
+            performance_tracker=perf_tracker,
+            state_file=tmp_path / "test-state.json",
+            log_dir=log_dir,
+        )
+
+        # Trigger protection first time
+        perf_tracker.get_summary.return_value = Mock(realized_pnl=Decimal("600"), unrealized_pnl=Decimal("0"))
+        tracker.update_state()
+
+        perf_tracker.get_summary.return_value = Mock(realized_pnl=Decimal("300"), unrealized_pnl=Decimal("0"))
+        tracker.update_state()
+
+        # Count initial protection events
+        log_files = list(log_dir.glob("*.jsonl"))
+        assert len(log_files) == 1
+        with open(log_files[0]) as f:
+            initial_events = len(f.readlines())
+
+        # Continue with protection active (should not re-trigger)
+        perf_tracker.get_summary.return_value = Mock(realized_pnl=Decimal("250"), unrealized_pnl=Decimal("0"))
+        tracker.update_state()
+
+        # Verify no new protection events logged
+        with open(log_files[0]) as f:
+            current_events = len(f.readlines())
+
+        assert current_events == initial_events  # No new events
