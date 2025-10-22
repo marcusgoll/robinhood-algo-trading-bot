@@ -82,12 +82,33 @@ class TapeMonitor:
             >>> avg_volume = monitor.calculate_rolling_average()
             >>> print(f"Average: {avg_volume:.0f} shares/min")
         """
-        # TODO: T021 - Implement rolling average calculation
-        # Algorithm:
-        # 1. Sum size from all trades in tape_buffer
-        # 2. Divide by time span (5 minutes)
-        # 3. Return average volume per minute
-        raise NotImplementedError("T021: calculate_rolling_average() not yet implemented")
+        if not self.tape_buffer:
+            return 0.0
+
+        # Sum total volume from all trades in buffer
+        total_volume = sum(trade.size for trade in self.tape_buffer)
+
+        # Calculate time span between oldest and newest trades (in minutes)
+        if len(self.tape_buffer) == 1:
+            # Single trade: Treat as 1-minute worth of data
+            return float(total_volume)
+
+        oldest_trade = self.tape_buffer[0]
+        newest_trade = self.tape_buffer[-1]
+        time_span_seconds = (newest_trade.timestamp_utc - oldest_trade.timestamp_utc).total_seconds()
+
+        # Convert to minutes (add 1 to include both endpoints)
+        # Example: If trades are at minute 0 and minute 4, that's 5 minutes of data (0,1,2,3,4)
+        time_span_minutes = (time_span_seconds / 60.0) + 1.0
+
+        # Avoid division by zero
+        if time_span_minutes <= 0.0:
+            return float(total_volume)
+
+        # Calculate average volume per minute
+        avg_volume_per_minute = total_volume / time_span_minutes
+
+        return avg_volume_per_minute
 
     def detect_red_burst(self, trades: list[TimeAndSalesRecord]) -> list[OrderFlowAlert]:
         """
@@ -106,18 +127,72 @@ class TapeMonitor:
             >>> for alert in alerts:
             ...     print(f"{alert.symbol}: {alert.volume_ratio:.1f}x volume spike")
         """
-        # TODO: T022 - Implement red burst detection logic
-        # Algorithm:
-        # 1. Calculate current period volume
-        # 2. Get rolling average from calculate_rolling_average()
-        # 3. Calculate volume_ratio = current / average
-        # 4. Calculate sell_ratio = sell_volume / total_volume
-        # 5. If volume_ratio > volume_spike_threshold AND sell_ratio > 0.60:
-        #    - Create OrderFlowAlert with alert_type="red_burst"
-        #    - severity="warning" if volume_ratio > 3.0x
-        #    - severity="critical" if volume_ratio > red_burst_threshold (4.0x)
-        # 6. Log alert event
-        raise NotImplementedError("T022: detect_red_burst() not yet implemented")
+        if not trades:
+            return []
+
+        # Calculate current period volume
+        current_volume = sum(trade.size for trade in trades)
+
+        # Get historical average volume (from volume_history)
+        # If volume_history is empty, use tape_buffer for baseline
+        if self.volume_history:
+            avg_volume = sum(self.volume_history) / len(self.volume_history)
+        elif self.tape_buffer:
+            avg_volume = self.calculate_rolling_average()
+        else:
+            avg_volume = 1.0  # Avoid division by zero
+
+        # Calculate volume ratio
+        volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0.0
+
+        # Calculate sell ratio
+        sell_ratio = self._calculate_sell_ratio(trades)
+
+        # Update volume_history with current period volume
+        self.volume_history.append(float(current_volume))
+
+        # Check for red burst pattern
+        if volume_ratio < self.config.volume_spike_threshold:
+            # Volume spike not high enough
+            return []
+
+        if sell_ratio < 0.60:
+            # Sell-side ratio not high enough (not a red burst)
+            return []
+
+        # Red burst detected - determine severity
+        severity = "warning"
+        if volume_ratio >= self.config.red_burst_threshold:
+            severity = "critical"
+
+        # Extract symbol from first trade
+        symbol = trades[0].symbol
+
+        # Create alert
+        alert = OrderFlowAlert(
+            symbol=symbol,
+            alert_type="red_burst",
+            severity=severity,
+            order_size=None,  # Not applicable for red burst
+            price_level=None,  # Not applicable for red burst
+            volume_ratio=volume_ratio,
+            timestamp_utc=trades[-1].timestamp_utc  # Use latest trade timestamp
+        )
+
+        # Log alert event
+        _logger.warning(
+            "Red burst detected",
+            extra={
+                "symbol": symbol,
+                "volume_ratio": volume_ratio,
+                "sell_ratio": sell_ratio,
+                "severity": severity,
+                "current_volume": current_volume,
+                "avg_volume": avg_volume
+            }
+        )
+
+        return [alert]
 
     def _calculate_sell_ratio(self, trades: list[TimeAndSalesRecord]) -> float:
         """

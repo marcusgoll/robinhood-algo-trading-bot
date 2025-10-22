@@ -162,6 +162,88 @@ class OrderFlowDetector:
 
         return should_exit
 
+    def publish_alert_to_risk_management(self, alert: OrderFlowAlert) -> None:
+        """
+        Publish OrderFlowAlert to risk management module (T027).
+
+        In production, this would integrate with RiskManager to trigger exits.
+        For MVP, this logs the alert with structured logging for audit trail.
+
+        Args:
+            alert: OrderFlowAlert to publish
+
+        Example:
+            >>> alert = OrderFlowAlert(...)
+            >>> detector.publish_alert_to_risk_management(alert)
+        """
+        # Log alert for risk management consumption
+        _logger.critical(
+            "Order flow alert published to risk management",
+            extra={
+                "symbol": alert.symbol,
+                "alert_type": alert.alert_type,
+                "severity": alert.severity,
+                "order_size": alert.order_size,
+                "price_level": str(alert.price_level) if alert.price_level else None,
+                "volume_ratio": alert.volume_ratio,
+                "timestamp_utc": alert.timestamp_utc.isoformat(),
+                "exit_signal": self.should_trigger_exit()
+            }
+        )
+
+        # TODO: T027 - In production, integrate with RiskManager
+        # Example:
+        # from trading_bot.risk_management import RiskManager
+        # risk_manager = RiskManager()
+        # risk_manager.process_order_flow_alert(alert)
+
+    def monitor_active_positions(self, symbols: list[str]) -> dict[str, list[OrderFlowAlert]]:
+        """
+        Monitor order flow for active positions only (T028).
+
+        Fetches Level 2 data and detects large sellers for symbols with active positions.
+        Reduces API costs by monitoring only positions_only mode (FR-013).
+
+        Args:
+            symbols: List of ticker symbols with active positions
+
+        Returns:
+            Dictionary mapping symbol to list of OrderFlowAlert
+
+        Example:
+            >>> active_symbols = ["AAPL", "TSLA", "NVDA"]
+            >>> alerts_by_symbol = detector.monitor_active_positions(active_symbols)
+            >>> for symbol, alerts in alerts_by_symbol.items():
+            ...     if alerts:
+            ...         print(f"{symbol}: {len(alerts)} alerts")
+        """
+        alerts_by_symbol = {}
+
+        for symbol in symbols:
+            try:
+                # Fetch Level 2 snapshot
+                snapshot = self.fetch_level2_snapshot(symbol)
+
+                # Detect large sellers
+                alerts = self.detect_large_sellers(snapshot)
+
+                # Store alerts
+                alerts_by_symbol[symbol] = alerts
+
+                # Publish alerts to risk management
+                for alert in alerts:
+                    self.publish_alert_to_risk_management(alert)
+
+            except Exception as e:
+                # Log error and continue monitoring other symbols
+                _logger.error(
+                    f"Error monitoring order flow for {symbol}",
+                    extra={"symbol": symbol, "error": str(e)}
+                )
+                alerts_by_symbol[symbol] = []
+
+        return alerts_by_symbol
+
     def _calculate_alert_severity(self, order_size: int) -> str:
         """
         Calculate alert severity based on order size.
