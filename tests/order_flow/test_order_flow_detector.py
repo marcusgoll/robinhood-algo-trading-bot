@@ -446,25 +446,66 @@ class TestOrderFlowDetectorIntegration:
         assert detector.alert_history[-1].symbol == "AAPL"
         assert detector.alert_history[-1].alert_type == "large_seller"
 
-    def test_health_check_returns_status(self):
+    @patch('requests.get')
+    def test_health_check_returns_status(self, mock_get):
         """Test that health_check() returns API connectivity status."""
         # Given: OrderFlowDetector
         config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
         detector = OrderFlowDetector(config)
 
-        # Given: Mock the PolygonClient's health_check method
-        with patch.object(detector.polygon_client, 'health_check') as mock_health_check:
-            # Given: Mock health check return value
-            mock_health_check.return_value = {
-                "status": "healthy",
-                "api_reachable": True,
-                "latency_ms": 150
-            }
+        # Given: Mock successful API response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
 
-            # When: Running health check
-            status = detector.health_check()
+        # When: Running health check
+        status = detector.health_check()
 
-            # Then: Should return status dict
-            assert status["status"] == "healthy"
-            assert status["api_reachable"] is True
-            assert "latency_ms" in status
+        # Then: Should return health status dict
+        assert status["status"] == "ok"
+        assert status["dependencies"]["polygon_api"] == "ok"
+        assert "timestamp_utc" in status
+        assert "last_alert_count" in status
+        assert status["last_alert_count"] == 0  # No alerts added yet
+
+        # Then: Should have called Polygon API for health check
+        mock_get.assert_called_once()
+        call_args = mock_get.call_args
+        assert "polygon.io" in call_args[0][0].lower()  # URL contains polygon.io
+
+    @patch('requests.get')
+    def test_health_check_handles_api_timeout(self, mock_get):
+        """Test that health_check() handles API timeout gracefully."""
+        # Given: OrderFlowDetector
+        config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
+        detector = OrderFlowDetector(config)
+
+        # Given: Mock timeout exception
+        import requests
+        mock_get.side_effect = requests.exceptions.Timeout()
+
+        # When: Running health check
+        status = detector.health_check()
+
+        # Then: Should return degraded status
+        assert status["status"] == "degraded"
+        assert status["dependencies"]["polygon_api"] == "timeout"
+
+    @patch('requests.get')
+    def test_health_check_handles_rate_limit(self, mock_get):
+        """Test that health_check() detects rate limiting."""
+        # Given: OrderFlowDetector
+        config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
+        detector = OrderFlowDetector(config)
+
+        # Given: Mock rate limit response (429)
+        mock_response = Mock()
+        mock_response.status_code = 429
+        mock_get.return_value = mock_response
+
+        # When: Running health check
+        status = detector.health_check()
+
+        # Then: Should detect rate limiting
+        assert status["status"] == "ok"  # Status OK but dependency rate limited
+        assert status["dependencies"]["polygon_api"] == "rate_limited"
