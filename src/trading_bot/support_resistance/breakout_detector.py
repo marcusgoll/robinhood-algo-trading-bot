@@ -17,14 +17,14 @@ Example:
     ...     print(f"Breakout detected! Zone flipped to {signal.flipped_zone.zone_type}")
 """
 
-from datetime import datetime, UTC
-from decimal import Decimal
 import uuid
-from typing import Optional
+from datetime import UTC, datetime
+from decimal import Decimal
+from typing import Any
 
-from .breakout_models import BreakoutEvent, BreakoutStatus, BreakoutSignal
 from .breakout_config import BreakoutConfig
-from .models import Zone, ZoneType, Timeframe
+from .breakout_models import BreakoutEvent, BreakoutSignal, BreakoutStatus
+from .models import Zone, ZoneType
 from .zone_logger import ZoneLogger
 
 
@@ -49,9 +49,9 @@ class BreakoutDetector:
     def __init__(
         self,
         config: BreakoutConfig,
-        market_data_service: any,  # MarketDataService (avoid circular import)
+        market_data_service: Any,  # MarketDataService (avoid circular import)
         logger: ZoneLogger,
-    ):
+    ) -> None:
         """
         Initialize BreakoutDetector with configuration and dependencies.
 
@@ -70,9 +70,9 @@ class BreakoutDetector:
         if logger is None:
             raise TypeError("logger cannot be None")
 
-        self.config = config
-        self.market_data_service = market_data_service
-        self.logger = logger
+        self.config: BreakoutConfig = config
+        self.market_data_service: Any = market_data_service
+        self.logger: ZoneLogger = logger
 
     def _calculate_price_change_pct(
         self,
@@ -125,7 +125,7 @@ class BreakoutDetector:
                 f"historical_volumes must have >=20 bars, got {len(historical_volumes)}"
             )
 
-        avg_volume = sum(historical_volumes) / len(historical_volumes)
+        avg_volume = sum(historical_volumes) / Decimal(len(historical_volumes))
         return current_volume / avg_volume
 
     def detect_breakout(
@@ -134,7 +134,7 @@ class BreakoutDetector:
         current_price: Decimal,
         current_volume: Decimal,
         historical_volumes: list[Decimal],
-    ) -> Optional[BreakoutSignal]:
+    ) -> BreakoutSignal | None:
         """
         Detect if current price/volume represents a breakout from the zone.
 
@@ -196,7 +196,7 @@ class BreakoutDetector:
         # Create breakout event
         event = BreakoutEvent(
             event_id=f"evt_{uuid.uuid4().hex[:12]}",
-            zone_id=zone.zone_id,
+            zone_id=zone.zone_id or f"zone_{zone.price_level}",
             timestamp=datetime.now(UTC),
             breakout_price=zone.price_level,
             close_price=current_price,
