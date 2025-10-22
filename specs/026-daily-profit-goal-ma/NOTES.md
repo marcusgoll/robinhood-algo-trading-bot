@@ -72,3 +72,70 @@ Daily profit goal management feature for automated profit protection. System tra
 
 ## Last Updated
 2025-10-21T23:15:00
+
+## Phase 2: Tasks (2025-10-21 23:30)
+
+**Summary**:
+- Total tasks: 36
+- User story tasks: 17 (US1: 4, US2: 6, US3: 7)
+- Parallel opportunities: 15 tasks marked [P]
+- Setup tasks: 2 (Phase 1)
+- Foundational tasks: 4 (Phase 2 - blocking prerequisites)
+- Polish tasks: 13 (Phase 6 - cross-cutting concerns)
+- Task file: specs/026-daily-profit-goal-ma/tasks.md
+
+**Task Breakdown by Phase**:
+- Phase 1 (Setup): T001-T002 (2 tasks - directory structure)
+- Phase 2 (Foundational): T005-T008 (4 tasks - core models and config)
+- Phase 3 (US1 - Configure target): T011-T014 (4 tasks - config and validation)
+- Phase 4 (US2 - Track P&L): T015-T020 (6 tasks - tracking and persistence)
+- Phase 5 (US3 - Detect giveback): T021-T027 (7 tasks - protection and integration)
+- Phase 6 (Polish): T030-T052 (13 tasks - reset, error handling, docs)
+
+**Dependency Graph Highlights**:
+1. Phase 2 blocks all user stories (core models required)
+2. US1 independent (config only)
+3. US2 depends on US1 (needs config to track against target)
+4. US3 depends on US2 (needs tracking to detect drawdown)
+5. Phase 6 depends on US1-US3 complete
+
+**Parallel Execution Strategy**:
+- 15 tasks can run in parallel (42% of total)
+- Phase 2: T005, T006, T007 (3 model files simultaneously)
+- Phase 3: T011, T012 (2 test files)
+- Phase 4: T015, T016, T017 (3 test aspects)
+- Phase 5: T021, T022, T023 (3 test files)
+- Phase 6: T030, T035, T036, T040, T041 (5 independent polish tasks)
+
+**Testing Strategy**:
+- TDD required (tests written before implementation per task order)
+- Target: ≥90% coverage (spec.md NFR-005)
+- 17 test tasks (47% of total - high test investment)
+- Integration tests: T045-T047 (E2E workflow validation)
+
+**REUSE Opportunities**:
+- 6 existing components identified for reuse
+- PerformanceTracker: P&L aggregation (avoid duplicate logic)
+- SafetyChecks: Trade blocking integration point
+- StructuredTradeLogger: JSONL daily rotation pattern
+- TradeRecord: Dataclass + validation pattern
+- Config: Dual loading pattern (env vars + config.json)
+- PerformanceSummary: Decimal precision for monetary values
+
+**Key Decisions**:
+1. TDD workflow: Write tests before implementation for all user stories
+2. Dependency injection: DailyProfitTracker receives PerformanceTracker (testability)
+3. File-based state: JSON for persistence, JSONL for audit trail (following existing patterns)
+4. Circuit breaker extension: Profit protection as additional validation rule in SafetyChecks
+5. Fail-safe design: Protection blocks entries but allows exits (§Safety_First)
+6. Single source of truth: PerformanceTracker calculates P&L, profit goal only reads
+
+**Checkpoint**:
+- ✅ Tasks generated: 36
+- ✅ User story organization: Complete (US1-US3 mapped to tasks)
+- ✅ Dependency graph: Created (sequential phases with parallel opportunities)
+- ✅ MVP strategy: Defined (US1-US3 only, US4-US6 deferred)
+- ✅ Test strategy: TDD with ≥90% coverage requirement
+- ✅ REUSE analysis: 6 components identified with integration points
+- 📋 Ready for: /analyze
+
