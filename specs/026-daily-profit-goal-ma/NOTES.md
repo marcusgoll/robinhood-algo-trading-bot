@@ -150,3 +150,7 @@ Daily profit goal management feature for automated profit protection. System tra
 - ✅ T006: Created DailyProfitState dataclass with 8 fields (P&L tracking, peak profit, protection status)
 - ✅ T007: Created ProfitProtectionEvent dataclass with factory method (audit trail logging)
 
+**Batch 3 (Config Loader) - Complete**:
+- ✅ T008: Created load_profit_goal_config() function with env var loading (PROFIT_TARGET_DAILY, PROFIT_GIVEBACK_THRESHOLD)
+- Key decisions: Graceful fallback on parse errors, audit logging, defaults (target=$0, threshold=0.50)
+
