@@ -375,61 +375,52 @@ class TestOrderFlowDetectorExitSignals:
 
 
 class TestOrderFlowDetectorIntegration:
-    """Integration tests for OrderFlowDetector with mocked PolygonClient."""
+    """Integration tests for OrderFlowDetector with direct snapshot testing."""
 
     def test_full_workflow_detect_and_trigger_exit(self):
-        """Test full workflow: fetch Level 2 → detect large sellers → trigger exit."""
-        # Given: OrderFlowDetector with mocked PolygonClient
-        config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
-        detector = OrderFlowDetector(config)
-
-        # Given: Mock the PolygonClient instance directly
-        with patch.object(detector, 'polygon_client') as mock_client:
-            # Given: Mock Level 2 snapshot with large seller
-            from datetime import UTC
-            mock_snapshot = OrderBookSnapshot(
-                symbol="AAPL",
-                bids=[(Decimal("175.50"), 15000)],  # Large seller (>10k threshold)
-                asks=[(Decimal("175.51"), 3000)],
-                timestamp_utc=datetime.now(UTC)
-            )
-            mock_client.get_level2_snapshot.return_value = mock_snapshot
-
-            # When: Detecting large sellers 3 times (to trigger exit)
-            for _ in range(3):
-                alerts = detector.detect_large_sellers("AAPL")
-                assert len(alerts) == 1
-
-            # Then: Should trigger exit signal (3+ alerts within window)
-            should_exit = detector.should_trigger_exit()
-            assert should_exit is True
-
-    def test_detect_large_sellers_calls_polygon_client(self):
-        """Test that detect_large_sellers() calls PolygonClient.get_level2_snapshot()."""
+        """Test full workflow: create snapshot → detect large sellers → trigger exit."""
         # Given: OrderFlowDetector
         config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
         detector = OrderFlowDetector(config)
 
-        # Given: Mock the PolygonClient instance directly
-        with patch.object(detector, 'polygon_client') as mock_client:
-            # Given: Mock Level 2 snapshot
-            from datetime import UTC
-            mock_snapshot = OrderBookSnapshot(
-                symbol="AAPL",
-                bids=[(Decimal("175.50"), 5000)],  # Below threshold
-                asks=[(Decimal("175.51"), 3000)],
-                timestamp_utc=datetime.now(UTC)
-            )
-            mock_client.get_level2_snapshot.return_value = mock_snapshot
+        # Given: Create Level 2 snapshot with large seller
+        from datetime import UTC
+        mock_snapshot = OrderBookSnapshot(
+            symbol="AAPL",
+            bids=[(Decimal("175.50"), 15000)],  # Large seller (>10k threshold)
+            asks=[(Decimal("175.51"), 3000)],
+            timestamp_utc=datetime.now(UTC)
+        )
 
-            # When: Detecting large sellers
-            alerts = detector.detect_large_sellers("AAPL")
+        # When: Detecting large sellers 3 times (to trigger exit)
+        for _ in range(3):
+            alerts = detector.detect_large_sellers(mock_snapshot)
+            assert len(alerts) == 1
 
-            # Then: Should call PolygonClient.get_level2_snapshot()
-            mock_client.get_level2_snapshot.assert_called_once_with("AAPL")
+        # Then: Should trigger exit signal (3+ alerts within window)
+        should_exit = detector.should_trigger_exit()
+        assert should_exit is True
 
-            # Then: Should return no alerts (size below threshold)
-            assert len(alerts) == 0
+    def test_detect_large_sellers_with_small_orders(self):
+        """Test that detect_large_sellers() returns no alerts for small orders."""
+        # Given: OrderFlowDetector
+        config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
+        detector = OrderFlowDetector(config)
+
+        # Given: Create Level 2 snapshot with small orders
+        from datetime import UTC
+        mock_snapshot = OrderBookSnapshot(
+            symbol="AAPL",
+            bids=[(Decimal("175.50"), 5000)],  # Below threshold (10k)
+            asks=[(Decimal("175.51"), 3000)],
+            timestamp_utc=datetime.now(UTC)
+        )
+
+        # When: Detecting large sellers
+        alerts = detector.detect_large_sellers(mock_snapshot)
+
+        # Then: Should return no alerts (size below threshold)
+        assert len(alerts) == 0
 
     def test_detect_large_sellers_adds_alerts_to_history(self):
         """Test that detected alerts are added to alert_history deque."""
@@ -437,26 +428,23 @@ class TestOrderFlowDetectorIntegration:
         config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
         detector = OrderFlowDetector(config)
 
-        # Given: Mock the PolygonClient instance directly
-        with patch.object(detector, 'polygon_client') as mock_client:
-            # Given: Mock Level 2 snapshot with large seller
-            from datetime import UTC
-            mock_snapshot = OrderBookSnapshot(
-                symbol="AAPL",
-                bids=[(Decimal("175.50"), 20000)],  # Large seller
-                asks=[(Decimal("175.51"), 3000)],
-                timestamp_utc=datetime.now(UTC)
-            )
-            mock_client.get_level2_snapshot.return_value = mock_snapshot
+        # Given: Create Level 2 snapshot with large seller
+        from datetime import UTC
+        mock_snapshot = OrderBookSnapshot(
+            symbol="AAPL",
+            bids=[(Decimal("175.50"), 20000)],  # Large seller
+            asks=[(Decimal("175.51"), 3000)],
+            timestamp_utc=datetime.now(UTC)
+        )
 
-            # When: Detecting large sellers
-            initial_history_len = len(detector.alert_history)
-            alerts = detector.detect_large_sellers("AAPL")
+        # When: Detecting large sellers
+        initial_history_len = len(detector.alert_history)
+        alerts = detector.detect_large_sellers(mock_snapshot)
 
-            # Then: Should add alert to history
-            assert len(detector.alert_history) == initial_history_len + 1
-            assert detector.alert_history[-1].symbol == "AAPL"
-            assert detector.alert_history[-1].alert_type == "large_seller"
+        # Then: Should add alert to history
+        assert len(detector.alert_history) == initial_history_len + 1
+        assert detector.alert_history[-1].symbol == "AAPL"
+        assert detector.alert_history[-1].alert_type == "large_seller"
 
     def test_health_check_returns_status(self):
         """Test that health_check() returns API connectivity status."""
@@ -464,10 +452,10 @@ class TestOrderFlowDetectorIntegration:
         config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
         detector = OrderFlowDetector(config)
 
-        # Given: Mock the PolygonClient instance directly
-        with patch.object(detector, 'polygon_client') as mock_client:
+        # Given: Mock the PolygonClient's health_check method
+        with patch.object(detector.polygon_client, 'health_check') as mock_health_check:
             # Given: Mock health check return value
-            mock_client.health_check.return_value = {
+            mock_health_check.return_value = {
                 "status": "healthy",
                 "api_reachable": True,
                 "latency_ms": 150

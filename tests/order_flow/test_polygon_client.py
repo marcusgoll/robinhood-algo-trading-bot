@@ -383,13 +383,17 @@ class TestPolygonClientAPIMocked:
         config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
         client = PolygonClient(config)
 
+        # Given: Current timestamp in Unix milliseconds (within 30s freshness window)
+        import time
+        current_timestamp_ms = int(time.time() * 1000)
+
         # Given: Mocked successful HTTP response
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "status": "OK",
             "ticker": "AAPL",
-            "updated": 1698768000000,
+            "updated": current_timestamp_ms,  # Use current timestamp to pass validation
             "bids": [{"p": 175.50, "s": 10000}],
             "asks": [{"p": 175.51, "s": 3000}]
         }
@@ -434,6 +438,10 @@ class TestPolygonClientAPIMocked:
         config = OrderFlowConfig(polygon_api_key="test_key_1234567890")
         client = PolygonClient(config)
 
+        # Given: Current timestamp in Unix milliseconds
+        import time
+        current_timestamp_ms = int(time.time() * 1000)
+
         # Given: Mocked successful HTTP response
         mock_response = Mock()
         mock_response.status_code = 200
@@ -443,14 +451,14 @@ class TestPolygonClientAPIMocked:
             "results": [
                 {
                     "T": "AAPL",
-                    "t": 1698768000000,
+                    "t": current_timestamp_ms - 10000,  # 10 seconds ago
                     "p": 175.50,
                     "s": 100,
                     "c": [0]  # Condition code
                 },
                 {
                     "T": "AAPL",
-                    "t": 1698768001000,
+                    "t": current_timestamp_ms - 5000,  # 5 seconds ago
                     "p": 175.51,
                     "s": 200,
                     "c": [1]
@@ -459,10 +467,11 @@ class TestPolygonClientAPIMocked:
         }
         mock_get.return_value = mock_response
 
-        # When: Fetching Time & Sales
+        # When: Fetching Time & Sales (with both start and end time)
         from datetime import timedelta
-        start_time = datetime.now(UTC) - timedelta(minutes=5)
-        records = client.get_time_and_sales("AAPL", start_time)
+        end_time = datetime.now(UTC)
+        start_time = end_time - timedelta(minutes=5)
+        records = client.get_time_and_sales("AAPL", start_time, end_time)
 
         # Then: Should call API with correct parameters
         mock_get.assert_called_once()
@@ -493,10 +502,11 @@ class TestPolygonClientAPIMocked:
         }
         mock_get.return_value = mock_response
 
-        # When: Fetching Time & Sales
+        # When: Fetching Time & Sales (with both start and end time)
         from datetime import timedelta
-        start_time = datetime.now(UTC) - timedelta(minutes=5)
-        records = client.get_time_and_sales("AAPL", start_time)
+        end_time = datetime.now(UTC)
+        start_time = end_time - timedelta(minutes=5)
+        records = client.get_time_and_sales("AAPL", start_time, end_time)
 
         # Then: Should return empty list
         assert records == []
