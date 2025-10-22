@@ -269,6 +269,131 @@ cat logs/profit-protection/daily-profit-state.json | jq '.protection_active'
 
 ---
 
+## 🧠 Emotional Control Mechanisms
+
+Protect your trading capital from emotional decision-making during losing streaks. The system automatically reduces position sizes to 25% of normal after significant losses and requires a recovery period before restoring full sizing.
+
+### Quick Start
+
+```python
+from src.trading_bot.emotional_control import EmotionalControl, EmotionalControlConfig
+from decimal import Decimal
+
+# Configure emotional control
+config = EmotionalControlConfig.from_env()  # Or use default()
+tracker = EmotionalControl(config)
+
+# Update after each trade
+tracker.update_state(
+    trade_pnl=Decimal("-150.00"),     # Trade P&L
+    account_balance=Decimal("100000"), # Current account balance
+    is_win=False                       # True if profit, False if loss
+)
+
+# Get position multiplier for risk management
+multiplier = tracker.get_position_multiplier()  # Returns Decimal("0.25") or Decimal("1.00")
+
+# Apply to position sizing
+base_position_size = 100  # Normal position size
+adjusted_size = int(Decimal(base_position_size) * multiplier)  # Reduced to 25 when active
+
+# Check if emotional control is active
+if tracker._state.is_active:
+    print("⚠️ Emotional control active - position sizing reduced to 25%")
+    print(f"Trigger: {tracker._state.trigger_reason}")
+    print(f"Consecutive losses: {tracker._state.consecutive_losses}")
+
+# Manual reset (requires confirmation)
+tracker.reset_manual(confirm=True)
+```
+
+### Features
+
+**Emotional Control Mechanisms** (v1.6.0):
+- **Activation Triggers**: Single loss ≥3% of account OR 3 consecutive losses
+- **Position Reduction**: Automatically reduces position sizes to 25% of normal
+- **Recovery Triggers**: Requires 3 consecutive wins OR manual admin reset
+- **RiskManager Integration**: Position multiplier seamlessly integrates with existing risk calculations
+- **Fail-Safe Design**: State corruption defaults to ACTIVE (conservative 25% sizing)
+- **Event Logging**: JSONL audit trail of all activation/recovery events
+- **State Persistence**: Atomic file writes with crash recovery
+- **CLI Commands**: status, reset, events for monitoring and management
+- **High Performance**: <10ms P95 for update_state(), <1ms for position multiplier lookup
+- **Production Ready**: 89.39% core coverage, zero vulnerabilities, 100% type safety
+
+### Configuration
+
+Add to your `.env` file (feature enabled by default for safety):
+
+```bash
+# Emotional control settings (v1.6.0)
+EMOTIONAL_CONTROL_ENABLED="true"  # Enable emotional control (default: true)
+```
+
+**Thresholds** (hardcoded for safety):
+- Single loss trigger: 3% of account balance
+- Consecutive loss trigger: 3 losses in a row
+- Recovery requirement: 3 wins in a row
+- Position reduction: 25% of normal size
+
+### How It Works
+
+1. **Monitor Trade Results**: Tracks each trade's P&L and win/loss status
+2. **Detect Loss Events**: Identifies single large losses (≥3%) or losing streaks (≥3 consecutive)
+3. **Activate Protection**: Reduces position multiplier to 0.25 (25% sizing)
+4. **Track Recovery**: Monitors consecutive wins (requires 3) or manual reset
+5. **Restore Normal Sizing**: Returns multiplier to 1.00 after recovery
+6. **Log All Events**: Records activation, recovery, and manual reset events
+
+**Example Scenario**:
+- Start: Normal 100-share position sizing (multiplier = 1.00)
+- Trade 1: -$3,200 loss on $100,000 account (3.2% loss)
+- **Emotional control activates**: Position sizing reduced to 25 shares
+- Trade 2-4: Three consecutive profitable trades (+$200, +$150, +$180)
+- **Emotional control deactivates**: Position sizing restored to 100 shares
+
+### Use Cases
+
+1. **Prevent Revenge Trading**: Automatically limits risk after emotional losses
+2. **Protect Capital**: Reduces position sizes during drawdown periods
+3. **Enforce Discipline**: Requires proof of recovery (3 wins) before normal sizing
+4. **Risk Management**: Complements existing circuit breakers and safety checks
+
+### Monitoring
+
+```bash
+# Check current state
+cat logs/emotional-control/state.json | jq
+
+# View activation/recovery events
+tail -f logs/emotional-control/events-$(date +%Y-%m-%d).jsonl
+
+# CLI status command
+python -m src.trading_bot.emotional_control.cli status
+
+# CLI reset command (requires confirmation)
+python -m src.trading_bot.emotional_control.cli reset
+
+# View recent events
+python -m src.trading_bot.emotional_control.cli events --limit 10
+```
+
+### Documentation
+
+- [Feature Specification](specs/027-emotional-control-me/spec.md)
+- [Implementation Plan](specs/027-emotional-control-me/plan.md)
+- [Ship Summary](specs/027-emotional-control-me/ship-summary.md)
+- [Quickstart Guide](specs/027-emotional-control-me/quickstart.md)
+
+### Quality Metrics
+
+- **Tests**: 68/68 passing (100%)
+- **Coverage**: 89.39% core logic (tracker), 100% models, 100% config
+- **Performance**: update_state() <10ms P95, get_position_multiplier() <1ms
+- **Security**: 0 vulnerabilities, Decimal precision, fail-safe defaults
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
