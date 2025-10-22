@@ -14,14 +14,18 @@ Task: T035 - BullFlagDetector service implementation
 """
 
 import logging
+import time
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import pandas as pd
 
 from ..market_data.market_data_service import MarketDataService
+from ..support_resistance.proximity_checker import ProximityChecker
+from ..support_resistance.config import ZoneDetectionConfig
 from .config import MomentumConfig
 from .logging.momentum_logger import MomentumLogger
-from .schemas.momentum_signal import BullFlagPattern, MomentumSignal, SignalType
+from .schemas.momentum_signal import BullFlagPattern, MomentumSignal, SignalType, TargetCalculation
 from .validation import validate_symbols
 
 # Module logger
@@ -58,6 +62,7 @@ class BullFlagDetector:
         config: MomentumConfig,
         market_data_service: MarketDataService,
         momentum_logger: MomentumLogger | None = None,
+        zone_detector: "ZoneDetector | None" = None,
     ):
         """Initialize bull flag detector with configuration and dependencies.
 
@@ -65,10 +70,28 @@ class BullFlagDetector:
             config: Momentum detection configuration
             market_data_service: Service for fetching historical market data
             momentum_logger: Optional logger instance (creates default if None)
+            zone_detector: Optional support/resistance zone detector for dynamically
+                adjusting profit targets. If provided, targets will be adjusted to
+                90% of the nearest resistance zone when it's closer than the standard
+                2:1 R:R target. Falls back to standard 2:1 targets if None or if zone
+                detection fails (per NFR-002 backward compatibility).
+
+        Example:
+            >>> # With zone detection
+            >>> zone_detector = ZoneDetector(market_data)
+            >>> detector = BullFlagDetector(config, market_data, zone_detector=zone_detector)
+            >>> signals = await detector.scan(["AAPL"])
+            >>> # Targets adjusted based on resistance zones
+
+            >>> # Without zone detection (backward compatible)
+            >>> detector = BullFlagDetector(config, market_data)
+            >>> signals = await detector.scan(["AAPL"])
+            >>> # Standard 2:1 R:R targets
         """
         self.config = config
         self.market_data = market_data_service
         self.logger = momentum_logger or MomentumLogger()
+        self.zone_detector = zone_detector
 
     async def scan(self, symbols: list[str]) -> list[MomentumSignal]:
         """Scan for bull flag patterns in historical price data.
@@ -126,7 +149,7 @@ class BullFlagDetector:
                     continue
 
                 # Detect bull flag pattern
-                pattern = self._detect_pattern(ohlcv)
+                pattern = self._detect_pattern(symbol, ohlcv)
 
                 # Skip if no valid pattern found
                 if pattern is None:
@@ -235,13 +258,14 @@ class BullFlagDetector:
 
         return signals
 
-    def _detect_pattern(self, ohlcv: pd.DataFrame) -> BullFlagPattern | None:
+    def _detect_pattern(self, symbol: str, ohlcv: pd.DataFrame) -> BullFlagPattern | None:
         """Detect bull flag pattern from OHLCV data.
 
         Scans historical data for pole (>8% gain in 1-3 days) followed by
         consolidation (3-5% range for 2-5 days with downward/flat slope).
 
         Args:
+            symbol: Stock ticker symbol (needed for zone-adjusted targets)
             ohlcv: DataFrame with columns: date, open, high, low, close, volume
 
         Returns:
@@ -264,15 +288,18 @@ class BullFlagDetector:
 
             # Note: slope validation now happens inside _detect_flag(), so no need to check again
 
-            # Calculate breakout price and target
-            breakout_price, price_target = self._calculate_targets(pole_high, pole_low, flag_high)
+            # Calculate breakout price (always flag_high)
+            breakout_price = flag_high
+
+            # Calculate price target with zone adjustment
+            target_calc = self._calculate_targets(symbol, pole_high, pole_low, flag_high)
 
             # Create BullFlagPattern (validation happens in __post_init__)
             pattern = BullFlagPattern(
                 pole_gain_pct=pole_gain_pct,
                 flag_range_pct=flag_range_pct,
-                breakout_price=breakout_price,
-                price_target=price_target,
+                breakout_price=breakout_price,               # Breakout is always top of flag
+                price_target=float(target_calc.adjusted_target),  # Target is zone-adjusted
                 pattern_valid=True,  # If we reached here, all validations passed
             )
 
@@ -448,33 +475,233 @@ class BullFlagDetector:
         return flag_slope_pct <= 0
 
     def _calculate_targets(
-        self, pole_high: float, pole_low: float, flag_high: float
-    ) -> tuple[float, float]:
-        """Calculate breakout price and price target.
+        self, symbol: str, pole_high: float, pole_low: float, flag_high: float
+    ) -> TargetCalculation:
+        """Calculate price target with zone adjustment.
 
         Logic:
         - breakout_price = flag_high (top of consolidation range)
         - pole_height = pole_high - pole_low
-        - price_target = breakout_price + pole_height
+        - original_target = breakout_price + pole_height (standard 2:1 R:R)
+        - Check for resistance zones and adjust target if needed
 
         Args:
+            symbol: Stock ticker symbol (needed for zone detection)
             pole_high: Highest price during pole
             pole_low: Lowest price during pole
             flag_high: Highest price during flag
 
         Returns:
-            Tuple of (breakout_price, price_target)
+            TargetCalculation with adjusted target and metadata
         """
+        # Calculate standard 2:1 R:R target
         breakout_price = flag_high
         pole_height = pole_high - pole_low
-        price_target = breakout_price + pole_height
+        original_target = breakout_price + pole_height
 
         logger.debug(
-            f"Targets calculated: breakout=${breakout_price:.2f}, "
-            f"target=${price_target:.2f} (pole_height=${pole_height:.2f})"
+            f"Original 2:1 target calculated for {symbol}: "
+            f"breakout=${breakout_price:.2f}, target=${original_target:.2f} "
+            f"(pole_height=${pole_height:.2f})"
         )
 
-        return (breakout_price, price_target)
+        # Adjust target based on resistance zones
+        target_calc = self._adjust_target_for_zones(
+            symbol=symbol,
+            entry_price=Decimal(str(breakout_price)),
+            original_target=Decimal(str(original_target))
+        )
+
+        logger.debug(
+            f"Final target for {symbol}: adjusted=${target_calc.adjusted_target}, "
+            f"reason={target_calc.adjustment_reason}"
+        )
+
+        # Log target calculation event to JSONL
+        self.logger.log_signal(
+            {
+                "event": "target_calculated",
+                "symbol": symbol,
+                "entry_price": str(breakout_price),
+                "adjusted_target": str(target_calc.adjusted_target),
+                "original_2r_target": str(target_calc.original_2r_target),
+                "adjustment_reason": target_calc.adjustment_reason,
+                "resistance_zone_price": str(target_calc.resistance_zone_price) if target_calc.resistance_zone_price else None,
+                "resistance_zone_strength": float(target_calc.resistance_zone_strength) if target_calc.resistance_zone_strength else None,
+            },
+            {"source": "bull_flag_detector", "method": "_calculate_targets"}
+        )
+
+        return target_calc
+
+    def _adjust_target_for_zones(
+        self,
+        symbol: str,
+        entry_price: Decimal,
+        original_target: Decimal
+    ) -> TargetCalculation:
+        """Adjust profit target based on nearest resistance zone.
+
+        If a resistance zone is found between entry and the 2:1 R:R target,
+        adjusts the target to 90% of the zone price to avoid resistance.
+
+        Args:
+            symbol: Stock ticker symbol
+            entry_price: Bull flag entry price (breakout price)
+            original_target: Original 2:1 R:R target price
+
+        Returns:
+            TargetCalculation with adjusted target and metadata
+
+        Logic:
+            1. If zone_detector is None → return fallback with reason "zone_detection_failed"
+            2. Call zone_detector.detect_zones(symbol, days=60) with timeout check
+            3. Call ProximityChecker.find_nearest_resistance(entry_price, zones, 5%)
+            4. If zone found and zone_price < original_target:
+               - adjusted = zone_price * 0.90
+               - reason = "zone_resistance"
+            5. Else:
+               - adjusted = original_target
+               - reason = "no_zone"
+
+        Error Handling (T023-T025):
+            - zone_detector=None → log "no_zone", return fallback
+            - Exception → log "zone_detection_failed" with error details
+            - Timeout >50ms → log "zone_detection_timeout", return fallback
+        """
+        # T023: Graceful degradation - No zone detector available
+        if self.zone_detector is None:
+            self.logger.log_signal(
+                {
+                    "event": "target_calculated",
+                    "symbol": symbol,
+                    "entry_price": str(entry_price),
+                    "adjusted_target": str(original_target),
+                    "original_2r_target": str(original_target),
+                    "adjustment_reason": "zone_detection_failed",
+                    "error": "zone_detector_not_available"
+                },
+                {"source": "bull_flag_detector", "method": "_adjust_target_for_zones"}
+            )
+            return TargetCalculation(
+                adjusted_target=original_target,
+                original_2r_target=original_target,
+                adjustment_reason="zone_detection_failed",
+                resistance_zone_price=None,
+                resistance_zone_strength=None
+            )
+
+        try:
+            # T024: Measure zone detection performance (<50ms per NFR-001)
+            start_time = time.perf_counter()
+
+            # Detect zones for the symbol
+            zones = self.zone_detector.detect_zones(symbol=symbol, days=60)
+
+            # Calculate elapsed time
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+            # T024: Check for timeout (>50ms threshold)
+            if elapsed_ms > 50:
+                logger.warning(
+                    f"Zone detection slow for {symbol}: {elapsed_ms:.2f}ms (threshold: 50ms). "
+                    f"Using fallback to original 2:1 R:R target."
+                )
+
+                # T025: Log timeout event to JSONL
+                self.logger.log_signal(
+                    {
+                        "event": "zone_detection_timeout",
+                        "symbol": symbol,
+                        "entry_price": str(entry_price),
+                        "adjusted_target": str(original_target),
+                        "original_2r_target": str(original_target),
+                        "adjustment_reason": "zone_detection_timeout",
+                        "elapsed_ms": round(elapsed_ms, 2),
+                        "threshold_ms": 50
+                    },
+                    {"source": "bull_flag_detector", "method": "_adjust_target_for_zones"}
+                )
+
+                return TargetCalculation(
+                    adjusted_target=original_target,
+                    original_2r_target=original_target,
+                    adjustment_reason="zone_detection_timeout",
+                    resistance_zone_price=None,
+                    resistance_zone_strength=None
+                )
+
+            # Find nearest resistance zone above entry price
+            # Use default config for proximity checking
+            zone_config = ZoneDetectionConfig()
+            proximity_checker = ProximityChecker(config=zone_config)
+            nearest_resistance = proximity_checker.find_nearest_resistance(
+                current_price=entry_price,
+                zones=zones
+            )
+
+            # Check if zone is within range and closer than original target
+            if nearest_resistance is not None:
+                zone_price = nearest_resistance.price_level
+
+                # Only adjust if zone is between entry and original target
+                if zone_price < original_target:
+                    # Adjust target to 90% of resistance zone
+                    adjusted_target = zone_price * Decimal("0.90")
+
+                    logger.debug(
+                        f"Target adjusted for {symbol}: "
+                        f"original=${original_target}, "
+                        f"zone=${zone_price}, "
+                        f"adjusted=${adjusted_target} (90% of zone)"
+                    )
+
+                    return TargetCalculation(
+                        adjusted_target=adjusted_target,
+                        original_2r_target=original_target,
+                        adjustment_reason="zone_resistance",
+                        resistance_zone_price=zone_price,
+                        resistance_zone_strength=nearest_resistance.strength_score
+                    )
+
+            # No zone found within range or zone beyond target
+            return TargetCalculation(
+                adjusted_target=original_target,
+                original_2r_target=original_target,
+                adjustment_reason="no_zone",
+                resistance_zone_price=None,
+                resistance_zone_strength=None
+            )
+
+        except Exception as e:
+            # T023: Graceful degradation - Zone detection failed
+            logger.warning(
+                f"Zone detection failed for {symbol}: {type(e).__name__}: {e}. "
+                f"Using original 2:1 R:R target."
+            )
+
+            # T025: Log error event to JSONL
+            self.logger.log_signal(
+                {
+                    "event": "zone_detection_error",
+                    "symbol": symbol,
+                    "entry_price": str(entry_price),
+                    "adjusted_target": str(original_target),
+                    "original_2r_target": str(original_target),
+                    "adjustment_reason": "zone_detection_failed",
+                    "error_type": type(e).__name__,
+                    "error_message": str(e)
+                },
+                {"source": "bull_flag_detector", "method": "_adjust_target_for_zones"}
+            )
+
+            return TargetCalculation(
+                adjusted_target=original_target,
+                original_2r_target=original_target,
+                adjustment_reason="zone_detection_failed",
+                resistance_zone_price=None,
+                resistance_zone_strength=None
+            )
 
     def _calculate_strength(self, pattern: BullFlagPattern) -> float:
         """Calculate signal strength (0-100) based on pole gain and flag confirmation.

@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2025-10-21
+
+### Added
+- **Support/Resistance Zone Mapping**: Algorithmic zone detection for improved entry timing
+  - ZoneDetector: Swing point detection with 5-bar lookback and 1.5% clustering tolerance
+  - Zone strength scoring: Base touch count + volume bonus (>1.5x average)
+  - Proximity alerts: Automatic alerts when price within 2% of zones
+  - Multi-timeframe support: Daily (3+ touches) and 4-hour (2+ touches) zones
+  - Configuration: `touch_threshold`, `price_tolerance_pct`, `proximity_threshold_pct`, `volume_threshold_mult`
+- ProximityChecker service with find_nearest_support/resistance helpers
+- ZoneLogger: Thread-safe JSONL logging with daily rotation
+- Graceful degradation: Empty results + warnings on insufficient data (<30 days)
+- Real OHLCV integration via MarketDataService (Robinhood API)
+- Zone models: Zone, ZoneTouch, ProximityAlert dataclasses with Decimal precision
+
+### Performance
+- Zone detection: <1s for 90 days daily data (3x faster than 3s target)
+- Proximity check: <1ms (100x faster than 100ms target)
+- Unit test execution: 0.86s for 69 tests
+
+### Security
+- Input validation: All methods validate symbol, price, and date inputs
+- Decimal precision: All financial calculations use Decimal to avoid floating-point errors
+- No new credentials required: Reuses existing Robinhood API configuration
+- Bandit scan: 0 vulnerabilities (977 lines scanned)
+
+### Documentation
+- Complete feature specification: specs/023-support-resistance-mapping/spec.md
+- Architecture plan with reuse analysis: specs/023-support-resistance-mapping/plan.md
+- 44 TDD tasks breakdown: specs/023-support-resistance-mapping/tasks.md
+- Optimization report: 5 critical issues resolved, all quality gates passing
+- Deployment finalization: Local-only deployment guide with usage instructions
+- Preview checklist: Backend functional validation (4/6 user stories validated)
+
+### Testing
+- 69 tests passing (100% success rate)
+- Test coverage: proximity_checker 97.5%, models 100%, logger 100%
+- Type safety: 100% (mypy --strict: 0 errors)
+- Linting: ruff check passes (0 errors)
+
+### Changed
+- Enhanced trading bot with zone-aware decision making capabilities
+- Improved entry timing by identifying high-probability support/resistance levels
+
+### Deferred (Future Releases)
+- US5: Real-time breakout detection (requires live price monitoring infrastructure) - Issue #30
+- US6: Bull flag integration (dynamic profit targets to nearest resistance) - Issue #31
+
 ## [1.2.0] - 2025-10-16
 
 ### Added

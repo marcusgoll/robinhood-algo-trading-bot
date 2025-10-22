@@ -1,0 +1,272 @@
+# Service Interface Contract: SupportResistanceDetector
+# Internal Python service (not REST API)
+# Documents method signatures and return types for testing and integration
+
+service_name: SupportResistanceDetector
+version: 1.0.0
+language: Python 3.11+
+
+methods:
+  detect_zones:
+    description: Identify support and resistance zones from historical OHLCV data
+    parameters:
+      - name: symbol
+        type: str
+        required: true
+        validation: "Alphanumeric, 1-5 characters"
+        example: "AAPL"
+
+      - name: days
+        type: int
+        required: true
+        validation: "Range 30-90"
+        default: 60
+        example: 60
+
+      - name: timeframe
+        type: Literal["daily", "4h"]
+        required: false
+        default: "daily"
+        example: "daily"
+
+    returns:
+      type: list[Zone]
+      description: "List of detected zones sorted by strength score descending"
+      example: |
+        [
+          Zone(
+            symbol="AAPL",
+            price_level=Decimal("155.00"),
+            zone_type=ZoneType.RESISTANCE,
+            strength_score=8,
+            touch_count=5,
+            first_touch_date=datetime(2025, 1, 15, tzinfo=UTC),
+            last_touch_date=datetime(2025, 3, 20, tzinfo=UTC),
+            average_volume=Decimal("85000000"),
+            highest_volume_touch=Decimal("120000000"),
+            timeframe=Timeframe.DAILY
+          )
+        ]
+
+    raises:
+      - ValueError: "If symbol invalid or days out of range"
+      - DataFetchError: "If insufficient historical data (<30 days available)"
+
+  check_proximity:
+    description: Flag zones within threshold distance of current price
+    parameters:
+      - name: zones
+        type: list[Zone]
+        required: true
+        description: "Zones to check against"
+
+      - name: current_price
+        type: Decimal
+        required: true
+        validation: "> 0"
+        example: "Decimal('152.50')"
+
+      - name: threshold_pct
+        type: Decimal
+        required: false
+        default: "Decimal('2.0')"
+        example: "Decimal('2.0')"
+
+    returns:
+      type: list[ProximityAlert]
+      description: "Alerts sorted by distance (closest first)"
+      example: |
+        [
+          ProximityAlert(
+            symbol="AAPL",
+            zone_price=Decimal("155.00"),
+            current_price=Decimal("152.50"),
+            distance_percent=Decimal("1.61"),
+            direction="APPROACHING_RESISTANCE",
+            timestamp=datetime(2025, 3, 21, 14, 30, tzinfo=UTC)
+          )
+        ]
+
+    raises: []
+
+  calculate_strength_score:
+    description: Score zone by touch count + volume bonus
+    parameters:
+      - name: touches
+        type: list[ZoneTouch]
+        required: true
+        description: "Historical touches for this zone"
+
+      - name: avg_volume
+        type: Decimal
+        required: true
+        description: "Average volume across all touches"
+
+    returns:
+      type: int
+      description: "Strength score (base = touch count + volume bonuses)"
+      example: 7
+
+    raises: []
+
+  detect_breakout:
+    description: Identify when price breaks through resistance with volume confirmation
+    parameters:
+      - name: zone
+        type: Zone
+        required: true
+        description: "Zone to check for breakout"
+
+      - name: current_bar
+        type: dict
+        required: true
+        description: "Current OHLCV bar data"
+        example: |
+          {
+            "open": Decimal("154.00"),
+            "high": Decimal("156.50"),
+            "low": Decimal("153.80"),
+            "close": Decimal("156.20"),
+            "volume": Decimal("95000000"),
+            "timestamp": datetime(2025, 3, 21, 16, 0, tzinfo=UTC)
+          }
+
+      - name: avg_volume
+        type: Decimal
+        required: true
+        description: "Average volume for this symbol"
+
+    returns:
+      type: bool
+      description: "True if breakout detected (price >1% above zone with 1.3x+ volume)"
+      example: true
+
+    raises: []
+
+  merge_overlapping_zones:
+    description: Consolidate zones within tolerance into single zone
+    parameters:
+      - name: zones
+        type: list[Zone]
+        required: true
+        description: "Zones to merge"
+
+      - name: tolerance_pct
+        type: Decimal
+        required: false
+        default: "Decimal('1.5')"
+        example: "Decimal('1.5')"
+
+    returns:
+      type: list[Zone]
+      description: "Merged zones (keeps highest strength zone from each cluster)"
+      example: |
+        # Input: 3 zones at $154.80, $155.00, $155.20 (within 1.5%)
+        # Output: 1 zone at $155.00 (highest strength of the 3)
+
+    raises: []
+
+data_models:
+  Zone:
+    fields:
+      symbol: str
+      price_level: Decimal
+      zone_type: "Enum[SUPPORT, RESISTANCE]"
+      strength_score: int
+      touch_count: int
+      first_touch_date: datetime
+      last_touch_date: datetime
+      average_volume: Decimal
+      highest_volume_touch: Decimal
+      timeframe: "Enum[DAILY, FOUR_HOUR]"
+
+    methods:
+      to_dict: "Serialize to dict for JSONL logging"
+      to_jsonl_line: "Serialize to single-line JSON string"
+
+  ZoneTouch:
+    fields:
+      zone_price: Decimal
+      touch_date: datetime
+      price: Decimal
+      volume: Decimal
+      touch_type: "Enum[BOUNCE, REJECTION, BREAKOUT]"
+
+  ProximityAlert:
+    fields:
+      symbol: str
+      zone_price: Decimal
+      current_price: Decimal
+      distance_percent: Decimal
+      direction: "Enum[APPROACHING_SUPPORT, APPROACHING_RESISTANCE]"
+      timestamp: datetime
+
+logging_contract:
+  zone_detection_event:
+    file: "logs/zones/YYYY-MM-DD.jsonl"
+    format: "JSONL (one event per line)"
+    fields:
+      event_type: "zone_detection"
+      timestamp: "ISO 8601 UTC"
+      symbol: str
+      timeframe: str
+      zone_count: int
+      zones: "list[Zone.to_dict()]"
+      analysis_duration_ms: float
+
+  proximity_alert_event:
+    file: "logs/zones/YYYY-MM-DD.jsonl"
+    format: "JSONL (one event per line)"
+    fields:
+      event_type: "proximity_alert"
+      timestamp: "ISO 8601 UTC"
+      symbol: str
+      zone_price: str
+      current_price: str
+      distance_percent: str
+      direction: str
+
+  breakout_event:
+    file: "logs/zones/YYYY-MM-DD.jsonl"
+    format: "JSONL (one event per line)"
+    fields:
+      event_type: "breakout"
+      timestamp: "ISO 8601 UTC"
+      symbol: str
+      zone_price: str
+      breakout_price: str
+      volume: str
+      volume_ratio: float
+      old_type: "support/resistance"
+      new_type: "support/resistance"
+
+error_handling:
+  graceful_degradation:
+    - condition: "Insufficient data (<30 days)"
+      response: "Return empty list + warning log"
+      raises: false
+
+    - condition: "API rate limit"
+      response: "@with_retry decorator handles exponential backoff"
+      raises: "RateLimitError after 3 retries"
+
+    - condition: "Invalid symbol"
+      response: "Validate input, raise ValueError immediately"
+      raises: true
+
+    - condition: "Network timeout"
+      response: "@with_retry decorator retries with backoff"
+      raises: "NetworkError after retries exhausted"
+
+performance_targets:
+  detect_zones:
+    latency_p95: "< 3000ms for 90 days of data"
+    latency_p50: "< 1500ms for 60 days of data"
+
+  check_proximity:
+    latency_p95: "< 100ms"
+    latency_p50: "< 50ms"
+
+  log_zone_detection:
+    latency_p95: "< 5ms"
+    latency_p50: "< 2ms"
