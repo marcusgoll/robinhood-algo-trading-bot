@@ -1,0 +1,95 @@
+feature:
+  slug: daily-profit-goal-ma
+  number: "026"
+  title: Daily profit goal management
+  branch_name: feature/026-daily-profit-goal-ma
+  created_at: 2025-10-21T00:00:00Z
+  updated_at: 2025-10-21T00:00:00Z
+  roadmap_status: in-progress
+
+deployment:
+  model: remote-direct
+  staging:
+    deployed: false
+  production:
+    deployed: false
+
+workflow:
+  phase: initialization
+  status: in_progress
+  completed_phases: []
+  failed_phases: []
+
+phases:
+  spec-flow:
+    status: pending
+    started_at: null
+    completed_at: null
+  clarify:
+    status: pending
+    started_at: null
+    completed_at: null
+  plan:
+    status: pending
+    started_at: null
+    completed_at: null
+  tasks:
+    status: pending
+    started_at: null
+    completed_at: null
+  analyze:
+    status: pending
+    started_at: null
+    completed_at: null
+  implement:
+    status: pending
+    started_at: null
+    completed_at: null
+  optimize:
+    status: pending
+    started_at: null
+    completed_at: null
+  preview:
+    status: pending
+    started_at: null
+    completed_at: null
+  ship-staging:
+    status: pending
+    started_at: null
+    completed_at: null
+  validate-staging:
+    status: pending
+    started_at: null
+    completed_at: null
+  ship-prod:
+    status: pending
+    started_at: null
+    completed_at: null
+
+quality_gates:
+  pre_flight: false
+  code_review: false
+  rollback_capable: false
+
+manual_gates:
+  preview:
+    approved: false
+    approved_at: null
+  validate_staging:
+    approved: false
+    approved_at: null
+
+artifacts:
+  spec: null
+  plan: null
+  tasks: null
+  analysis: null
+  optimization: null
+  release_notes: null
+
+design_workflow:
+  enabled: false
+  phases:
+    variations: not_started
+    functional: not_started
+    polish: not_started

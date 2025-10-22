@@ -1,0 +1,242 @@
+# Internal API Contracts: daily-profit-goal-ma
+
+# Note: This is a local-only feature with no HTTP API surface.
+# This file documents internal Python API contracts for integration.
+
+## DailyProfitTracker API
+
+### Class: DailyProfitTracker
+**Purpose**: Orchestrates daily P&L tracking and profit protection logic
+
+**Methods**:
+
+```python
+def __init__(self, config: ProfitGoalConfig, performance_tracker: PerformanceTracker) -> None:
+    """Initialize profit tracker with configuration and dependencies."""
+
+def update_state(self) -> DailyProfitState:
+    """
+    Update daily profit state from current trades and positions.
+
+    Returns:
+        Updated DailyProfitState with latest P&L and protection status
+
+    Side Effects:
+        - Persists state to logs/profit-goal-state.json
+        - Logs protection event if threshold breached
+        - Triggers protection mode if drawdown ≥ threshold
+    """
+
+def get_current_state(self) -> DailyProfitState:
+    """
+    Get current profit state without triggering updates.
+
+    Returns:
+        Current DailyProfitState (may be stale)
+    """
+
+def reset_daily_state(self) -> None:
+    """
+    Reset daily profit state at market open.
+
+    Side Effects:
+        - Sets daily_pnl, peak_profit to 0
+        - Sets protection_active to False
+        - Updates last_reset timestamp
+        - Persists state to file
+    """
+
+def is_protection_active(self) -> bool:
+    """
+    Check if profit protection mode is currently active.
+
+    Returns:
+        True if protection active, False otherwise
+    """
+```
+
+---
+
+## SafetyChecks Integration
+
+### Modified Method: validate_trade()
+
+**New Check Added**:
+```python
+def validate_trade(
+    self,
+    symbol: str,
+    action: str,
+    quantity: int,
+    price: float,
+    current_buying_power: float | None = None,
+    profit_tracker: DailyProfitTracker | None = None  # NEW PARAMETER
+) -> SafetyResult:
+    """
+    Validate trade against all safety checks including profit protection.
+
+    New validation:
+        - If profit_tracker provided and action == "BUY":
+          - Check if protection_active
+          - If active, return SafetyResult(is_safe=False, reason="Profit protection active")
+
+    Returns:
+        SafetyResult with is_safe=False if profit protection blocks trade
+    """
+```
+
+---
+
+## Configuration Schema
+
+### Environment Variables
+
+```yaml
+PROFIT_TARGET_DAILY:
+  type: string
+  description: Daily profit target in dollars
+  format: decimal
+  example: "500.00"
+  default: "0"
+  validation:
+    - Must be valid decimal string
+    - Must be >= 0
+    - Must be <= 10000
+
+PROFIT_GIVEBACK_THRESHOLD:
+  type: string
+  description: Profit drawdown threshold (0-1)
+  format: decimal
+  example: "0.50"
+  default: "0.50"
+  validation:
+    - Must be valid decimal string
+    - Must be >= 0.10 (10%)
+    - Must be <= 0.90 (90%)
+```
+
+### config.json Schema (Optional)
+
+```json
+{
+  "profit_goal": {
+    "target": 500.00,
+    "threshold": 0.50
+  }
+}
+```
+
+---
+
+## State File Schema
+
+### logs/profit-goal-state.json
+
+```json
+{
+  "session_date": "2025-10-21",
+  "daily_pnl": "350.75",
+  "realized_pnl": "200.00",
+  "unrealized_pnl": "150.75",
+  "peak_profit": "600.00",
+  "protection_active": true,
+  "last_reset": "2025-10-21T09:00:00Z",
+  "last_updated": "2025-10-21T14:32:15Z"
+}
+```
+
+**Schema**:
+```yaml
+session_date:
+  type: string
+  format: ISO 8601 date (YYYY-MM-DD)
+  description: Current trading session date
+
+daily_pnl:
+  type: string
+  format: decimal
+  description: Total daily P&L (realized + unrealized)
+
+realized_pnl:
+  type: string
+  format: decimal
+  description: P&L from closed trades
+
+unrealized_pnl:
+  type: string
+  format: decimal
+  description: P&L from open positions
+
+peak_profit:
+  type: string
+  format: decimal
+  description: Highest daily_pnl reached (monotonically increasing)
+
+protection_active:
+  type: boolean
+  description: Whether profit protection mode is triggered
+
+last_reset:
+  type: string
+  format: ISO 8601 UTC timestamp
+  description: Last time state was reset (4:00 AM EST)
+
+last_updated:
+  type: string
+  format: ISO 8601 UTC timestamp
+  description: Last time state was updated
+```
+
+---
+
+## Event Log Schema
+
+### logs/profit-protection/YYYY-MM-DD.jsonl
+
+**Format**: One JSON object per line (JSONL)
+
+**Event Types**:
+
+#### Event: protection_triggered
+```json
+{
+  "event": "protection_triggered",
+  "event_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-10-21T14:32:15.123Z",
+  "session_date": "2025-10-21",
+  "peak_profit": "600.00",
+  "current_profit": "300.00",
+  "drawdown_percent": "0.50",
+  "threshold": "0.50",
+  "session_id": "session-2025-10-21-0001"
+}
+```
+
+#### Event: trade_blocked
+```json
+{
+  "event": "trade_blocked",
+  "event_id": "550e8400-e29b-41d4-a716-446655440001",
+  "timestamp": "2025-10-21T14:35:00.456Z",
+  "session_date": "2025-10-21",
+  "symbol": "AAPL",
+  "action": "BUY",
+  "quantity": 100,
+  "price": "150.25",
+  "reason": "Profit protection active",
+  "session_id": "session-2025-10-21-0001"
+}
+```
+
+#### Event: daily_reset
+```json
+{
+  "event": "daily_reset",
+  "event_id": "550e8400-e29b-41d4-a716-446655440002",
+  "timestamp": "2025-10-22T09:00:00.000Z",
+  "session_date": "2025-10-22",
+  "previous_session": "2025-10-21",
+  "final_daily_pnl": "300.00",
+  "session_id": "session-2025-10-22-0001"
+}
+```

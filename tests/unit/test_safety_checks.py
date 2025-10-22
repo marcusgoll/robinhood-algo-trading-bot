@@ -7,6 +7,7 @@ Constitution v1.0.0 - §Testing_Requirements: TDD with RED-GREEN-REFACTOR
 """
 
 import pytest
+from decimal import Decimal
 from unittest.mock import Mock, patch, MagicMock
 
 # Import data classes from safety_checks module
@@ -413,3 +414,137 @@ class TestFailSafeBehavior:
 
         # Should return True (pass check) when no history available
         assert result is True, "Should assume 0 losses when trades.log missing"
+
+
+class TestProfitProtectionIntegration:
+    """Test profit protection integration with SafetyChecks (T022 - US3)."""
+
+    # =========================================================================
+    # T022 [US3]: Test SafetyChecks blocks trades when protection active
+    # =========================================================================
+
+    @patch('src.trading_bot.safety_checks.is_trading_hours')
+    def test_profit_protection_blocks_buy_when_active(self, mock_is_trading_hours):
+        """Should block BUY orders when profit protection is active (T022).
+
+        Given profit protection is triggered
+        When validate_trade() is called for BUY action
+        Then trade should be blocked with reason "Profit protection active"
+        """
+        from src.trading_bot.safety_checks import SafetyChecks
+        from src.trading_bot.config import Config
+
+        mock_is_trading_hours.return_value = True
+
+        config = Mock(spec=Config)
+        config.trading_timezone = "US/Eastern"
+        safety = SafetyChecks(config)
+
+        # Mock profit tracker with active protection
+        profit_tracker = Mock()
+        profit_tracker.is_protection_active.return_value = True
+
+        result = safety.validate_trade(
+            symbol="AAPL",
+            action="BUY",
+            quantity=100,
+            price=150.00,
+            current_buying_power=20000.00,
+            profit_tracker=profit_tracker
+        )
+
+        assert result.is_safe is False, "Should block BUY when protection active"
+        assert "profit protection" in result.reason.lower(), f"Expected profit protection message, got: {result.reason}"
+
+    @patch('src.trading_bot.safety_checks.is_trading_hours')
+    def test_profit_protection_allows_sell_when_active(self, mock_is_trading_hours):
+        """Should allow SELL orders even when profit protection is active (T022, FR-007).
+
+        Given profit protection is triggered
+        When validate_trade() is called for SELL action
+        Then trade should be allowed (can exit positions)
+        """
+        from src.trading_bot.safety_checks import SafetyChecks
+        from src.trading_bot.config import Config
+
+        mock_is_trading_hours.return_value = True
+
+        config = Mock(spec=Config)
+        config.trading_timezone = "US/Eastern"
+        safety = SafetyChecks(config)
+
+        # Mock profit tracker with active protection
+        profit_tracker = Mock()
+        profit_tracker.is_protection_active.return_value = True
+
+        result = safety.validate_trade(
+            symbol="AAPL",
+            action="SELL",
+            quantity=100,
+            price=150.00,
+            current_buying_power=20000.00,
+            profit_tracker=profit_tracker
+        )
+
+        assert result.is_safe is True, "Should allow SELL even when protection active (can exit positions)"
+
+    @patch('src.trading_bot.safety_checks.is_trading_hours')
+    def test_profit_protection_allows_trade_when_inactive(self, mock_is_trading_hours):
+        """Should allow trades when profit protection is not active (T022).
+
+        Given profit protection is not triggered
+        When validate_trade() is called for BUY action
+        Then trade should be allowed
+        """
+        from src.trading_bot.safety_checks import SafetyChecks
+        from src.trading_bot.config import Config
+
+        mock_is_trading_hours.return_value = True
+
+        config = Mock(spec=Config)
+        config.trading_timezone = "US/Eastern"
+        safety = SafetyChecks(config)
+
+        # Mock profit tracker with inactive protection
+        profit_tracker = Mock()
+        profit_tracker.is_protection_active.return_value = False
+
+        result = safety.validate_trade(
+            symbol="AAPL",
+            action="BUY",
+            quantity=100,
+            price=150.00,
+            current_buying_power=20000.00,
+            profit_tracker=profit_tracker
+        )
+
+        assert result.is_safe is True, "Should allow BUY when protection inactive"
+
+    @patch('src.trading_bot.safety_checks.is_trading_hours')
+    def test_profit_protection_optional_parameter(self, mock_is_trading_hours):
+        """Should work without profit_tracker parameter (backward compatibility) (T022).
+
+        Given profit_tracker parameter is not provided
+        When validate_trade() is called
+        Then trade validation should proceed normally (no profit protection check)
+        """
+        from src.trading_bot.safety_checks import SafetyChecks
+        from src.trading_bot.config import Config
+
+        mock_is_trading_hours.return_value = True
+
+        config = Mock(spec=Config)
+        config.trading_timezone = "US/Eastern"
+        safety = SafetyChecks(config)
+
+        result = safety.validate_trade(
+            symbol="AAPL",
+            action="BUY",
+            quantity=100,
+            price=150.00,
+            current_buying_power=20000.00
+            # No profit_tracker parameter
+        )
+
+        # Should allow trade (backward compatibility - no protection check)
+        assert result.is_safe is True, "Should work without profit_tracker parameter"
