@@ -289,3 +289,6 @@ Integrate Level 2 order book data and Time & Sales (tape) data to provide real-t
 - ✅ T001: Created order_flow directory structure (src/trading_bot/order_flow/, tests/order_flow/, logs/order_flow/)
 - ✅ T002: Added polygon-api-client==1.12.5 to requirements.txt
 - ✅ T003: Added ORDER_FLOW_* environment variables to .env.example (8 variables)
+
+### Batch 2: Foundation - Config (Completed)
+- ✅ T004: Created OrderFlowConfig dataclass following MomentumConfig pattern (frozen, validated, from_env())
