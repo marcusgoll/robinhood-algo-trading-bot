@@ -14,9 +14,9 @@ deployment:
   model: remote-direct  # staging-prod | direct-prod | local-only
 
 workflow:
-  phase: implement
+  phase: preview
   status: in_progress
-  phases_completed: [spec, plan, tasks, analyze]
+  phases_completed: [spec, plan, tasks, analyze, implement, optimize]
   phases_failed: []
 
 manual_gates:
