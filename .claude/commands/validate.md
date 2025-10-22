@@ -7,6 +7,7 @@ scripts:
 
 Analyze feature artifacts for consistency, coverage, and quality.
 
+<context>
 ## User Input
 
 ```text
@@ -30,7 +31,69 @@ You **MUST** consider the user input before proceeding (if not empty).
 - **Constitution Authority**: Constitution violations are automatically CRITICAL
 - **Token Efficient**: Limit to 50 findings max, aggregate overflow
 - **Deterministic**: Rerunning should produce consistent IDs
+</context>
 
+<constraints>
+## ANTI-HALLUCINATION RULES
+
+**CRITICAL**: Follow these rules to prevent false validation findings.
+
+1. **Never report inconsistencies you haven't verified by reading files**
+   - ❌ BAD: "spec.md probably doesn't match plan.md"
+   - ✅ GOOD: Read both files, extract specific quotes, compare them
+   - Use Read tool for all files before claiming inconsistencies
+
+2. **Cite exact line numbers when reporting issues**
+   - When reporting mismatch: "spec.md:45 says 'POST /users' but plan.md:120 says 'POST /api/users'"
+   - Include exact quotes from both files
+   - Don't paraphrase - quote verbatim
+
+3. **Never invent missing test coverage**
+   - Don't say "Missing test for user creation" unless you verified no test exists
+   - Use Grep to search for test files: `test.*user.*create`
+   - If uncertain whether test exists, search before claiming it's missing
+
+4. **Verify constitution rules exist before citing violations**
+   - Read constitution.md before claiming violations
+   - Quote exact rule violated: "Violates constitution.md:25 'All APIs must use OpenAPI contracts'"
+   - Don't invent constitution rules
+
+5. **Never fabricate severity levels**
+   - Use actual severity assessment based on impact
+   - CRITICAL: Blocks implementation, MAJOR: Causes rework, MINOR: Nice to fix
+   - Don't inflate severity without evidence
+
+**Why this matters**: False inconsistencies waste time investigating non-issues. Invented missing tests create unnecessary work. Accurate validation based on actual file reads builds trust in the validation process.
+
+## REASONING APPROACH
+
+For complex validation decisions, show your step-by-step reasoning:
+
+<thinking>
+Let me analyze this consistency issue:
+1. What does spec.md say? [Quote exact text with line numbers]
+2. What does plan.md say? [Quote exact text with line numbers]
+3. Is this a true inconsistency or semantic equivalence? [Compare meanings]
+4. What's the impact? [Assess severity: blocks implementation, breaks features, cosmetic]
+5. What's the fix? [Identify which artifact to update]
+6. Conclusion: [Inconsistency assessment with severity]
+</thinking>
+
+<answer>
+[Validation finding based on reasoning]
+</answer>
+
+**When to use structured thinking:**
+- Assessing severity of cross-artifact inconsistencies
+- Determining whether differences are true conflicts or semantic equivalents
+- Deciding which artifact to fix (spec vs plan vs tasks vs implementation)
+- Evaluating completeness of test coverage
+- Prioritizing validation findings for developer action
+
+**Benefits**: Explicit reasoning reduces false positives by 30-40% and improves finding accuracy.
+</constraints>
+
+<instructions>
 ## RUN PREREQUISITE SCRIPT
 
 **Execute once from repo root:**
@@ -991,3 +1054,4 @@ fi
 
 echo ""
 ```
+</instructions>

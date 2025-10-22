@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-21 (strategy-orchestrator v1.1.0 complete with 14/14 tests passing, 100% coverage for critical paths)
+**Last updated**: 2025-10-21 (position-scaling v1.0.0 complete with 172/172 tests passing, 2/3 critical issues resolved)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`

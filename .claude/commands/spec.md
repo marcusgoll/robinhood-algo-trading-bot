@@ -4,6 +4,7 @@ description: Create feature specification from natural language (planning is 80%
 
 Create specification for: $ARGUMENTS
 
+<context>
 ## MENTAL MODEL
 
 **Workflow**: spec-flow -> clarify -> plan -> tasks -> analyze -> implement -> optimize -> debug -> preview -> phase-1-ship -> validate-staging -> phase-2-ship
@@ -25,7 +26,68 @@ Create specification for: $ARGUMENTS
 - Removes filler words: "we want to", "get our", "to a", "with", "before moving on to", etc.
 - Example: "We want to add student progress dashboard" → `add-student-progress-dashboard`
 - Example: "We want to get our vercel and railway app to a healthy state..." → `vercel-railway-app-healthy-state`
+</context>
 
+<constraints>
+## ANTI-HALLUCINATION RULES
+
+**CRITICAL**: Follow these rules to prevent making up information when creating specifications.
+
+1. **Never speculate about existing code you have not read**
+   - ❌ BAD: "The app probably uses React Router for navigation"
+   - ✅ GOOD: "Let me check package.json and src/ to see what's currently used"
+   - Use Glob to find files, Read to examine them before making assumptions
+
+2. **Cite sources for technical constraints**
+   - When referencing existing architecture, cite files: `package.json:12`, `tsconfig.json:5-8`
+   - When referencing similar features, cite: `specs/002-auth-flow/spec.md:45`
+   - Don't invent APIs, libraries, or frameworks that might not exist
+
+3. **Admit when research is needed**
+   - If uncertain about tech stack, say: "I need to read package.json and check existing code"
+   - If unsure about design patterns, say: "Let me search for similar implementations"
+   - Never make up database schemas, API endpoints, or component hierarchies
+
+4. **Verify roadmap entries before referencing**
+   - Before saying "This builds on feature X", search roadmap.md for X
+   - Use exact roadmap slugs and titles, don't paraphrase
+   - If feature not in roadmap, say: "This is a new feature, not extending existing work"
+
+5. **Quote user requirements exactly**
+   - When documenting user needs, quote $ARGUMENTS directly
+   - Don't add unstated requirements or assumptions
+   - Mark clarifications needed with `[NEEDS CLARIFICATION]` explicitly
+
+**Why this matters**: Hallucinated technical constraints lead to specs that can't be implemented. Specs based on non-existent code create impossible plans. Accurate specifications save 50-60% of implementation time.
+
+## REASONING APPROACH
+
+For complex specification decisions, show your step-by-step reasoning:
+
+<thinking>
+Let me analyze this requirement:
+1. What is the user actually asking for? [Quote $ARGUMENTS]
+2. What are the implied constraints? [Technical, UX, performance]
+3. What existing features does this build on? [Check roadmap.md]
+4. What ambiguities need clarification? [List unclear points]
+5. Conclusion: [Specification approach with justification]
+</thinking>
+
+<answer>
+[Specification decision based on reasoning]
+</answer>
+
+**When to use structured thinking:**
+- Classifying feature type (enhancement vs new feature vs bugfix)
+- Deciding feature scope (what's in vs out of scope)
+- Identifying technical constraints from vague requirements
+- Choosing between multiple valid interpretations of user intent
+- Determining which roadmap section to place the feature in
+
+**Benefits**: Explicit reasoning reduces scope creep by 30-40% and prevents misaligned specifications.
+</constraints>
+
+<instructions>
 ## CONTEXT
 
 **Path constants:**
@@ -986,7 +1048,7 @@ rollback_spec_flow() {
 
 ## AUTO-COMPACTION
 
-In `/flow` mode, auto-compaction runs after specification:
+In `/feature` mode, auto-compaction runs after specification:
 - ✅ Preserve: Spec decisions, requirements, UX research, visual insights
 - ❌ Remove: Redundant research notes, verbose inspiration quotes
 - Strategy: Aggressive (planning phase)
@@ -997,7 +1059,7 @@ In `/flow` mode, auto-compaction runs after specification:
 ```
 
 **When to compact:**
-- Auto: After `/spec-flow` in `/flow` mode
+- Auto: After `/spec-flow` in `/feature` mode
 - Manual: If context >`$COMPACT_THRESHOLD` tokens before `/clarify` or `/plan`
 - Rationale: Planning quality degrades above 50k tokens (empirical observation)
 
@@ -1035,7 +1097,7 @@ if [ "$CLARIFICATIONS" -gt 0 ]; then
   echo "Recommended: /clarify"
   echo "Alternative: /plan (proceed with current spec, clarify later)"
   echo ""
-  echo "To automate: /flow \"${SLUG}\" (runs full workflow)"
+  echo "To automate: /feature \"${SLUG}\" (runs full workflow)"
 elif [ "$CHECKLIST_COMPLETE" = false ]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "⚠️  AUTO-PROGRESSION: Quality checks incomplete"
@@ -1056,7 +1118,7 @@ else
   echo "Ready for planning phase"
   echo ""
   echo "Recommended: /plan"
-  echo "Alternative: /flow continue (automates plan → tasks → implement → ship)"
+  echo "Alternative: /feature continue (automates plan → tasks → implement → ship)"
 fi
 ```
 
@@ -1121,19 +1183,20 @@ if [ "$CLARIFICATIONS" -gt 0 ]; then
   echo "  → /clarify (resolve ${CLARIFICATIONS} ambiguities)"
   echo ""
   echo "Automated (full workflow):"
-  echo "  → /flow continue"
+  echo "  → /feature continue"
 elif [ "$COMPLETE_CHECKS" -ne "$TOTAL_CHECKS" ] 2>/dev/null; then
   echo "Manual (step-by-step):"
   echo "  → Review and complete requirements checklist"
   echo "  → Then: /plan"
   echo ""
   echo "Automated (full workflow):"
-  echo "  → /flow continue (will prompt for checklist completion)"
+  echo "  → /feature continue (will prompt for checklist completion)"
 else
   echo "Manual (step-by-step):"
   echo "  → /plan"
   echo ""
   echo "Automated (full workflow):"
-  echo "  → /flow continue"
+  echo "  → /feature continue"
 fi
 ```
+</instructions>

@@ -1,0 +1,75 @@
+# Workflow State for Support/resistance zone mapping
+# Generated: 2025-10-21
+
+feature:
+  slug: support-resistance-mapping
+  number: 23
+  title: Support/resistance zone mapping
+  branch_name: feature/023-support-resistance-mapping
+  github_issue: 26
+  created_at: 2025-10-21T00:00:00Z
+  updated_at: 2025-10-21T00:00:00Z
+
+deployment_model: remote-direct
+
+workflow:
+  phase: initialization
+  status: in_progress
+  phases_completed: []
+  phases_failed: []
+  phase_summaries: {}
+
+manual_gates:
+  preview:
+    required: true
+    approved: false
+    timestamp: null
+  validate_staging:
+    required: false
+    approved: false
+    timestamp: null
+
+quality_gates:
+  pre_flight:
+    passed: false
+    timestamp: null
+  code_review:
+    passed: false
+    timestamp: null
+  rollback_capability:
+    available: false
+
+deployment:
+  staging:
+    deployed: false
+    url: null
+    deployment_id: null
+    timestamp: null
+  production:
+    deployed: false
+    url: null
+    deployment_id: null
+    timestamp: null
+    version: null
+
+artifacts:
+  spec: null
+  plan: null
+  tasks: null
+  analysis_report: null
+  optimization_report: null
+  release_notes: null
+
+token_budget:
+  planning: 75000
+  implementation: 100000
+  optimization: 125000
+  current_usage: 0
+  compaction_threshold: 0.8
+
+design_workflow:
+  enabled: null
+  phases:
+    variations: not_started
+    functional: not_started
+    polish: not_started

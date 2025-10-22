@@ -7,6 +7,7 @@ scripts:
 
 Design implementation for: $ARGUMENTS
 
+<context>
 ## MENTAL MODEL
 
 **Workflow**: spec-flow -> clarify -> plan -> tasks -> analyze -> implement -> optimize -> debug -> preview -> phase-1-ship -> validate-staging -> phase-2-ship
@@ -21,6 +22,7 @@ Design implementation for: $ARGUMENTS
 **Auto-suggest:**
 - UI features → `/design-variations` or `/tasks`
 - Backend features → `/tasks`
+</context>
 
 ## USER INPUT
 
@@ -829,6 +831,67 @@ git log -1 --oneline
 echo ""
 ```
 
+<constraints>
+## ANTI-HALLUCINATION RULES
+
+**CRITICAL**: Follow these rules to prevent making up architectural decisions.
+
+1. **Never speculate about existing patterns you have not read**
+   - ❌ BAD: "The app probably follows a services pattern"
+   - ✅ GOOD: "Let me search for existing service files to understand current patterns"
+   - Use Grep to find patterns: `class.*Service`, `interface.*Repository`
+
+2. **Cite existing code when recommending reuse**
+   - When suggesting to reuse UserService, cite: `api/app/services/user.py:20-45`
+   - When referencing patterns, cite: `api/app/core/database.py:12-18 shows our DB session pattern`
+   - Don't invent reusable components that don't exist
+
+3. **Admit when codebase exploration is needed**
+   - If unsure about tech stack, say: "I need to read package.json and search for imports"
+   - If uncertain about patterns, say: "Let me search the codebase for similar implementations"
+   - Never make up directory structures, module names, or import paths
+
+4. **Quote from spec.md exactly when planning**
+   - Don't paraphrase requirements - quote user stories verbatim
+   - Example: "According to spec.md:45-48: '[exact quote]', therefore we need..."
+   - If spec is ambiguous, flag it rather than assuming intent
+
+5. **Verify dependencies exist before recommending**
+   - Before suggesting "use axios for HTTP", check package.json
+   - Before recommending libraries, search existing imports
+   - Don't suggest packages that aren't installed
+
+**Why this matters**: Hallucinated architecture leads to plans that can't be implemented. Plans based on non-existent patterns create unnecessary refactoring. Accurate planning grounded in actual code saves 40-50% of implementation rework.
+
+## REASONING APPROACH
+
+For complex architecture decisions, show your step-by-step reasoning:
+
+<thinking>
+Let me analyze this design choice:
+1. What does spec.md require? [Quote requirements]
+2. What existing patterns can I reuse? [Cite file:line from codebase]
+3. What are the architectural options? [List 2-3 approaches]
+4. What are the trade-offs? [Performance, maintainability, complexity]
+5. What does constitution.md prefer? [Quote architectural principles]
+6. Conclusion: [Recommended approach with justification]
+</thinking>
+
+<answer>
+[Architecture decision based on reasoning]
+</answer>
+
+**When to use structured thinking:**
+- Choosing architectural patterns (e.g., REST vs GraphQL, monolith vs microservices)
+- Selecting libraries or frameworks (e.g., Redux vs Context API)
+- Designing database schemas (normalization vs denormalization)
+- Planning file/folder structure for new features
+- Deciding on code reuse vs new implementation
+
+**Benefits**: Explicit reasoning reduces architectural rework by 30-40% and improves maintainability.
+</constraints>
+
+<instructions>
 ## CONTEXT MANAGEMENT
 
 **Before proceeding to /tasks:**
@@ -971,7 +1034,7 @@ fi
 
 echo ""
 echo "Automated (full workflow):"
-echo "  → /flow continue"
+echo "  → /feature continue"
 echo ""
 
 # Optional compaction reminder if conversation is long
@@ -982,3 +1045,4 @@ if [ "$CONTEXT_CHECK" -gt 500 ]; then
 fi
 ```
 
+</instructions>

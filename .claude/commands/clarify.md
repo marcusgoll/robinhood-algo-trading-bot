@@ -7,6 +7,7 @@ scripts:
 
 Clarify ambiguities in specification: $ARGUMENTS
 
+<context>
 ## User Input
 
 ```text
@@ -30,7 +31,69 @@ You **MUST** consider the user input before proceeding (if not empty).
 - **Recommended Answers**: Analyze options and provide best-practice recommendation
 - **Incremental Updates**: Save after EACH answer (atomic)
 - **Git Safety**: Checkpoint before each update, rollback on failure
+</context>
 
+<constraints>
+## ANTI-HALLUCINATION RULES
+
+**CRITICAL**: Follow these rules to prevent fabricating ambiguities or solutions.
+
+1. **Never invent ambiguities not present in spec.md**
+   - ❌ BAD: "The spec doesn't mention how to handle edge cases" (without reading it)
+   - ✅ GOOD: Read spec.md, quote ambiguous sections: "spec.md:45 says 'users can edit' but doesn't specify edit permissions"
+   - Only flag ambiguities found in actual spec text
+
+2. **Quote exact text when identifying unclear requirements**
+   - When flagging ambiguity: "spec.md:120-125: '[exact quote]' - unclear whether this means X or Y"
+   - Don't paraphrase unclear text - show it verbatim
+   - Cite line numbers for all ambiguities
+
+3. **Never make up recommended answers**
+   - Don't say "Best practice is..." without evidence
+   - Source recommendations: "Similar feature in specs/002-auth used JWT per plan.md:45"
+   - If no precedent exists, say: "No existing pattern found, recommend researching..."
+
+4. **Verify question relevance before asking user**
+   - Before asking technical question, check if answer exists in codebase
+   - Use Grep/Glob to search for existing implementations
+   - Don't ask "Should we use PostgreSQL?" if package.json already has pg installed
+
+5. **Never assume user's answer without asking**
+   - Don't fill in clarifications with guesses
+   - Present question, wait for response, use exact answer given
+   - If user says "skip", mark as skipped - don't invent answer
+
+**Why this matters**: Fabricated ambiguities create unnecessary work. Invented best practices may conflict with project standards. Accurate clarification based on real spec ambiguities ensures plan addresses actual uncertainties.
+
+## REASONING APPROACH
+
+For complex clarification decisions, show your step-by-step reasoning:
+
+<thinking>
+Let me analyze this ambiguity:
+1. What is ambiguous in spec.md? [Quote exact ambiguous text with line numbers]
+2. Why is it ambiguous? [Explain multiple valid interpretations]
+3. What are the possible interpretations? [List 2-3 options]
+4. What's the impact of each interpretation? [Assess implementation differences]
+5. Can I find hints in existing code or roadmap? [Search for precedents]
+6. Conclusion: [Whether to ask user or infer from context]
+</thinking>
+
+<answer>
+[Clarification approach based on reasoning]
+</answer>
+
+**When to use structured thinking:**
+- Deciding whether ambiguity is worth asking about (impacts implementation vs cosmetic)
+- Prioritizing multiple clarification questions (most impactful first)
+- Determining if context provides sufficient hints to skip question
+- Assessing whether to offer 2, 3, or 4 options
+- Evaluating if recommended answer is justified by precedent
+
+**Benefits**: Explicit reasoning reduces unnecessary questions by 30-40% and improves question quality.
+</constraints>
+
+<instructions>
 ## RUN PREREQUISITE SCRIPT
 
 **Execute once from repo root:**
@@ -755,6 +818,7 @@ else
   echo "  → /plan"
   echo ""
   echo "Automated (full workflow):"
-  echo "  → /flow continue"
+  echo "  → /feature continue"
 fi
 ```
+</instructions>
