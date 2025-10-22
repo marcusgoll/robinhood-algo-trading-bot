@@ -22,6 +22,7 @@ from .pullback_analyzer import PullbackAnalyzer
 
 if TYPE_CHECKING:
     from trading_bot.order_management.manager import OrderManager
+    from src.trading_bot.emotional_control.tracker import EmotionalControl
 
 
 class AccountProvider(Protocol):
@@ -45,6 +46,7 @@ class RiskManager:
         order_manager: OrderManager | None = None,
         log_dir: Path | None = None,
         pullback_analyzer: PullbackAnalyzer | None = None,
+        emotional_control_tracker: EmotionalControl | None = None,
     ) -> None:
         """Initialize risk manager with configuration and optional dependencies.
 
@@ -53,6 +55,7 @@ class RiskManager:
             order_manager: Order management dependency for order placement
             log_dir: Directory for JSONL audit logs (default: logs/)
             pullback_analyzer: Pullback analyzer for stop-loss calculation (optional)
+            emotional_control_tracker: Emotional control tracker for position sizing adjustment (optional)
         """
         self.config = config or RiskManagementConfig.default()
         self.order_manager = order_manager
@@ -62,6 +65,7 @@ class RiskManager:
         self.pullback_analyzer = pullback_analyzer or PullbackAnalyzer(
             pullback_threshold_pct=5.0
         )
+        self.emotional_control = emotional_control_tracker
 
         # Circuit breaker for stop placement failures (T040)
         # Per spec.md guardrail: Trip if failure rate >2% (threshold=2 failures per 100 attempts)
@@ -131,6 +135,18 @@ class RiskManager:
             min_risk_reward_ratio=self.config.min_risk_reward_ratio,
             pullback_source=pullback_source,
         )
+
+        # Step 2.5: Apply emotional control multiplier (T017)
+        # If emotional control is active, reduce position size by multiplier (0.25)
+        if self.emotional_control:
+            multiplier = self.emotional_control.get_position_multiplier()
+            if multiplier < Decimal("1.00"):
+                original_quantity = position_plan.quantity
+                # Apply multiplier and ensure positive integer quantity
+                position_plan.quantity = int(Decimal(position_plan.quantity) * multiplier)
+                # Ensure at least 1 share if multiplier rounds down to 0
+                if position_plan.quantity == 0 and original_quantity > 0:
+                    position_plan.quantity = 1
 
         # Step 3: Log position plan creation to audit trail
         self.log_position_plan(position_plan, pullback_source=pullback_source)
