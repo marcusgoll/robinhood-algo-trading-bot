@@ -1,0 +1,42 @@
+feature:
+  slug: level-2-order-flow-i
+  title: Level 2 order flow integration
+  branch_name: feature/028-level-2-order-flow-i
+  created_at: 2025-10-22T00:00:00Z
+  updated_at: 2025-10-22T00:00:00Z
+
+deployment:
+  model: remote-direct
+
+workflow:
+  phase: initialize
+  status: in_progress
+  phases:
+    spec:
+      status: pending
+    clarify:
+      status: pending
+    plan:
+      status: pending
+    tasks:
+      status: pending
+    analyze:
+      status: pending
+    implement:
+      status: pending
+    optimize:
+      status: pending
+    preview:
+      status: pending
+    ship-prod:
+      status: pending
+    finalize:
+      status: pending
+
+artifacts:
+  spec: ""
+  plan: ""
+  tasks: ""
+  analysis: ""
+  optimization: ""
+  release_notes: ""
