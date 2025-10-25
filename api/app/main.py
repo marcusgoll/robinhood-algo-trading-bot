@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
 
-from .routes import orders, state
+from .routes import orders, state, config
 
 app = FastAPI(
     title="Trading Bot API",
@@ -58,6 +58,7 @@ app.add_middleware(
 # Include routers
 app.include_router(orders.router)
 app.include_router(state.router)
+app.include_router(config.router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health/healthz")

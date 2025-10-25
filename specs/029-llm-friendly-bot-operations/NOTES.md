@@ -173,12 +173,12 @@ The implementation builds on existing infrastructure (dashboard, logging, perfor
 
 **Implementation Roadmap - Remaining Work**:
 
-**Batch 8: US6 Config Management** (5 tasks - NOT STARTED)
-- T050: Create config schemas (BotConfigRequest, ValidationResult, ConfigDiff)
-- T051: Create config validator service (validate, diff, apply, rollback)
-- T052: Create config routes (GET, POST /validate, GET /diff, PUT /rollback)
-- T053: Create JSON schema for bot config
-- T055: Integration test for config validation and rollback
+**Batch 8: US6 Config Management** (5 tasks - COMPLETE)
+- ✅ T050: Create config schemas (BotConfigRequest, ValidationResult, ConfigDiff)
+- ✅ T051: Create config validator service (validate, diff, apply, rollback)
+- ✅ T052: Create config routes (GET, POST /validate, GET /diff, PUT /rollback)
+- ✅ T053: Create JSON schema for bot config
+- ✅ T055: Integration test for config validation and rollback
 
 **Batch 9: US8 Observability** (4 tasks - NOT STARTED)
 - T060: Create WebSocket connection manager

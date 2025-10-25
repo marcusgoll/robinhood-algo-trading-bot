@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Letter Page Mockup (MDX → Print CSS) v6</title>
+  <title>Letter Page Mockup (MDX → Print CSS) v7</title>
   <style>
     :root{
       --page-width: 8.5in;
@@ -70,12 +70,13 @@
       content: "";
       position: absolute;
       top: 0;
-      right: -10%;
+      right: -20%;
       height: 100%;
-      width: 45%;
+      width: 65%;
       background: var(--header-stripe-1);
       transform: skewX(-25deg);
-      opacity: 0.95;
+      opacity: 0.5;
+      z-index: 2;
     }
     .sheet .header::before{
       content: "";
@@ -87,16 +88,18 @@
       background: var(--header-stripe-2);
       transform: skewX(-25deg);
       opacity: 0.8;
+      z-index: 2;
     }
     .header-inner{
       position: relative;
       height: 100%;
+            
       padding: 0 var(--margin-right) 0 var(--margin-left);
       display: grid;
       grid-template-columns: 1fr auto;
       align-items: center;
       gap: 16px;
-      z-index: 1;
+      z-index: 3; /* above stripes */
     }
     .hdr-left{
       display: flex;
@@ -128,39 +131,80 @@
       opacity: .9;
     }
 
-    /* ===== CHAPTER HEADER: like page header, but taller and with photo on right ===== */
+    /* ===== CHAPTER HEADER: match slant to page header, but taller with photo on right ===== */
     .sheet.chapter .header{
       height: var(--chapter-header-height);
       background: var(--header-bg);
       color: #fff;
     }
-    /* remove small stripes on chapter header */
-    .sheet.chapter .header::before,
-    .sheet.chapter .header::after{ display: none; }
-    /* reuse header-inner layout */
-    .sheet.chapter .header .header-inner{
-      grid-template-columns: 1fr;
-      align-items: center;
+    /* Use the SAME slanted stripes as page header */
+    .sheet.chapter .header::after,
+    .sheet.chapter .header::before{
+      z-index: 2; /* ensure stripes sit above the photo */
+      display: block;
     }
-    .sheet.chapter .header .hdr-left .section{ font-size: 12.5pt; }
-    .sheet.chapter .header .hdr-left .title{ font-size: 12.5pt; }
-    /* photo wedge in the top-right */
+    /* Photo wedge in the same geometry as the big stripe */
     .sheet.chapter .hdr-photo{
       position: absolute;
-      top: 0; right: 0;
+      top: 0;
+      right: -10%;
       height: 100%;
-      width: 48%;
-      clip-path: polygon(55% 0, 100% 0, 100% 100%, 75% 100%);
-      z-index: 0;
+      width: 55%; /* a bit wider than stripe so it peeks under both */
+      transform: skewX(-25deg);
+      overflow: hidden;
+      z-index: 1; /* under the stripes */
+    }
+    .sheet.chapter .hdr-photo .img{
+      position: absolute; inset: 0;
+      transform: skewX(25deg); /* unskew image back */
+      transform-origin: right center;
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
       filter: grayscale(0.1) contrast(1.05);
     }
     .sheet.chapter .hdr-photo::after{
+      /* blue tint overlay */
       content: "";
       position: absolute; inset: 0;
-      background: rgba(37, 99, 235, .45);
+      background: rgba(37, 99, 235, .15);
+      pointer-events: none;
+    }
+    /* Chapter header text stack (two lines) */
+    .sheet.chapter .header .header-inner{
+      grid-template-columns: 1fr;
+      align-items: end;
+      padding-top: 0.1in;
+      padding-bottom: 0.1in;
+    }
+    .sheet.chapter .chapter-stack{
+      display: grid;
+      align-content: end;
+      gap: 8px;
+      z-index: 3;
+    }
+    .sheet.chapter .chapter-meta{
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      font-size: 11.5pt;
+      opacity: .95;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .sheet.chapter .chapter-rule{
+      height: 2px;
+      background: rgba(255,255,255,.85);
+      border: 0;
+      margin: 0;
+      width: 100%;
+    }
+    .sheet.chapter .chapter-title{
+      font-size: 24pt;
+      line-height: 1.12;
+      font-weight: 800;
+      margin: 0;
     }
 
     /* CONTENT/FOOTER */
@@ -300,6 +344,8 @@
   </div>
 
   <script>
+    const DEFAULT_CHAPTER_IMAGE = "https://images.unsplash.com/flagged/photo-1555685460-1d9cf532761b?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1973";
+
     const State = {
       header: { section: '4.15', title: 'CROSS-CONTROL STALL', logoUrl: null },
     };
@@ -344,25 +390,38 @@
     }
 
     function buildChapterHeader(container, meta){
-      // Photo wedge behind content on the right
+      // Photo wedge under stripes
       const photo = document.createElement('div');
       photo.className = 'hdr-photo';
-      const url = meta.image ||
-        'https://images.unsplash.com/flagged/photo-1555685460-1d9cf532761b?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1973';
-      photo.style.backgroundImage = `url("${url}")`;
+      const img = document.createElement('div');
+      img.className = 'img';
+      img.style.backgroundImage = `url("${meta.image || DEFAULT_CHAPTER_IMAGE}")`;
+      photo.appendChild(img);
       container.appendChild(photo);
 
-      // Text identical to the page header, but we omit the logo block
+      // Two-line chapter stack
       const inner = document.createElement('div');
       inner.className = 'header-inner';
-      const left = document.createElement('div');
-      left.className = 'hdr-left';
-      // Compose "CHAPTER / SECTION | TITLE"
+      const stack = document.createElement('div');
+      stack.className = 'chapter-stack';
+
+      const metaLine = document.createElement('div');
+      metaLine.className = 'chapter-meta';
       const chapter = meta.chapter ? `CHAPTER ${meta.chapter}` : '';
       const section = meta.section ? `SECTION ${meta.section}` : '';
-      const leftText = [chapter, section].filter(Boolean).join(' / ');
-      left.innerHTML = `<span class="section">${leftText}</span><span class="sep">|</span><span class="title">${meta.title || ''}</span>`;
-      inner.appendChild(left);
+      metaLine.textContent = [chapter, section].filter(Boolean).join(' / ');
+      stack.appendChild(metaLine);
+
+      const rule = document.createElement('div');
+      rule.className = 'chapter-rule';
+      stack.appendChild(rule);
+
+      const title = document.createElement('div');
+      title.className = 'chapter-title';
+      title.textContent = meta.title || '';
+      stack.appendChild(title);
+
+      inner.appendChild(stack);
       container.appendChild(inner);
     }
 
