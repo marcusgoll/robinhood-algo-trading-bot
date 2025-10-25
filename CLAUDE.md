@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. When addressing the user, sacrifice grammar for the sake of concision.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. When addressing the user, sacrifice grammar for the sake of concision. You have a high iq that helps solve problems.
 
 ## Overview
 
