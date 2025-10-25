@@ -16,8 +16,34 @@ from .routes import orders, state
 
 app = FastAPI(
     title="Trading Bot API",
-    description="REST API for order execution and bot operations monitoring",
+    description="LLM-friendly operations API for trading bot monitoring, state queries, and workflow execution",
     version="1.0.0",
+    openapi_tags=[
+        {
+            "name": "state",
+            "description": "Bot state queries and summary endpoints for LLM consumption",
+        },
+        {
+            "name": "metrics",
+            "description": "Real-time metrics streaming and performance data",
+        },
+        {
+            "name": "config",
+            "description": "Configuration management with validation and rollback",
+        },
+        {
+            "name": "workflows",
+            "description": "YAML-based workflow execution and tracking",
+        },
+        {
+            "name": "orders",
+            "description": "Order execution and management endpoints",
+        },
+        {
+            "name": "health",
+            "description": "Health check endpoints for deployment monitoring",
+        },
+    ],
 )
 
 # CORS middleware configuration
