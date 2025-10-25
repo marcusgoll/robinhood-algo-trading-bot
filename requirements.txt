@@ -36,7 +36,7 @@ backtrader==1.9.78.123
 
 # Utilities
 python-dateutil==2.8.2
-pytz==2024.1  # Timezone handling for trading hours (safety-checks)
+pytz==2025.2  # Timezone handling for trading hours (safety-checks)
 
 # Dashboard UI (status-dashboard)
 rich==13.7.0  # Terminal UI rendering
