@@ -193,10 +193,10 @@ The implementation builds on existing infrastructure (dashboard, logging, perfor
 - ✅ T073: Create YAML workflow definitions (restart-bot, update-targets, export-logs, check-health)
 - ✅ T075: Integration test for workflow execution
 
-**Batch 11: US5 NL Commands** (3 tasks - NOT STARTED)
-- T080: Create NL command CLI (extract_intent, route_to_api, format_response)
-- T081: Add CLI entry point in main.py
-- T083: Unit test for intent extraction
+**Batch 11: US5 NL Commands** (3 tasks - COMPLETE)
+- ✅ T080: Create NL command CLI (extract_intent, route_to_api, format_response)
+- ✅ T081: Add CLI entry point in main.py (integrated in nl_commands.py)
+- ✅ T083: Unit test for intent extraction
 
 **Batch 12: Polish & Deploy** (8 tasks - NOT STARTED)
 - T090: Register semantic error handler in main.py
