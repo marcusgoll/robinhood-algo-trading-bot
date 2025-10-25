@@ -16,8 +16,12 @@ import sys
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .trade_record import TradeRecord
+
+if TYPE_CHECKING:
+    from .semantic_error import SemanticError
 
 
 class StructuredTradeLogger:
@@ -183,3 +187,50 @@ class StructuredTradeLogger:
             # Graceful degradation: Log error to stderr but don't crash bot
             # This ensures bot continues operating even if disk is full or permissions denied
             print(f"ERROR: Failed to write trade log: {e}", file=sys.stderr)
+
+    def log_semantic_error(self, error: "SemanticError") -> None:
+        """Log a semantic error to daily JSONL file for LLM consumption.
+
+        Thread-safe operation similar to log_trade, but for semantic errors
+        with LLM-friendly fields (cause, impact, remediation).
+
+        Args:
+            error: SemanticError instance to log
+
+        Examples:
+            >>> from .semantic_error import SemanticError
+            >>> logger = StructuredTradeLogger()
+            >>> error = SemanticError(
+            ...     error_code="ERR_CIRCUIT_BREAKER",
+            ...     error_type="RiskControlError",
+            ...     message="Daily loss limit exceeded",
+            ...     cause="Circuit breaker triggered due to -5% daily loss",
+            ...     impact="Trading halted until manual reset",
+            ...     remediation="Review trading strategy and adjust risk limits",
+            ...     context={"daily_loss_pct": -5.2},
+            ... )
+            >>> logger.log_semantic_error(error)
+            >>> # Error written to: logs/errors/2025-01-09.jsonl
+        """
+        try:
+            # Get error log file path (separate from trade logs)
+            error_log_dir = self.log_dir / "errors"
+            today = datetime.now(UTC).strftime("%Y-%m-%d")
+            log_file = error_log_dir / f"{today}.jsonl"
+
+            # Thread-safe write with file locking
+            with self._lock:
+                # Create parent directories if needed
+                log_file.parent.mkdir(parents=True, exist_ok=True)
+
+                # Write to file with optimized buffering
+                with open(log_file, 'a', buffering=8192, encoding='utf-8') as f:
+                    # Serialize semantic error to JSONL format
+                    jsonl_line = error.to_jsonl()
+
+                    # Write line with newline
+                    f.write(jsonl_line + '\n')
+
+        except OSError as e:
+            # Graceful degradation: Log error to stderr but don't crash bot
+            print(f"ERROR: Failed to write error log: {e}", file=sys.stderr)
