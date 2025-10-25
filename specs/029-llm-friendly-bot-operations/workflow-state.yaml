@@ -1,0 +1,55 @@
+feature:
+  slug: llm-friendly-bot-operations
+  title: "LLM-Friendly Bot Operations and Monitoring"
+  branch_name: feature/029-llm-friendly-bot-operations
+  github_issue: 34
+  created: "2025-10-24T00:00:00Z"
+  updated: "2025-10-24T00:00:00Z"
+
+deployment:
+  model: remote-direct
+  
+workflow:
+  phase: spec-flow
+  status: in_progress
+  phases:
+    spec-flow:
+      status: in_progress
+      started: "2025-10-24T00:00:00Z"
+    clarify:
+      status: not_started
+    plan:
+      status: not_started
+    tasks:
+      status: not_started
+    analyze:
+      status: not_started
+    implement:
+      status: not_started
+    optimize:
+      status: not_started
+    preview:
+      status: not_started
+    ship-prod:
+      status: not_started
+    finalize:
+      status: not_started
+
+manual_gates:
+  preview:
+    required: true
+    approved: false
+
+quality_gates:
+  pre-flight:
+    passed: false
+  code_review:
+    passed: false
+
+artifacts:
+  spec: ""
+  plan: ""
+  tasks: ""
+  analysis: ""
+  optimization: ""
+  ship_report: ""
