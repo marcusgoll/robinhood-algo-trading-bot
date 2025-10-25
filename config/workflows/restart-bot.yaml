@@ -1,0 +1,44 @@
+id: restart-bot
+name: Restart Bot Workflow
+description: Gracefully restart trading bot with pre and post checks
+
+steps:
+  - id: pre_check_health
+    description: Check bot health before restart
+    action_type: api_call
+    parameters:
+      endpoint: /api/v1/health/healthz
+      method: GET
+
+  - id: close_positions
+    description: Ensure no open positions before restart (stub)
+    action_type: validation
+    parameters:
+      message: Verify all positions are closed
+
+  - id: stop_bot
+    description: Send stop signal to bot
+    action_type: command
+    parameters:
+      cmd: echo "Stopping bot (stub - would send SIGTERM)"
+
+  - id: wait_shutdown
+    description: Wait for graceful shutdown
+    action_type: sleep
+    parameters:
+      duration: 5
+
+  - id: start_bot
+    description: Start bot process
+    action_type: command
+    parameters:
+      cmd: echo "Starting bot (stub - would exec bot process)"
+
+  - id: post_check_health
+    description: Verify bot health after restart
+    action_type: api_call
+    parameters:
+      endpoint: /api/v1/health/healthz
+      method: GET
+    validation:
+      expected_status: healthy

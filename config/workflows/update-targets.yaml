@@ -1,0 +1,45 @@
+id: update-targets
+name: Update Trading Targets Workflow
+description: Update trading targets based on market conditions
+
+steps:
+  - id: fetch_current_config
+    description: Get current bot configuration
+    action_type: api_call
+    parameters:
+      endpoint: /api/v1/config
+      method: GET
+
+  - id: analyze_performance
+    description: Analyze recent trading performance
+    action_type: api_call
+    parameters:
+      endpoint: /api/v1/metrics
+      method: GET
+
+  - id: calculate_new_targets
+    description: Calculate new risk/position targets (stub)
+    action_type: validation
+    parameters:
+      message: Calculate new targets based on performance
+
+  - id: validate_new_config
+    description: Validate proposed configuration changes
+    action_type: api_call
+    parameters:
+      endpoint: /api/v1/config/validate
+      method: POST
+
+  - id: apply_config
+    description: Apply new configuration
+    action_type: api_call
+    parameters:
+      endpoint: /api/v1/config
+      method: PUT
+
+  - id: verify_changes
+    description: Verify configuration was applied
+    action_type: api_call
+    parameters:
+      endpoint: /api/v1/config
+      method: GET

@@ -1,0 +1,34 @@
+id: export-logs
+name: Export Logs Workflow
+description: Export trading logs for analysis
+
+steps:
+  - id: check_log_directory
+    description: Verify logs directory exists
+    action_type: validation
+    parameters:
+      message: Check logs directory at logs/
+
+  - id: compress_logs
+    description: Compress log files
+    action_type: command
+    parameters:
+      cmd: echo "Compressing logs (stub - would tar logs/)"
+
+  - id: upload_to_storage
+    description: Upload compressed logs to storage
+    action_type: command
+    parameters:
+      cmd: echo "Uploading to storage (stub - would use S3/GCS)"
+
+  - id: cleanup_old_logs
+    description: Remove logs older than 30 days
+    action_type: command
+    parameters:
+      cmd: echo "Cleaning old logs (stub - would remove old files)"
+
+  - id: log_export_complete
+    description: Log export completion
+    action_type: validation
+    parameters:
+      message: Log export completed successfully

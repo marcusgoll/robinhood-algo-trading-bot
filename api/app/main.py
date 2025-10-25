@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
 
-from .routes import orders, state, config, metrics
+from .routes import orders, state, config, metrics, workflows
 from .core.websocket import manager as ws_manager
 from .services.state_aggregator import StateAggregator
 
@@ -118,6 +118,7 @@ app.include_router(orders.router)
 app.include_router(state.router)
 app.include_router(config.router, prefix="/api/v1")
 app.include_router(metrics.router, prefix="/api/v1")
+app.include_router(workflows.router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health/healthz")

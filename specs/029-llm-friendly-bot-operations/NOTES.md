@@ -186,12 +186,12 @@ The implementation builds on existing infrastructure (dashboard, logging, perfor
 - ✅ T062: Add WebSocket broadcast loop in main.py
 - ✅ T064: Integration test for WebSocket streaming
 
-**Batch 10: US7 Workflows** (5 tasks - NOT STARTED)
-- T070: Create workflow schemas (WorkflowListResponse, WorkflowExecutionRequest, etc.)
-- T071: Create workflow executor service (load, execute, get_status)
-- T072: Create workflow routes (GET /workflows, POST /{id}/execute, GET /{id}/status)
-- T073: Create YAML workflow definitions (restart-bot, update-targets, export-logs, check-health)
-- T075: Integration test for workflow execution
+**Batch 10: US7 Workflows** (5 tasks - COMPLETE)
+- ✅ T070: Create workflow schemas (WorkflowListResponse, WorkflowExecutionRequest, etc.)
+- ✅ T071: Create workflow executor service (load, execute, get_status)
+- ✅ T072: Create workflow routes (GET /workflows, POST /{id}/execute, GET /{id}/status)
+- ✅ T073: Create YAML workflow definitions (restart-bot, update-targets, export-logs, check-health)
+- ✅ T075: Integration test for workflow execution
 
 **Batch 11: US5 NL Commands** (3 tasks - NOT STARTED)
 - T080: Create NL command CLI (extract_intent, route_to_api, format_response)
