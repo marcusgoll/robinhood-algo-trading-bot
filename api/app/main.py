@@ -104,7 +104,8 @@ app = FastAPI(
     ],
 )
 
-# CORS middleware configuration
+# Middleware configuration
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # TODO: Configure for production
@@ -112,6 +113,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Rate limiting (100 requests/minute per token)
+from .middleware.rate_limiter import RateLimiter
+app.add_middleware(RateLimiter, requests_per_minute=100)
 
 # Include routers
 app.include_router(orders.router)

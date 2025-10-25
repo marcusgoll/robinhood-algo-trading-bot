@@ -75,7 +75,7 @@
       width: 45%;
       background: var(--header-stripe-1);
       transform: skewX(-25deg);
-      opacity: 0.5;
+      opacity: 0.3;
       z-index: 2;
     }
     .sheet .header::before{
@@ -87,7 +87,7 @@
       width: 52%;
       background: var(--header-stripe-2);
       transform: skewX(-25deg);
-      opacity: 0.8;
+      opacity: 0.2;
       z-index: 2;
     }
     .header-inner{
@@ -149,14 +149,14 @@
       top: 0;
       right: -10%;
       height: 100%;
-      width: 5%; /* a bit wider than stripe so it peeks under both */
-      transform: skewX(-25deg);
+      width: 45%; /* a bit wider than stripe so it peeks under both */
+      
       overflow: hidden;
       z-index: 1; /* under the stripes */
     }
     .sheet.chapter .hdr-photo .img{
       position: absolute; inset: 0;
-      transform: skewX(25deg); /* unskew image back */
+       /* unskew image back */
       transform-origin: right center;
       background-size: cover;
       background-position: center;
