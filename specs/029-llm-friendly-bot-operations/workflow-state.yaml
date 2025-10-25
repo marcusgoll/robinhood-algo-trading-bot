@@ -34,8 +34,24 @@ workflow:
     implement:
       status: in_progress
       started: "2025-10-24T00:26:00Z"
+      summary: "16/47 tasks completed (34%) - MVP core infrastructure delivered (US1-US3)"
+      stats:
+        total_tasks: 47
+        completed_tasks: 16
+        batches_executed: 5
+        batches_total: 12
+        commits_created: 5
+        files_changed: 29
+    debug:
+      status: completed
+      started: "2025-10-24T01:30:00Z"
+      completed: "2025-10-24T02:00:00Z"
+      notes: "Fixed 3 critical contract violations (commit 6d3b5dd)"
     optimize:
-      status: not_started
+      status: completed
+      started: "2025-10-24T01:00:00Z"
+      completed: "2025-10-24T02:30:00Z"
+      notes: "Validation run - contract compliance 100% (5/5 endpoints)"
     preview:
       status: not_started
     ship-prod:
@@ -52,12 +68,16 @@ quality_gates:
   pre-flight:
     passed: false
   code_review:
-    passed: false
+    passed: true
+    completed: "2025-10-24T02:30:00Z"
+    notes: "Contract compliance 100% after /debug fixes"
 
 artifacts:
   spec: "specs/029-llm-friendly-bot-operations/spec.md"
   plan: "specs/029-llm-friendly-bot-operations/plan.md"
   tasks: "specs/029-llm-friendly-bot-operations/tasks.md"
   analysis: "specs/029-llm-friendly-bot-operations/analysis-report.md"
-  optimization: ""
+  optimization: "specs/029-llm-friendly-bot-operations/optimization-report.md"
+  code_review: "specs/029-llm-friendly-bot-operations/code-review.md"
+  error_log: "specs/029-llm-friendly-bot-operations/error-log.md"
   ship_report: ""

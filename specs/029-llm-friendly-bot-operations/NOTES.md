@@ -145,12 +145,23 @@ The implementation builds on existing infrastructure (dashboard, logging, perfor
 - T020: Extend structured logger with log_semantic_error method
 - T021: Create semantic error handler middleware in api/app/middleware/semantic_error_handler.py
 
+**Batch 5: OpenAPI Metadata** (Complete - Commit ecb7106)
+- T030: Add OpenAPI tags and enhanced description
+- T031: Schema examples (already present in all models)
+- T033: OpenAPI smoke tests (6 tests, all passing <1s)
+
+**Batch 6: US4 Summary Endpoint** (Complete)
+- T040: BotSummaryResponse schema created (already in state.py)
+- T041: GET /summary endpoint implemented (already in state.py routes)
+- T043: Unit test for summary size validation (<10KB) - 8 tests, all passing
+- Fixes: Field name typo (positions_count → position_count), added missing data_age_seconds and warnings fields
+
 **Implementation Progress Summary**:
-- Completed: 13 tasks across 4 batches (MVP core infrastructure)
-- Remaining: 34 tasks across 8 batches (enhancements, tests, polish)
-- Files created: 6 new files (schemas, services, routes, middleware, logging)
-- Files modified: 5 files (requirements.txt, .env.example, auth.py, main.py, structured_logger.py)
-- Commits: 3 (batches 1-2, batch 3, batch 4)
+- Completed: 19 tasks across 6 batches (MVP core + OpenAPI docs + Summary endpoint)
+- Remaining: 28 tasks across 6 batches (critical tests, enhancements, polish)
+- Files created: 8 new files (schemas, services, routes, middleware, logging, unit tests)
+- Files modified: 7 files (requirements.txt, .env.example, auth.py, main.py, structured_logger.py, state.py, state_aggregator.py)
+- Commits: 5 (batches 1-2, batch 3, batch 4, batch 5, batch 6)
 
 ## Phase 2: Tasks (2025-10-24)
 

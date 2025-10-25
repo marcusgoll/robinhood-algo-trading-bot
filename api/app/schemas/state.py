@@ -213,7 +213,7 @@ class BotSummaryResponse(BaseModel):
         json_schema_extra={
             "example": {
                 "health_status": "healthy",
-                "positions_count": 1,
+                "position_count": 1,
                 "open_orders_count": 0,
                 "daily_pnl": "550.00",
                 "circuit_breaker_status": "inactive",

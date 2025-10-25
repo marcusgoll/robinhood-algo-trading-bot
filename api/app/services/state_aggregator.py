@@ -80,11 +80,13 @@ class StateAggregator:
         """
         # TODO: Integrate with actual health monitor
         # For now, return mock data
+        now = datetime.now(timezone.utc)
         return HealthStatus(
             status="healthy",
             circuit_breaker_active=False,
             api_connected=True,
-            last_trade_timestamp=datetime.now(timezone.utc),
+            last_trade_timestamp=now,
+            last_heartbeat=now,
             error_count_last_hour=0,
         )
 
@@ -98,7 +100,7 @@ class StateAggregator:
         Example:
             >>> aggregator = StateAggregator()
             >>> summary = await aggregator.get_summary()
-            >>> summary.positions_count
+            >>> summary.position_count
             2
         """
         # Get full state (will use cache if valid)
@@ -114,7 +116,7 @@ class StateAggregator:
 
         return BotSummaryResponse(
             health_status=state.health.status,
-            positions_count=len(state.positions),
+            position_count=len(state.positions),
             open_orders_count=len(state.orders),
             daily_pnl=daily_pnl,
             circuit_breaker_status=(
@@ -204,6 +206,12 @@ class StateAggregator:
             "paper_trading": os.getenv("PAPER_TRADING", "true").lower() == "true",
         }
 
+        now = datetime.now(timezone.utc)
+        data_collection_time = (
+            self._cache_timestamp if self._is_cache_valid() else now
+        )
+        data_age = (now - data_collection_time).total_seconds() if data_collection_time else 0.0
+
         return BotStateResponse(
             positions=positions,
             orders=[],  # TODO: Integrate with order repository
@@ -212,5 +220,7 @@ class StateAggregator:
             performance=performance,
             config_summary=config_summary,
             market_status="OPEN",  # TODO: Integrate with market data
-            timestamp=datetime.now(timezone.utc),
+            timestamp=now,
+            data_age_seconds=data_age,
+            warnings=[],  # TODO: Integrate with alert system
         )

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Letter Page Mockup (MDX → Print CSS) v3</title>
+  <title>Letter Page Mockup (MDX → Print CSS) v6</title>
   <style>
     :root{
       --page-width: 8.5in;
@@ -13,8 +13,13 @@
       --margin-bottom: 0.75in;
       --margin-left: 0.7in;
 
-      --header-height: 0.5in;
-      --header-bg: #2563eb; /* blue */
+      --header-height: 0.55in;          /* normal page header */
+      --chapter-header-height: 1.3in;    /* taller chapter header */
+      --footer-height: 0.35in;
+
+      --header-bg: #2f6fbe;
+      --header-stripe-1: #3b82f6;
+      --header-stripe-2: #93c5fd;
 
       --text-color: #111827;
       --muted: #6b7280;
@@ -51,87 +56,167 @@
       box-shadow: var(--sheet-shadow);
       overflow: hidden;
     }
+
+    /* ===== Normal PAGE HEADER ===== */
     .sheet .header{
       position: absolute;
-      left: 0;
-      right: 0;
-      top: 0;
+      left: 0; right: 0; top: 0;
       height: var(--header-height);
       background: var(--header-bg);
       color: #fff;
+      overflow: hidden;
     }
-    .sheet .page-num{
+    .sheet .header::after{
+      content: "";
       position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 10.5pt;
-      font-weight: 600;
-      opacity: .95;
+      top: 0;
+      right: -10%;
+      height: 100%;
+      width: 45%;
+      background: var(--header-stripe-1);
+      transform: skewX(-25deg);
+      opacity: 0.95;
     }
-    /* alignments based on sheet parity */
-    .sheet.odd  .page-num{ right: var(--margin-right); left: auto; text-align: right; }
-    .sheet.even .page-num{ left: var(--margin-left);  right: auto; text-align: left;  }
+    .sheet .header::before{
+      content: "";
+      position: absolute;
+      top: 0;
+      right: -18%;
+      height: 100%;
+      width: 32%;
+      background: var(--header-stripe-2);
+      transform: skewX(-25deg);
+      opacity: 0.8;
+    }
+    .header-inner{
+      position: relative;
+      height: 100%;
+      padding: 0 var(--margin-right) 0 var(--margin-left);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 16px;
+      z-index: 1;
+    }
+    .hdr-left{
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      letter-spacing: .03em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hdr-left .section{ font-weight: 700; font-size: 11.5pt; opacity: .95; }
+    .hdr-left .sep{ opacity: .6; }
+    .hdr-left .title{ font-weight: 600; font-size: 11.5pt; text-transform: uppercase; }
+    .hdr-right .logo{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 4px;
+      padding: 4px 8px;
+      height: calc(var(--header-height) - 0.18in);
+    }
+    .hdr-right .logo .placeholder{
+      width: 1.2in; height: 100%;
+      display: grid; place-items: center;
+      font-weight: 700; font-size: 10pt;
+      color: #fff;
+      opacity: .9;
+    }
 
+    /* ===== CHAPTER HEADER: like page header, but taller and with photo on right ===== */
+    .sheet.chapter .header{
+      height: var(--chapter-header-height);
+      background: var(--header-bg);
+      color: #fff;
+    }
+    /* remove small stripes on chapter header */
+    .sheet.chapter .header::before,
+    .sheet.chapter .header::after{ display: none; }
+    /* reuse header-inner layout */
+    .sheet.chapter .header .header-inner{
+      grid-template-columns: 1fr;
+      align-items: center;
+    }
+    .sheet.chapter .header .hdr-left .section{ font-size: 12.5pt; }
+    .sheet.chapter .header .hdr-left .title{ font-size: 12.5pt; }
+    /* photo wedge in the top-right */
+    .sheet.chapter .hdr-photo{
+      position: absolute;
+      top: 0; right: 0;
+      height: 100%;
+      width: 48%;
+      clip-path: polygon(55% 0, 100% 0, 100% 100%, 75% 100%);
+      z-index: 0;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      filter: grayscale(0.1) contrast(1.05);
+    }
+    .sheet.chapter .hdr-photo::after{
+      content: "";
+      position: absolute; inset: 0;
+      background: rgba(37, 99, 235, .45);
+    }
+
+    /* CONTENT/FOOTER */
     .sheet .content{
       position: absolute;
       top: calc(var(--margin-top) + var(--header-height));
       left: var(--margin-left);
       width: calc(var(--page-width) - var(--margin-left) - var(--margin-right));
-      height: calc(var(--page-height) - var(--margin-top) - var(--margin-bottom) - var(--header-height));
+      height: calc(var(--page-height) - var(--margin-top) - var(--margin-bottom) - var(--header-height) - var(--footer-height));
       overflow: hidden;
     }
-    .sheet canvas.guides{
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
+    .sheet.chapter .content{
+      top: calc(var(--margin-top) + var(--chapter-header-height));
+      height: calc(var(--page-height) - var(--margin-top) - var(--margin-bottom) - var(--chapter-header-height) - var(--footer-height));
     }
-    .counter{ display: none; } /* moved to header */
+
+    .sheet .footer{
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: var(--footer-height);
+      background: transparent;
+      color: var(--muted);
+      font-size: 10.5pt;
+    }
+    .sheet .footer .page-num{
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-variant-numeric: tabular-nums;
+    }
+    .sheet.odd  .footer .page-num{ right: var(--margin-right); text-align: right; }
+    .sheet.even .footer .page-num{ left: var(--margin-left);  text-align: left;  }
+
+    /* Guides */
+    .sheet canvas.guides{ position: absolute; inset: 0; pointer-events: none; }
+    .counter{ display: none; }
 
     /* Typography */
-    .content h1, .content h2, .content h3, .content h4{
-      line-height: 1.2;
-      margin: 0 0 0.3rem;
-    }
+    .content h1, .content h2, .content h3, .content h4{ line-height: 1.2; margin: 0 0 0.3rem; }
     .content h1{ font-size: 20pt; }
     .content h2{ font-size: 16pt; }
     .content h3{ font-size: 13.5pt; }
     .content p{ margin: 0 0 0.5rem; }
     .content small{ color: var(--muted); }
-    .content ul, .content ol{
-      margin: 0 0 0.5rem 1.2rem;
-      padding: 0;
-    }
-    .content table{
-      width: 100%;
-      border-collapse: collapse;
-      margin: 0 0 0.5rem;
-      font-size: 11pt;
-    }
-    .content th, .content td{
-      border: 1px solid #e5e7eb;
-      padding: 6px 8px;
-      vertical-align: top;
-    }
-    .content img, .content svg, .content canvas{
-      max-width: 100%;
-      height: auto;
-      display: block;
-      margin: 0.25rem 0;
-    }
+    .content ul, .content ol{ margin: 0 0 0.5rem 1.2rem; padding: 0; }
+    .content table{ width: 100%; border-collapse: collapse; margin: 0 0 0.5rem; font-size: 11pt; }
+    .content th, .content td{ border: 1px solid #e5e7eb; padding: 6px 8px; vertical-align: top; }
+    .content img, .content svg, .content canvas{ max-width: 100%; height: auto; display: block; margin: 0.25rem 0; }
     .content h1, .content h2, .content h3,
     .content table, .content pre, .content blockquote,
-    .content img, .content ul, .content ol, .content figure{
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
+    .content img, .content ul, .content ol, .content figure{ break-inside: avoid; page-break-inside: avoid; }
     .page-break{ break-before: page; page-break-before: always; }
     .autoscale{ transform-origin: top left; display: inline-block; }
 
     /* PRINT */
-    @page{
-      size: 8.5in 11in;
-      margin: 0;
-    }
+    @page{ size: 8.5in 11in; margin: 0; }
     @media print{
       body{ background: #fff; }
       #viewer{ display: block; padding: 0; }
@@ -143,13 +228,23 @@
         page-break-after: always;
         margin: 0;
       }
-      /* Let content use padding so browsers honor page area exactly */
       .sheet .content{
         position: static;
         width: auto;
         height: auto;
         overflow: visible;
-        padding: calc(var(--margin-top) + var(--header-height)) var(--margin-right) var(--margin-bottom) var(--margin-left);
+        padding:
+          calc(var(--margin-top) + var(--header-height))
+          var(--margin-right)
+          calc(var(--margin-bottom) + var(--footer-height))
+          var(--margin-left);
+      }
+      .sheet.chapter .content{
+        padding:
+          calc(var(--margin-top) + var(--chapter-header-height))
+          var(--margin-right)
+          calc(var(--margin-bottom) + var(--footer-height))
+          var(--margin-left);
       }
       .sheet canvas.guides{ display: none !important; }
       .autoscale{ transform: none !important; }
@@ -162,11 +257,17 @@
 <body>
   <div id="viewer"></div>
 
+  <!-- Demo source with a chapter-start marker -->
   <div id="source" style="display:none">
-    <h1>Sample Title</h1>
-    <p>This is placeholder content. Replace #source with your compiled MDX HTML.</p>
-    <p>The engine paginates into fixed letter-size sheets with strict margins and no overflow.</p>
-    <h2>Bulleted List</h2>
+    <div
+      class="chapter-start"
+      data-chapter="4"
+      data-section="15"
+      data-title="Cross-Control Stall"
+      data-image="https://images.unsplash.com/flagged/photo-1555685460-1d9cf532761b?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1973"
+    ></div>
+    <p>This is placeholder content under the chapter header.</p>
+    <p>Below is normal content continuing on this and subsequent pages.</p>
     <ul>
       <li>Exact page size: 8.5in × 11in.</li>
       <li>Safe printable margins set via CSS variables.</li>
@@ -199,6 +300,10 @@
   </div>
 
   <script>
+    const State = {
+      header: { section: '4.15', title: 'CROSS-CONTROL STALL', logoUrl: null },
+    };
+
     function cssPixelsPerInch(){
       const probe = document.createElement('div');
       probe.style.width = '1in';
@@ -209,7 +314,6 @@
       document.body.removeChild(probe);
       return ppi || 96;
     }
-
     function readInches(v){
       if(!v) return 0;
       if(v.endsWith('in')) return parseFloat(v);
@@ -217,42 +321,90 @@
       return parseFloat(v);
     }
 
-    function getHeaderHeightInches(){
-      const cs = getComputedStyle(document.documentElement);
-      return readInches(cs.getPropertyValue('--header-height').trim());
+    function buildRegularHeader(container){
+      const inner = document.createElement('div');
+      inner.className = 'header-inner';
+      const left = document.createElement('div');
+      left.className = 'hdr-left';
+      left.innerHTML = '<span class="section"></span><span class="sep">|</span><span class="title"></span>';
+      inner.appendChild(left);
+      const right = document.createElement('div');
+      right.className = 'hdr-right';
+      const logo = document.createElement('div');
+      logo.className = 'logo';
+      const ph = document.createElement('div');
+      ph.className = 'placeholder';
+      ph.textContent = 'LOGO';
+      logo.appendChild(ph);
+      right.appendChild(logo);
+      inner.appendChild(right);
+      container.appendChild(inner);
+      left.querySelector('.section').textContent = State.header.section || '';
+      left.querySelector('.title').textContent = State.header.title || '';
     }
 
-    function newSheet(){
+    function buildChapterHeader(container, meta){
+      // Photo wedge behind content on the right
+      const photo = document.createElement('div');
+      photo.className = 'hdr-photo';
+      const url = meta.image ||
+        'https://images.unsplash.com/flagged/photo-1555685460-1d9cf532761b?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1973';
+      photo.style.backgroundImage = `url("${url}")`;
+      container.appendChild(photo);
+
+      // Text identical to the page header, but we omit the logo block
+      const inner = document.createElement('div');
+      inner.className = 'header-inner';
+      const left = document.createElement('div');
+      left.className = 'hdr-left';
+      // Compose "CHAPTER / SECTION | TITLE"
+      const chapter = meta.chapter ? `CHAPTER ${meta.chapter}` : '';
+      const section = meta.section ? `SECTION ${meta.section}` : '';
+      const leftText = [chapter, section].filter(Boolean).join(' / ');
+      left.innerHTML = `<span class="section">${leftText}</span><span class="sep">|</span><span class="title">${meta.title || ''}</span>`;
+      inner.appendChild(left);
+      container.appendChild(inner);
+    }
+
+    function newSheet(variant='page', meta=null){
       const sheet = document.createElement('div');
       sheet.className = 'sheet';
+      if(variant === 'chapter') sheet.classList.add('chapter');
 
       const header = document.createElement('div');
       header.className = 'header';
-      const pnum = document.createElement('div');
-      pnum.className = 'page-num';
-      header.appendChild(pnum);
+      if(variant === 'chapter'){
+        buildChapterHeader(header, meta || {});
+      } else {
+        buildRegularHeader(header);
+      }
 
       const canvas = document.createElement('canvas');
       canvas.className = 'guides';
+
       const content = document.createElement('div');
       content.className = 'content';
 
-      const counter = document.createElement('div');
-      counter.className = 'counter';
+      const footer = document.createElement('div');
+      footer.className = 'footer';
+      const pnum = document.createElement('div');
+      pnum.className = 'page-num';
+      footer.appendChild(pnum);
 
       sheet.appendChild(header);
       sheet.appendChild(canvas);
       sheet.appendChild(content);
-      sheet.appendChild(counter);
+      sheet.appendChild(footer);
       document.getElementById('viewer').appendChild(sheet);
+
       drawGuides(sheet);
       return sheet;
     }
 
     function drawGuides(sheet){
       const canvas = sheet.querySelector('canvas.guides');
-      const cs = getComputedStyle(document.documentElement);
       const ppi = cssPixelsPerInch();
+      const cs = getComputedStyle(document.documentElement);
 
       const pageW_in = readInches(cs.getPropertyValue('--page-width').trim());
       const pageH_in = readInches(cs.getPropertyValue('--page-height').trim());
@@ -260,7 +412,11 @@
       const mRight_in = readInches(cs.getPropertyValue('--margin-right').trim());
       const mBottom_in = readInches(cs.getPropertyValue('--margin-bottom').trim());
       const mLeft_in = readInches(cs.getPropertyValue('--margin-left').trim());
-      const header_in = getHeaderHeightInches();
+
+      const header_px = sheet.querySelector('.header').getBoundingClientRect().height;
+      const footer_px = sheet.querySelector('.footer').getBoundingClientRect().height;
+      const header_in = header_px / ppi;
+      const footer_in = footer_px / ppi;
 
       const W = Math.round(pageW_in * ppi);
       const H = Math.round(pageH_in * ppi);
@@ -270,28 +426,24 @@
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0,0,W,H);
 
-      // Page border
       ctx.strokeStyle = '#d1d5db';
       ctx.lineWidth = 1;
       ctx.strokeRect(0.5, 0.5, W-1, H-1);
 
-      // Margin/content box (starts below header)
       const mx = Math.round(mLeft_in * ppi);
       const my = Math.round((mTop_in + header_in) * ppi);
       const mw = Math.round((pageW_in - mLeft_in - mRight_in) * ppi);
-      const mh = Math.round((pageH_in - (mTop_in + header_in) - mBottom_in) * ppi);
+      const mh = Math.round((pageH_in - (mTop_in + header_in) - (mBottom_in + footer_in)) * ppi);
 
       ctx.strokeStyle = '#9ca3af';
       ctx.setLineDash([5,4]);
       ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
       ctx.setLineDash([]);
 
-      // Crop marks
       const cropLen = Math.round(0.2 * ppi);
       ctx.strokeStyle = '#cbd5e1';
       ctx.lineWidth = 1;
 
-      // top-left
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(cropLen, 0);
@@ -299,7 +451,6 @@
       ctx.lineTo(0, cropLen);
       ctx.stroke();
 
-      // top-right
       ctx.beginPath();
       ctx.moveTo(W, 0);
       ctx.lineTo(W - cropLen, 0);
@@ -307,7 +458,6 @@
       ctx.lineTo(W, cropLen);
       ctx.stroke();
 
-      // bottom-left
       ctx.beginPath();
       ctx.moveTo(0, H);
       ctx.lineTo(cropLen, H);
@@ -315,7 +465,6 @@
       ctx.lineTo(0, H - cropLen);
       ctx.stroke();
 
-      // bottom-right
       ctx.beginPath();
       ctx.moveTo(W, H);
       ctx.lineTo(W - cropLen, H);
@@ -323,7 +472,6 @@
       ctx.lineTo(W, H - cropLen);
       ctx.stroke();
 
-      // Baseline grid (optional)
       const leading_in = 14 / 72;
       const step = leading_in * ppi;
       ctx.strokeStyle = 'rgba(148,163,184,0.2)';
@@ -343,52 +491,60 @@
       const nodes = Array.from(src.childNodes);
       src.innerHTML = '';
 
-      let sheet = newSheet();
+      let sheet = newSheet('page');
       let content = sheet.querySelector('.content');
 
       const fits = () => content.scrollHeight <= content.clientHeight + 0.5;
       const isIgnorable = (n) =>
         (n.nodeType === 3 && !/\S/.test(n.nodeValue)) || (n.nodeType === 8);
 
-      function placeOnNewPage(node){
-        sheet = newSheet();
+      function placeOnNewPage(node, variant='page', meta=null){
+        sheet = newSheet(variant, meta);
         content = sheet.querySelector('.content');
-        content.appendChild(node);
-        if(content.scrollHeight > content.clientHeight + 0.5){
-          const scale = content.clientHeight / content.scrollHeight;
-          node.classList.add('autoscale');
-          node.style.transform = `scale(${Math.max(0.01, scale - 0.01)})`;
-          node.style.width = '100%';
+        if(node){
+          content.appendChild(node);
+          if(content.scrollHeight > content.clientHeight + 0.5){
+            const scale = content.clientHeight / content.scrollHeight;
+            node.classList.add('autoscale');
+            node.style.transform = `scale(${Math.max(0.01, scale - 0.01)})`;
+            node.style.width = '100%';
+          }
         }
       }
 
       for(const node of nodes){
         if(isIgnorable(node)) continue;
 
+        if(node.nodeType === 1 && node.classList.contains('chapter-start')){
+          const meta = {
+            chapter: node.getAttribute('data-chapter') || '',
+            section: node.getAttribute('data-section') || '',
+            title:   node.getAttribute('data-title')   || '',
+            image:   node.getAttribute('data-image')   || '',
+          };
+          placeOnNewPage(null, 'chapter', meta);
+          continue;
+        }
+
         if(node.nodeType === 1 && node.classList.contains('page-break')){
-          if(content.childNodes.length > 0){
-            sheet = newSheet();
-            content = sheet.querySelector('.content');
-          }
+          placeOnNewPage(null, 'page', null);
           continue;
         }
 
         content.appendChild(node);
-
         if(!fits()){
           content.removeChild(node);
-          placeOnNewPage(node);
+          placeOnNewPage(node, 'page', null);
         }
       }
 
-      // Set page numbers and alternate alignment
       const pages = Array.from(document.querySelectorAll('.sheet'));
       pages.forEach((s, i) => {
         const n = i + 1;
-        s.classList.remove('odd', 'even');
-        s.classList.add(n % 2 === 1 ? 'odd' : 'even');
-        const el = s.querySelector('.page-num');
-        if(el) el.textContent = String(n);
+        s.classList.toggle('odd', n % 2 === 1);
+        s.classList.toggle('even', n % 2 === 0);
+        const p = s.querySelector('.footer .page-num');
+        if(p) p.textContent = String(n);
       });
     }
 
@@ -399,18 +555,14 @@
     function exitPrint(){ document.documentElement.classList.remove('print-mode'); paginate(); }
     if('onbeforeprint' in window){
       window.onbeforeprint = enterPrint;
-      window.onafterprint = exitPrint;
+      window.onafterprint  = exitPrint;
     }else{
       const mql = window.matchMedia('print');
       mql.addEventListener('change', e => { if(e.matches) enterPrint(); else exitPrint(); });
     }
 
-    // Public API
     window.Mockup = {
-      setHTML(html){
-        const src = document.getElementById('source');
-        src.innerHTML = html;
-      },
+      setHTML(html){ document.getElementById('source').innerHTML = html; },
       render: paginate,
       setMargins({top, right, bottom, left}){
         const root = document.documentElement;
@@ -424,17 +576,27 @@
         document.documentElement.style.setProperty('--base-font', pt + 'pt');
         paginate();
       },
-      setHeader({height, bg}){
+      setHeader({height, bg, stripe1, stripe2}){
         const root = document.documentElement;
         if(height) root.style.setProperty('--header-height', height);
         if(bg) root.style.setProperty('--header-bg', bg);
+        if(stripe1) root.style.setProperty('--header-stripe-1', stripe1);
+        if(stripe2) root.style.setProperty('--header-stripe-2', stripe2);
         paginate();
       },
-      hideGuides(state=true){
-        document.body.classList.toggle('hide-guides', state);
+      setChapterHeaderHeight(h){ document.documentElement.style.setProperty('--chapter-header-height', h); paginate(); },
+      startChapter(meta){
+        const div = document.createElement('div');
+        div.className = 'chapter-start';
+        if(meta.chapter) div.setAttribute('data-chapter', meta.chapter);
+        if(meta.section) div.setAttribute('data-section', meta.section);
+        if(meta.title) div.setAttribute('data-title', meta.title);
+        if(meta.image) div.setAttribute('data-image', meta.image);
+        const src = document.getElementById('source');
+        src.appendChild(div);
+        paginate();
       }
     };
   </script>
 </body>
 </html>
-
