@@ -65,7 +65,9 @@ workflow:
       completed: "2025-10-24T02:30:00Z"
       notes: "Validation run - contract compliance 100% (5/5 endpoints)"
     preview:
-      status: pending
+      status: completed
+      approved: "2025-10-24T23:45:00Z"
+      notes: "Manual preview testing passed - all endpoints functional"
     ship-prod:
       status: not_started
     finalize:
@@ -74,7 +76,8 @@ workflow:
 manual_gates:
   preview:
     required: true
-    approved: false
+    approved: true
+    approved_at: "2025-10-24T23:45:00Z"
 
 quality_gates:
   pre-flight:
