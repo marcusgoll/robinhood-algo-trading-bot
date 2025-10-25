@@ -13,7 +13,7 @@ dependencies = [
     "robin-stocks>=3.4.0",
     "pandas==2.3.3",
     "numpy==1.26.3",
-    "python-dotenv==1.0.0",
+    "python-dotenv==1.1.1",
     "python-dateutil==2.8.2",
     "pytz==2023.3",
     "PyYAML==6.0.1",
