@@ -122,3 +122,43 @@ The implementation builds on existing infrastructure (dashboard, logging, perfor
 ## Last Updated
 
 2025-10-24T21:45:00
+
+## Phase 2: Tasks (2025-10-24)
+
+**Summary**:
+- Total tasks: 47
+- User story tasks: 41 (organized by priority P1, P2, P3)
+- Parallel opportunities: 29 tasks marked [P]
+- Setup tasks: 3
+- Foundational tasks: 3
+- MVP tasks (US1-US4): 18
+- Enhancement tasks (US5-US8): 20
+- Polish tasks: 9
+- Task file: specs/029-llm-friendly-bot-operations/tasks.md
+
+**Task Breakdown by Story**:
+- US1 (State API): 7 tasks
+- US2 (Semantic Logging): 6 tasks
+- US3 (OpenAPI Docs): 4 tasks
+- US4 (Summary <10KB): 4 tasks
+- US5 (NL Commands): 4 tasks
+- US6 (Config Management): 6 tasks
+- US7 (Workflows): 6 tasks
+- US8 (Observability/WebSocket): 5 tasks
+- US10 (Testing): 3 tasks
+
+**Checkpoint**:
+- ✅ Tasks generated: 47
+- ✅ User story organization: Complete (organized by dependency graph)
+- ✅ Dependency graph: Created (11 phases with clear progression)
+- ✅ MVP strategy: Defined (Phases 1-6: US1-US4 only)
+- ✅ Parallel execution: 29 tasks identified [P]
+- ✅ REUSE analysis: 13 existing modules identified
+- 📋 Ready for: /analyze
+
+**Implementation Strategy**:
+- MVP Scope: Phases 1-6 (Setup → Foundational → US1-US4)
+- Incremental delivery: MVP → staging validation → Enhancements (US5-US8) → Final testing
+- Testing approach: Unit tests for services, integration tests for routes, smoke tests for critical paths
+- Coverage targets: 100% new code, ≥80% unit, ≥60% integration, ≥90% critical path
+
