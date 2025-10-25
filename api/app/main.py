@@ -12,11 +12,11 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
 
-from .routes import orders
+from .routes import orders, state
 
 app = FastAPI(
-    title="Order Execution API",
-    description="REST API for order submission, validation, and execution",
+    title="Trading Bot API",
+    description="REST API for order execution and bot operations monitoring",
     version="1.0.0",
 )
 
@@ -31,6 +31,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(orders.router)
+app.include_router(state.router)
 
 
 @app.get("/api/v1/health/healthz")

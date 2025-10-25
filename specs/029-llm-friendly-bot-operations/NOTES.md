@@ -135,6 +135,12 @@ The implementation builds on existing infrastructure (dashboard, logging, perfor
 - T006: Create error formatter in src/trading_bot/logging/error_formatter.py
 - T007: Extend API key auth in api/app/core/auth.py (verify_api_key function)
 
+**Batch 3: US1 State API** (Complete)
+- T010: Create BotStateResponse schema in api/app/schemas/state.py
+- T011: Create state aggregator service in api/app/services/state_aggregator.py
+- T012: Create state routes in api/app/routes/state.py (GET /state, /summary, /health)
+- T013: Register state routes in api/app/main.py
+
 ## Phase 2: Tasks (2025-10-24)
 
 **Summary**:
