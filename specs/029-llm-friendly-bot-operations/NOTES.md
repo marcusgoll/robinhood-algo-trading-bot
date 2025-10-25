@@ -180,11 +180,11 @@ The implementation builds on existing infrastructure (dashboard, logging, perfor
 - ✅ T053: Create JSON schema for bot config
 - ✅ T055: Integration test for config validation and rollback
 
-**Batch 9: US8 Observability** (4 tasks - NOT STARTED)
-- T060: Create WebSocket connection manager
-- T061: Create metrics routes (GET /metrics, WebSocket /stream)
-- T062: Add WebSocket broadcast loop in main.py
-- T064: Integration test for WebSocket streaming
+**Batch 9: US8 Observability** (4 tasks - COMPLETE)
+- ✅ T060: Create WebSocket connection manager
+- ✅ T061: Create metrics routes (GET /metrics, WebSocket /stream)
+- ✅ T062: Add WebSocket broadcast loop in main.py
+- ✅ T064: Integration test for WebSocket streaming
 
 **Batch 10: US7 Workflows** (5 tasks - NOT STARTED)
 - T070: Create workflow schemas (WorkflowListResponse, WorkflowExecutionRequest, etc.)
