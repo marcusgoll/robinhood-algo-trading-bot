@@ -10,16 +10,18 @@ deployment:
   model: remote-direct
   
 workflow:
-  phase: spec-flow
+  phase: plan
   status: in_progress
   phases:
     spec-flow:
-      status: in_progress
+      status: completed
       started: "2025-10-24T00:00:00Z"
+      completed: "2025-10-24T00:05:00Z"
     clarify:
       status: not_started
     plan:
-      status: not_started
+      status: in_progress
+      started: "2025-10-24T00:05:00Z"
     tasks:
       status: not_started
     analyze:
@@ -47,7 +49,7 @@ quality_gates:
     passed: false
 
 artifacts:
-  spec: ""
+  spec: "specs/029-llm-friendly-bot-operations/spec.md"
   plan: ""
   tasks: ""
   analysis: ""
