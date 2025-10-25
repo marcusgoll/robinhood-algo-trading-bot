@@ -1,0 +1,116 @@
+# Screens Inventory: LLM-Friendly Bot Operations
+
+screens:
+  api_docs:
+    name: "API Documentation (Swagger UI)"
+    route: "/api/docs"
+    purpose: "Interactive API documentation for LLM consumption"
+    primary_action: "Test Endpoint"
+    states:
+      - default: "Documentation loaded, endpoints listed"
+      - loading: "Fetching OpenAPI spec"
+      - error: "Failed to load API specification"
+    components:
+      - SwaggerUI (third-party)
+      - Endpoint list
+      - Request/response schema viewers
+      - Try-it-out interface
+    copy_ref: "API Documentation - Swagger UI"
+
+  dashboard_api_view:
+    name: "Dashboard API View (JSON)"
+    route: "/api/v1/metrics"
+    purpose: "Real-time bot status for LLM queries (JSON response)"
+    primary_action: "Refresh Data"
+    states:
+      - default: "Current metrics displayed"
+      - loading: "Fetching latest metrics"
+      - stale: "Data >60s old, showing cached"
+      - error: "Failed to fetch metrics"
+    components:
+      - JSON response formatter
+      - Health status indicator
+      - Positions summary
+      - Performance metrics
+      - Error list
+    copy_ref: "Dashboard Metrics"
+
+  state_summary:
+    name: "State Summary (Compressed)"
+    route: "/api/v1/summary"
+    purpose: "Compressed bot state for LLM context windows (<10KB)"
+    primary_action: "Get Summary"
+    states:
+      - default: "Summary generated"
+      - loading: "Aggregating state"
+      - error: "Failed to generate summary"
+    components:
+      - Health status badge
+      - Position count
+      - Order count
+      - Daily P&L summary
+      - Recent errors (max 3)
+    copy_ref: "State Summary"
+
+  config_editor:
+    name: "Configuration Editor (API)"
+    route: "/api/v1/config"
+    purpose: "View and update bot configuration with validation"
+    primary_action: "Apply Changes"
+    states:
+      - default: "Current config displayed"
+      - editing: "Changes pending validation"
+      - validating: "Checking schema compliance"
+      - diff_view: "Showing proposed changes"
+      - error: "Validation failed"
+      - applied: "Changes saved successfully"
+    components:
+      - Config JSON editor
+      - Schema validator
+      - Diff viewer
+      - Rollback button
+      - Validation error messages
+    copy_ref: "Configuration Management"
+
+  workflow_executor:
+    name: "Workflow Execution View"
+    route: "/api/v1/workflows/{id}"
+    purpose: "Execute and monitor maintenance workflows"
+    primary_action: "Execute Workflow"
+    states:
+      - default: "Workflow definition loaded"
+      - executing: "Steps in progress"
+      - step_validation: "Validating current step"
+      - completed: "All steps successful"
+      - failed: "Step failed, rollback available"
+      - rolled_back: "Workflow reverted"
+    components:
+      - Workflow step list
+      - Progress indicator
+      - Step status badges
+      - Execution logs
+      - Rollback button
+    copy_ref: "Workflow Execution"
+
+  error_inspector:
+    name: "Semantic Error Inspector"
+    route: "/api/v1/errors/recent"
+    purpose: "Browse and analyze errors with semantic context"
+    primary_action: "View Error Details"
+    states:
+      - default: "Error list displayed"
+      - loading: "Fetching error logs"
+      - detail_view: "Error details expanded"
+      - empty: "No errors found"
+      - error: "Failed to load errors"
+    components:
+      - Error list table
+      - Error detail panel
+      - Semantic fields display (cause, impact, remediation)
+      - Context viewer (trade_id, symbol, etc.)
+      - Export button
+    copy_ref: "Error Inspector"
+
+# Note: Most interfaces are JSON APIs consumed by LLMs
+# UI screens listed here are for developer/operator access
+# Primary interface for LLMs is the API documentation itself

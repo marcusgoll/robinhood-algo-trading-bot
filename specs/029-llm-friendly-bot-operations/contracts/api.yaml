@@ -1,0 +1,757 @@
+openapi: 3.0.0
+info:
+  title: Trading Bot LLM Operations API
+  description: |
+    REST API for LLM-friendly bot operations, monitoring, and management.
+
+    This API provides structured interfaces for LLMs to:
+    - Query bot state and performance
+    - Monitor health and errors
+    - Execute maintenance workflows
+    - Manage configuration
+    - Stream real-time updates
+  version: 1.0.0
+  contact:
+    name: Bot Operations Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: https://api.bot.example.com
+    description: Production
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  # State & Summary Endpoints
+  /api/v1/state:
+    get:
+      summary: Get complete bot state
+      description: Returns comprehensive bot operational state including account, positions, orders, performance, health, and configuration
+      tags: [State]
+      responses:
+        '200':
+          description: Bot state retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BotState'
+              example:
+                account:
+                  buying_power: "50000.00"
+                  account_balance: "52345.67"
+                  cash_balance: "1234.56"
+                  day_trade_count: 2
+                  last_updated: "2025-10-24T14:32:00Z"
+                positions:
+                  - symbol: "AAPL"
+                    quantity: 100
+                    entry_price: "150.25"
+                    current_price: "152.30"
+                    unrealized_pl: "205.00"
+                    unrealized_pl_pct: "1.36"
+                    last_updated: "2025-10-24T14:31:55Z"
+                orders: []
+                performance:
+                  win_rate: 0.65
+                  avg_risk_reward: 1.8
+                  total_realized_pl: "1234.56"
+                  total_unrealized_pl: "205.00"
+                  total_pl: "1439.56"
+                  current_streak: 3
+                  streak_type: "WIN"
+                  trades_today: 5
+                  session_count: 2
+                  max_drawdown: "-145.32"
+                health:
+                  status: "healthy"
+                  circuit_breaker_active: false
+                  last_heartbeat: "2025-10-24T14:31:58Z"
+                config_summary:
+                  mode: "LIVE"
+                  max_position_size_pct: 5.0
+                  daily_loss_limit: "-500.00"
+                timestamp: "2025-10-24T14:32:00Z"
+                data_age_seconds: 2.1
+                warnings: []
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/v1/summary:
+    get:
+      summary: Get compressed bot summary (<10KB)
+      description: Returns optimized summary for LLM context windows with essential state only
+      tags: [State]
+      responses:
+        '200':
+          description: Bot summary retrieved successfully (guaranteed <10KB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BotSummary'
+              example:
+                health_status: "healthy"
+                health_reason: null
+                position_count: 1
+                open_order_count: 0
+                daily_pnl: "345.67"
+                circuit_breaker_active: false
+                circuit_breaker_reason: null
+                recent_errors:
+                  - error_code: "API_429"
+                    message: "Rate limit exceeded"
+                    cause: "Too many API calls in 1-minute window"
+                    impact: "Data refresh delayed by 60 seconds"
+                    remediation: "Reduce refresh rate or implement request batching"
+                    timestamp: "2025-10-24T14:28:15Z"
+                last_trade_time: "2025-10-24T13:45:32Z"
+                generated_at: "2025-10-24T14:32:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # Metrics & Observability
+  /api/v1/metrics:
+    get:
+      summary: Get current health metrics
+      description: Returns health status, positions, orders, and performance metrics snapshot
+      tags: [Metrics]
+      responses:
+        '200':
+          description: Metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsSnapshot'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/v1/stream:
+    get:
+      summary: WebSocket real-time updates
+      description: Subscribe to real-time bot state updates (positions, orders, health) pushed every 5 seconds
+      tags: [Metrics]
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema:
+            type: string
+          description: API authentication token
+      responses:
+        '101':
+          description: WebSocket connection established
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Configuration Management
+  /api/v1/config:
+    get:
+      summary: Get current configuration
+      description: Returns active bot configuration
+      tags: [Configuration]
+      responses:
+        '200':
+          description: Configuration retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BotConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/v1/config/validate:
+    post:
+      summary: Validate proposed configuration
+      description: Validates configuration against JSON schema without applying changes
+      tags: [Configuration]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BotConfig'
+      responses:
+        '200':
+          description: Configuration is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+        '400':
+          description: Configuration validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SemanticError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/config/diff:
+    get:
+      summary: Show configuration diff
+      description: Compares proposed configuration with current and returns field-level changes
+      tags: [Configuration]
+      parameters:
+        - in: query
+          name: proposed
+          required: true
+          schema:
+            type: string
+          description: JSON-encoded proposed configuration
+      responses:
+        '200':
+          description: Diff calculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigDiff'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/config/apply:
+    put:
+      summary: Apply configuration changes
+      description: Validates and applies new configuration, creating audit trail
+      tags: [Configuration]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BotConfig'
+      responses:
+        '200':
+          description: Configuration applied successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigChangeResult'
+        '400':
+          description: Configuration validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SemanticError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/config/rollback:
+    put:
+      summary: Rollback to previous configuration
+      description: Reverts configuration to last known good state
+      tags: [Configuration]
+      responses:
+        '200':
+          description: Configuration rolled back successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigChangeResult'
+        '400':
+          description: No previous configuration available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SemanticError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Workflow Execution
+  /api/v1/workflows:
+    get:
+      summary: List available workflows
+      description: Returns all defined maintenance workflows
+      tags: [Workflows]
+      responses:
+        '200':
+          description: Workflows retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Workflow'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/workflows/{workflow_id}/execute:
+    post:
+      summary: Execute maintenance workflow
+      description: Starts workflow execution with progress tracking
+      tags: [Workflows]
+      parameters:
+        - in: path
+          name: workflow_id
+          required: true
+          schema:
+            type: string
+          description: Workflow identifier (e.g., "restart-bot", "update-targets")
+      responses:
+        '202':
+          description: Workflow execution started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowExecution'
+        '400':
+          description: Workflow validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SemanticError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Workflow not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SemanticError'
+
+  /api/v1/workflows/{workflow_id}/status:
+    get:
+      summary: Get workflow execution status
+      description: Returns current status and progress of workflow execution
+      tags: [Workflows]
+      parameters:
+        - in: path
+          name: workflow_id
+          required: true
+          schema:
+            type: string
+          description: Workflow identifier
+      responses:
+        '200':
+          description: Workflow status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowExecution'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Workflow execution not found
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+  schemas:
+    BotState:
+      type: object
+      required: [account, positions, orders, performance, health, config_summary, timestamp, data_age_seconds, warnings]
+      properties:
+        account:
+          $ref: '#/components/schemas/AccountStatus'
+        positions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PositionDisplay'
+        orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderInfo'
+        performance:
+          $ref: '#/components/schemas/PerformanceMetrics'
+        health:
+          $ref: '#/components/schemas/HealthStatus'
+        config_summary:
+          $ref: '#/components/schemas/ConfigSummary'
+        timestamp:
+          type: string
+          format: date-time
+          description: State snapshot timestamp (UTC)
+        data_age_seconds:
+          type: number
+          format: float
+          description: Data staleness in seconds
+        warnings:
+          type: array
+          items:
+            type: string
+          description: Operator warnings
+
+    BotSummary:
+      type: object
+      required: [health_status, position_count, open_order_count, daily_pnl, circuit_breaker_active, recent_errors, generated_at]
+      properties:
+        health_status:
+          type: string
+          enum: [healthy, degraded, offline]
+        health_reason:
+          type: string
+          nullable: true
+        position_count:
+          type: integer
+        open_order_count:
+          type: integer
+        daily_pnl:
+          type: string
+          format: decimal
+        circuit_breaker_active:
+          type: boolean
+        circuit_breaker_reason:
+          type: string
+          nullable: true
+        recent_errors:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/RecentError'
+        last_trade_time:
+          type: string
+          format: date-time
+          nullable: true
+        generated_at:
+          type: string
+          format: date-time
+
+    AccountStatus:
+      type: object
+      properties:
+        buying_power:
+          type: string
+          format: decimal
+        account_balance:
+          type: string
+          format: decimal
+        cash_balance:
+          type: string
+          format: decimal
+        day_trade_count:
+          type: integer
+        last_updated:
+          type: string
+          format: date-time
+
+    PositionDisplay:
+      type: object
+      properties:
+        symbol:
+          type: string
+        quantity:
+          type: integer
+        entry_price:
+          type: string
+          format: decimal
+        current_price:
+          type: string
+          format: decimal
+        unrealized_pl:
+          type: string
+          format: decimal
+        unrealized_pl_pct:
+          type: string
+          format: decimal
+        last_updated:
+          type: string
+          format: date-time
+
+    OrderInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        symbol:
+          type: string
+        side:
+          type: string
+          enum: [BUY, SELL]
+        quantity:
+          type: integer
+        status:
+          type: string
+          enum: [PENDING, FILLED, CANCELLED, REJECTED]
+        created_at:
+          type: string
+          format: date-time
+
+    PerformanceMetrics:
+      type: object
+      properties:
+        win_rate:
+          type: number
+          format: float
+        avg_risk_reward:
+          type: number
+          format: float
+        total_realized_pl:
+          type: string
+          format: decimal
+        total_unrealized_pl:
+          type: string
+          format: decimal
+        total_pl:
+          type: string
+          format: decimal
+        current_streak:
+          type: integer
+        streak_type:
+          type: string
+          enum: [WIN, LOSS, NONE]
+        trades_today:
+          type: integer
+        session_count:
+          type: integer
+        max_drawdown:
+          type: string
+          format: decimal
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, offline]
+        circuit_breaker_active:
+          type: boolean
+        last_heartbeat:
+          type: string
+          format: date-time
+
+    ConfigSummary:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [LIVE, PAPER, BACKTEST]
+        max_position_size_pct:
+          type: number
+          format: float
+        daily_loss_limit:
+          type: string
+          format: decimal
+
+    MetricsSnapshot:
+      type: object
+      properties:
+        health:
+          $ref: '#/components/schemas/HealthStatus'
+        position_count:
+          type: integer
+        open_order_count:
+          type: integer
+        daily_pnl:
+          type: string
+          format: decimal
+        timestamp:
+          type: string
+          format: date-time
+
+    BotConfig:
+      type: object
+      description: Full bot configuration (schema defined in config.schema.json)
+      additionalProperties: true
+
+    ValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    ConfigDiff:
+      type: object
+      properties:
+        changed_fields:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              current_value:
+                type: string
+              proposed_value:
+                type: string
+        no_changes:
+          type: boolean
+
+    ConfigChangeResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        change_id:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+        applied_config:
+          $ref: '#/components/schemas/BotConfig'
+
+    Workflow:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowStep'
+
+    WorkflowStep:
+      type: object
+      properties:
+        id:
+          type: string
+        description:
+          type: string
+        action_type:
+          type: string
+          enum: [command, api_call, validation, wait]
+
+    WorkflowExecution:
+      type: object
+      properties:
+        workflow_id:
+          type: string
+        status:
+          type: string
+          enum: [NOT_STARTED, IN_PROGRESS, COMPLETED, FAILED]
+        current_step:
+          type: integer
+        total_steps:
+          type: integer
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        error:
+          $ref: '#/components/schemas/SemanticError'
+          nullable: true
+
+    SemanticError:
+      type: object
+      required: [error_code, error_type, message, cause, impact, remediation, context, timestamp, severity]
+      properties:
+        error_code:
+          type: string
+          description: Machine-readable error code (e.g., BOT_001, API_429)
+        error_type:
+          type: string
+          description: Error category
+        message:
+          type: string
+          description: Human-readable error description
+        cause:
+          type: string
+          description: Root cause explanation
+        impact:
+          type: string
+          description: Consequences of this error
+        remediation:
+          type: string
+          description: Specific steps to resolve
+        context:
+          type: object
+          additionalProperties: true
+          description: Relevant identifiers for correlation
+        timestamp:
+          type: string
+          format: date-time
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+
+    RecentError:
+      type: object
+      properties:
+        error_code:
+          type: string
+        message:
+          type: string
+        cause:
+          type: string
+        impact:
+          type: string
+        remediation:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    Unauthorized:
+      description: Unauthorized - invalid or missing API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SemanticError'
+          example:
+            error_code: "AUTH_001"
+            error_type: "AuthenticationError"
+            message: "Invalid or missing API key"
+            cause: "X-API-Key header not provided or token invalid"
+            impact: "API access denied"
+            remediation: "Provide valid API key in X-API-Key header"
+            context: {}
+            timestamp: "2025-10-24T14:32:00Z"
+            severity: "high"
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SemanticError'
+
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SemanticError'
+          example:
+            error_code: "SRV_001"
+            error_type: "ServerError"
+            message: "Internal server error"
+            cause: "Unexpected exception in state aggregation"
+            impact: "Unable to retrieve bot state"
+            remediation: "Check server logs for stack trace, retry request"
+            context:
+              request_id: "abc123"
+            timestamp: "2025-10-24T14:32:00Z"
+            severity: "critical"
+
+tags:
+  - name: State
+    description: Bot state and summary endpoints
+  - name: Metrics
+    description: Observability and real-time monitoring
+  - name: Configuration
+    description: Configuration management and validation
+  - name: Workflows
+    description: Automated maintenance workflows

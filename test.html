@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Letter Page Mockup (MDX → Print CSS) v7</title>
+  <style>
+    :root{
+      --page-width: 8.5in;
+      --page-height: 11in;
+      --margin-top: 0.75in;
+      --margin-right: 0.7in;
+      --margin-bottom: 0.75in;
+      --margin-left: 0.7in;
+
+      --header-height: 0.55in;          /* normal page header */
+      --chapter-header-height: 1.3in;    /* taller chapter header */
+      --footer-height: 0.35in;
+
+      --header-bg: #2f6fbe;
+      --header-stripe-1: #3b82f6;
+      --header-stripe-2: #93c5fd;
+
+      --text-color: #111827;
+      --muted: #6b7280;
+      --bg: #e5e7eb;
+      --sheet-shadow: 0 2px 10px rgba(0,0,0,.15);
+      --base-font: 12pt;
+      --line: 1.45;
+    }
+    *{ box-sizing: border-box; }
+    html, body { height: 100%; }
+    body{
+      margin:0;
+      color: var(--text-color);
+      background: var(--bg);
+      font: var(--base-font)/var(--line) system-ui, -apple-system, "Segoe UI", Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    #viewer{
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+      place-items: center;
+    }
+    @media (min-width: 1100px){
+      #viewer{ grid-template-columns: repeat(2, 1fr); }
+    }
+    .sheet{
+      position: relative;
+      background: #fff;
+      width: var(--page-width);
+      height: var(--page-height);
+      box-shadow: var(--sheet-shadow);
+      overflow: hidden;
+    }
+
+    /* ===== Normal PAGE HEADER ===== */
+    .sheet .header{
+      position: absolute;
+      left: 0; right: 0; top: 0;
+      height: var(--header-height);
+      background: var(--header-bg);
+      color: #fff;
+      overflow: hidden;
+    }
+    .sheet .header::after{
+      content: "";
+      position: absolute;
+      top: 0;
+      right: -20%;
+      height: 100%;
+      width: 45%;
+      background: var(--header-stripe-1);
+      transform: skewX(-25deg);
+      opacity: 0.3;
+      z-index: 2;
+    }
+    .sheet .header::before{
+      content: "";
+      position: absolute;
+      top: 0;
+      right: -20%;
+      height: 100%;
+      width: 52%;
+      background: var(--header-stripe-2);
+      transform: skewX(-25deg);
+      opacity: 0.2;
+      z-index: 2;
+    }
+    .header-inner{
+      position: relative;
+      height: 100%;
+            
+      padding: 0 var(--margin-right) 0 var(--margin-left);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 16px;
+      z-index: 3; /* above stripes */
+    }
+    .hdr-left{
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      letter-spacing: .03em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hdr-left .section{ font-weight: 700; font-size: 11.5pt; opacity: .95; }
+    .hdr-left .sep{ opacity: .6; }
+    .hdr-left .title{ font-weight: 600; font-size: 11.5pt; text-transform: uppercase; }
+    .hdr-right .logo{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 4px;
+      padding: 4px 8px;
+      height: calc(var(--header-height) - 0.18in);
+    }
+    .hdr-right .logo .placeholder{
+      width: 1.2in; height: 100%;
+      display: grid; place-items: center;
+      font-weight: 700; font-size: 10pt;
+      color: #fff;
+      opacity: .9;
+    }
+
+    /* ===== CHAPTER HEADER: match slant to page header, but taller with photo on right ===== */
+    .sheet.chapter .header{
+      height: var(--chapter-header-height);
+      background: var(--header-bg);
+      color: #fff;
+    }
+    /* Use the SAME slanted stripes as page header */
+    .sheet.chapter .header::after,
+    .sheet.chapter .header::before{
+      z-index: 2; /* ensure stripes sit above the photo */
+      display: block;
+    }
+    /* Photo wedge in the same geometry as the big stripe */
+    .sheet.chapter .hdr-photo{
+      position: absolute;
+      top: 0;
+      right: -10%;
+      height: 100%;
+      width: 45%; /* a bit wider than stripe so it peeks under both */
+      
+      overflow: hidden;
+      z-index: 1; /* under the stripes */
+    }
+    .sheet.chapter .hdr-photo .img{
+      position: absolute; inset: 0;
+       /* unskew image back */
+      transform-origin: right center;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      filter: grayscale(0.1) contrast(1.05);
+    }
+    .sheet.chapter .hdr-photo::after{
+      /* blue tint overlay */
+      content: "";
+      position: absolute; inset: 0;
+      background: rgba(37, 99, 235, .15);
+      pointer-events: none;
+    }
+    /* Chapter header text stack (two lines) */
+    .sheet.chapter .header .header-inner{
+      grid-template-columns: 1fr;
+      align-items: end;
+      padding-top: 0.1in;
+      padding-bottom: 0.1in;
+    }
+    .sheet.chapter .chapter-stack{
+      display: grid;
+      align-content: end;
+      gap: 8px;
+      z-index: 3;
+    }
+    .sheet.chapter .chapter-meta{
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      font-size: 11.5pt;
+      opacity: .95;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .sheet.chapter .chapter-rule{
+      height: 2px;
+      background: rgba(255,255,255,.85);
+      border: 0;
+      margin: 0;
+      width: 100%;
+    }
+    .sheet.chapter .chapter-title{
+      font-size: 24pt;
+      line-height: 1.12;
+      font-weight: 800;
+      margin: 0;
+    }
+
+    /* CONTENT/FOOTER */
+    .sheet .content{
+      position: absolute;
+      top: calc(var(--margin-top) + var(--header-height));
+      left: var(--margin-left);
+      width: calc(var(--page-width) - var(--margin-left) - var(--margin-right));
+      height: calc(var(--page-height) - var(--margin-top) - var(--margin-bottom) - var(--header-height) - var(--footer-height));
+      overflow: hidden;
+    }
+    .sheet.chapter .content{
+      top: calc(var(--margin-top) + var(--chapter-header-height));
+      height: calc(var(--page-height) - var(--margin-top) - var(--margin-bottom) - var(--chapter-header-height) - var(--footer-height));
+    }
+
+    .sheet .footer{
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: var(--footer-height);
+      background: transparent;
+      color: var(--muted);
+      font-size: 10.5pt;
+    }
+    .sheet .footer .page-num{
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-variant-numeric: tabular-nums;
+    }
+    .sheet.odd  .footer .page-num{ right: var(--margin-right); text-align: right; }
+    .sheet.even .footer .page-num{ left: var(--margin-left);  text-align: left;  }
+
+    /* Guides */
+    .sheet canvas.guides{ position: absolute; inset: 0; pointer-events: none; }
+    .counter{ display: none; }
+
+    /* Typography */
+    .content h1, .content h2, .content h3, .content h4{ line-height: 1.2; margin: 0 0 0.3rem; }
+    .content h1{ font-size: 20pt; }
+    .content h2{ font-size: 16pt; }
+    .content h3{ font-size: 13.5pt; }
+    .content p{ margin: 0 0 0.5rem; }
+    .content small{ color: var(--muted); }
+    .content ul, .content ol{ margin: 0 0 0.5rem 1.2rem; padding: 0; }
+    .content table{ width: 100%; border-collapse: collapse; margin: 0 0 0.5rem; font-size: 11pt; }
+    .content th, .content td{ border: 1px solid #e5e7eb; padding: 6px 8px; vertical-align: top; }
+    .content img, .content svg, .content canvas{ max-width: 100%; height: auto; display: block; margin: 0.25rem 0; }
+    .content h1, .content h2, .content h3,
+    .content table, .content pre, .content blockquote,
+    .content img, .content ul, .content ol, .content figure{ break-inside: avoid; page-break-inside: avoid; }
+    .page-break{ break-before: page; page-break-before: always; }
+    .autoscale{ transform-origin: top left; display: inline-block; }
+
+    /* PRINT */
+    @page{ size: 8.5in 11in; margin: 0; }
+    @media print{
+      body{ background: #fff; }
+      #viewer{ display: block; padding: 0; }
+      .sheet{
+        box-shadow: none;
+        width: 8.5in !important;
+        height: 11in !important;
+        break-after: page;
+        page-break-after: always;
+        margin: 0;
+      }
+      .sheet .content{
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        padding:
+          calc(var(--margin-top) + var(--header-height))
+          var(--margin-right)
+          calc(var(--margin-bottom) + var(--footer-height))
+          var(--margin-left);
+      }
+      .sheet.chapter .content{
+        padding:
+          calc(var(--margin-top) + var(--chapter-header-height))
+          var(--margin-right)
+          calc(var(--margin-bottom) + var(--footer-height))
+          var(--margin-left);
+      }
+      .sheet canvas.guides{ display: none !important; }
+      .autoscale{ transform: none !important; }
+      *{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+    .hide-guides .sheet canvas.guides{ display: none; }
+  </style>
+</head>
+<body>
+  <div id="viewer"></div>
+
+  <!-- Demo source with a chapter-start marker -->
+  <div id="source" style="display:none">
+    <div
+      class="chapter-start"
+      data-chapter="4"
+      data-section="15"
+      data-title="Cross-Control Stall"
+      data-image="https://images.unsplash.com/flagged/photo-1555685460-1d9cf532761b?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1973"
+    ></div>
+    <p>This is placeholder content under the chapter header.</p>
+    <p>Below is normal content continuing on this and subsequent pages.</p>
+    <ul>
+      <li>Exact page size: 8.5in × 11in.</li>
+      <li>Safe printable margins set via CSS variables.</li>
+      <li>Canvas overlay draws guides and crop marks.</li>
+      <li>Use <code>.page-break</code> to force a new page where needed.</li>
+    </ul>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur feugiat nisl at massa consectetur, vitae dignissim lorem sollicitudin. Sed gravida, arcu eget porta elementum, nulla ligula molestie mi, non gravida justo eros nec velit.</p>
+    <p>Repeat paragraphs to demonstrate pagination.</p>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec mauris a eros gravida aliquet. Sed euismod, nunc at efficitur pulvinar, ipsum lorem dictum metus, vel varius lorem lacus vel sapien. Vestibulum pellentesque risus id sapien aliquet porttitor.</p>
+    <p>Etiam ut imperdiet neque. Nulla facilisi. Vivamus luctus lorem id arcu malesuada, ut sagittis justo vestibulum.</p>
+    <p>Phasellus id tellus nec magna tristique consectetur. Sed luctus pulvinar semper. Integer at enim quis ipsum convallis hendrerit.</p>
+    <p>Aliquam erat volutpat. Suspendisse potenti. Donec consequat lorem in lectus hendrerit, porttitor pretium lectus fringilla.</p>
+    <p>Proin vitae suscipit odio. Ut viverra sem non sem aliquet, non luctus lectus condimentum.</p>
+    <p class="page-break"></p>
+    <h2>Tables</h2>
+    <table>
+      <thead><tr><th>Item</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Width</td><td>8.5in</td></tr>
+        <tr><td>Height</td><td>11in</td></tr>
+        <tr><td>Margins</td><td>0.75in / 0.7in / 0.75in / 0.7in</td></tr>
+      </tbody>
+    </table>
+    <p>More filler below to create multiple pages.</p>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec mauris a eros gravida aliquet. Sed euismod, nunc at efficitur pulvinar, ipsum lorem dictum metus, vel varius lorem lacus vel sapien. Vestibulum pellentesque risus id sapien aliquet porttitor.</p>
+    <p>Etiam ut imperdiet neque. Nulla facilisi. Vivamus luctus lorem id arcu malesuada, ut sagittis justo vestibulum.</p>
+    <p>Phasellus id tellus nec magna tristique consectetur. Sed luctus pulvinar semper. Integer at enim quis ipsum convallis hendrerit.</p>
+    <p>Aliquam erat volutpat. Suspendisse potenti. Donec consequat lorem in lectus hendrerit, porttitor pretium lectus fringilla.</p>
+    <p>Proin vitae suscipit odio. Ut viverra sem non sem aliquet, non luctus lectus condimentum.</p>
+  </div>
+
+  <script>
+    const DEFAULT_CHAPTER_IMAGE = "https://images.unsplash.com/flagged/photo-1555685460-1d9cf532761b?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1973";
+
+    const State = {
+      header: { section: '4.15', title: 'CROSS-CONTROL STALL', logoUrl: null },
+    };
+
+    function cssPixelsPerInch(){
+      const probe = document.createElement('div');
+      probe.style.width = '1in';
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      document.body.appendChild(probe);
+      const ppi = probe.getBoundingClientRect().width;
+      document.body.removeChild(probe);
+      return ppi || 96;
+    }
+    function readInches(v){
+      if(!v) return 0;
+      if(v.endsWith('in')) return parseFloat(v);
+      if(v.endsWith('px')) return parseFloat(v)/cssPixelsPerInch();
+      return parseFloat(v);
+    }
+
+    function buildRegularHeader(container){
+      const inner = document.createElement('div');
+      inner.className = 'header-inner';
+      const left = document.createElement('div');
+      left.className = 'hdr-left';
+      left.innerHTML = '<span class="section"></span><span class="sep">|</span><span class="title"></span>';
+      inner.appendChild(left);
+      const right = document.createElement('div');
+      right.className = 'hdr-right';
+      const logo = document.createElement('div');
+      logo.className = 'logo';
+      const ph = document.createElement('div');
+      ph.className = 'placeholder';
+      ph.textContent = 'LOGO';
+      logo.appendChild(ph);
+      right.appendChild(logo);
+      inner.appendChild(right);
+      container.appendChild(inner);
+      left.querySelector('.section').textContent = State.header.section || '';
+      left.querySelector('.title').textContent = State.header.title || '';
+    }
+
+    function buildChapterHeader(container, meta){
+      // Photo wedge under stripes
+      const photo = document.createElement('div');
+      photo.className = 'hdr-photo';
+      const img = document.createElement('div');
+      img.className = 'img';
+      img.style.backgroundImage = `url("${meta.image || DEFAULT_CHAPTER_IMAGE}")`;
+      photo.appendChild(img);
+      container.appendChild(photo);
+
+      // Two-line chapter stack
+      const inner = document.createElement('div');
+      inner.className = 'header-inner';
+      const stack = document.createElement('div');
+      stack.className = 'chapter-stack';
+
+      const metaLine = document.createElement('div');
+      metaLine.className = 'chapter-meta';
+      const chapter = meta.chapter ? `CHAPTER ${meta.chapter}` : '';
+      const section = meta.section ? `SECTION ${meta.section}` : '';
+      metaLine.textContent = [chapter, section].filter(Boolean).join(' / ');
+      stack.appendChild(metaLine);
+
+      const rule = document.createElement('div');
+      rule.className = 'chapter-rule';
+      stack.appendChild(rule);
+
+      const title = document.createElement('div');
+      title.className = 'chapter-title';
+      title.textContent = meta.title || '';
+      stack.appendChild(title);
+
+      inner.appendChild(stack);
+      container.appendChild(inner);
+    }
+
+    function newSheet(variant='page', meta=null){
+      const sheet = document.createElement('div');
+      sheet.className = 'sheet';
+      if(variant === 'chapter') sheet.classList.add('chapter');
+
+      const header = document.createElement('div');
+      header.className = 'header';
+      if(variant === 'chapter'){
+        buildChapterHeader(header, meta || {});
+      } else {
+        buildRegularHeader(header);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.className = 'guides';
+
+      const content = document.createElement('div');
+      content.className = 'content';
+
+      const footer = document.createElement('div');
+      footer.className = 'footer';
+      const pnum = document.createElement('div');
+      pnum.className = 'page-num';
+      footer.appendChild(pnum);
+
+      sheet.appendChild(header);
+      sheet.appendChild(canvas);
+      sheet.appendChild(content);
+      sheet.appendChild(footer);
+      document.getElementById('viewer').appendChild(sheet);
+
+      drawGuides(sheet);
+      return sheet;
+    }
+
+    function drawGuides(sheet){
+      const canvas = sheet.querySelector('canvas.guides');
+      const ppi = cssPixelsPerInch();
+      const cs = getComputedStyle(document.documentElement);
+
+      const pageW_in = readInches(cs.getPropertyValue('--page-width').trim());
+      const pageH_in = readInches(cs.getPropertyValue('--page-height').trim());
+      const mTop_in = readInches(cs.getPropertyValue('--margin-top').trim());
+      const mRight_in = readInches(cs.getPropertyValue('--margin-right').trim());
+      const mBottom_in = readInches(cs.getPropertyValue('--margin-bottom').trim());
+      const mLeft_in = readInches(cs.getPropertyValue('--margin-left').trim());
+
+      const header_px = sheet.querySelector('.header').getBoundingClientRect().height;
+      const footer_px = sheet.querySelector('.footer').getBoundingClientRect().height;
+      const header_in = header_px / ppi;
+      const footer_in = footer_px / ppi;
+
+      const W = Math.round(pageW_in * ppi);
+      const H = Math.round(pageH_in * ppi);
+      canvas.width = W;
+      canvas.height = H;
+
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0,0,W,H);
+
+      ctx.strokeStyle = '#d1d5db';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0.5, 0.5, W-1, H-1);
+
+      const mx = Math.round(mLeft_in * ppi);
+      const my = Math.round((mTop_in + header_in) * ppi);
+      const mw = Math.round((pageW_in - mLeft_in - mRight_in) * ppi);
+      const mh = Math.round((pageH_in - (mTop_in + header_in) - (mBottom_in + footer_in)) * ppi);
+
+      ctx.strokeStyle = '#9ca3af';
+      ctx.setLineDash([5,4]);
+      ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
+      ctx.setLineDash([]);
+
+      const cropLen = Math.round(0.2 * ppi);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1;
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(cropLen, 0);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, cropLen);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(W, 0);
+      ctx.lineTo(W - cropLen, 0);
+      ctx.moveTo(W, 0);
+      ctx.lineTo(W, cropLen);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      ctx.lineTo(cropLen, H);
+      ctx.moveTo(0, H);
+      ctx.lineTo(0, H - cropLen);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(W, H);
+      ctx.lineTo(W - cropLen, H);
+      ctx.moveTo(W, H);
+      ctx.lineTo(W, H - cropLen);
+      ctx.stroke();
+
+      const leading_in = 14 / 72;
+      const step = leading_in * ppi;
+      ctx.strokeStyle = 'rgba(148,163,184,0.2)';
+      ctx.lineWidth = 1;
+      for(let y = my + step; y < my + mh; y += step){
+        ctx.beginPath();
+        ctx.moveTo(mx, Math.round(y)+0.5);
+        ctx.lineTo(mx + mw, Math.round(y)+0.5);
+        ctx.stroke();
+      }
+    }
+
+    function paginate(){
+      const viewer = document.getElementById('viewer');
+      viewer.innerHTML = '';
+      const src = document.getElementById('source');
+      const nodes = Array.from(src.childNodes);
+      src.innerHTML = '';
+
+      let sheet = newSheet('page');
+      let content = sheet.querySelector('.content');
+
+      const fits = () => content.scrollHeight <= content.clientHeight + 0.5;
+      const isIgnorable = (n) =>
+        (n.nodeType === 3 && !/\S/.test(n.nodeValue)) || (n.nodeType === 8);
+
+      function placeOnNewPage(node, variant='page', meta=null){
+        sheet = newSheet(variant, meta);
+        content = sheet.querySelector('.content');
+        if(node){
+          content.appendChild(node);
+          if(content.scrollHeight > content.clientHeight + 0.5){
+            const scale = content.clientHeight / content.scrollHeight;
+            node.classList.add('autoscale');
+            node.style.transform = `scale(${Math.max(0.01, scale - 0.01)})`;
+            node.style.width = '100%';
+          }
+        }
+      }
+
+      for(const node of nodes){
+        if(isIgnorable(node)) continue;
+
+        if(node.nodeType === 1 && node.classList.contains('chapter-start')){
+          const meta = {
+            chapter: node.getAttribute('data-chapter') || '',
+            section: node.getAttribute('data-section') || '',
+            title:   node.getAttribute('data-title')   || '',
+            image:   node.getAttribute('data-image')   || '',
+          };
+          placeOnNewPage(null, 'chapter', meta);
+          continue;
+        }
+
+        if(node.nodeType === 1 && node.classList.contains('page-break')){
+          placeOnNewPage(null, 'page', null);
+          continue;
+        }
+
+        content.appendChild(node);
+        if(!fits()){
+          content.removeChild(node);
+          placeOnNewPage(node, 'page', null);
+        }
+      }
+
+      const pages = Array.from(document.querySelectorAll('.sheet'));
+      pages.forEach((s, i) => {
+        const n = i + 1;
+        s.classList.toggle('odd', n % 2 === 1);
+        s.classList.toggle('even', n % 2 === 0);
+        const p = s.querySelector('.footer .page-num');
+        if(p) p.textContent = String(n);
+      });
+    }
+
+    window.addEventListener('load', paginate);
+    window.addEventListener('resize', paginate);
+
+    function enterPrint(){ document.documentElement.classList.add('print-mode'); }
+    function exitPrint(){ document.documentElement.classList.remove('print-mode'); paginate(); }
+    if('onbeforeprint' in window){
+      window.onbeforeprint = enterPrint;
+      window.onafterprint  = exitPrint;
+    }else{
+      const mql = window.matchMedia('print');
+      mql.addEventListener('change', e => { if(e.matches) enterPrint(); else exitPrint(); });
+    }
+
+    window.Mockup = {
+      setHTML(html){ document.getElementById('source').innerHTML = html; },
+      render: paginate,
+      setMargins({top, right, bottom, left}){
+        const root = document.documentElement;
+        if(top) root.style.setProperty('--margin-top', top);
+        if(right) root.style.setProperty('--margin-right', right);
+        if(bottom) root.style.setProperty('--margin-bottom', bottom);
+        if(left) root.style.setProperty('--margin-left', left);
+        paginate();
+      },
+      setBaseFont(pt){
+        document.documentElement.style.setProperty('--base-font', pt + 'pt');
+        paginate();
+      },
+      setHeader({height, bg, stripe1, stripe2}){
+        const root = document.documentElement;
+        if(height) root.style.setProperty('--header-height', height);
+        if(bg) root.style.setProperty('--header-bg', bg);
+        if(stripe1) root.style.setProperty('--header-stripe-1', stripe1);
+        if(stripe2) root.style.setProperty('--header-stripe-2', stripe2);
+        paginate();
+      },
+      setChapterHeaderHeight(h){ document.documentElement.style.setProperty('--chapter-header-height', h); paginate(); },
+      startChapter(meta){
+        const div = document.createElement('div');
+        div.className = 'chapter-start';
+        if(meta.chapter) div.setAttribute('data-chapter', meta.chapter);
+        if(meta.section) div.setAttribute('data-section', meta.section);
+        if(meta.title) div.setAttribute('data-title', meta.title);
+        if(meta.image) div.setAttribute('data-image', meta.image);
+        const src = document.getElementById('source');
+        src.appendChild(div);
+        paginate();
+      }
+    };
+  </script>
+</body>
+</html>

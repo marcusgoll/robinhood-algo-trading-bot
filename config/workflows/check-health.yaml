@@ -1,0 +1,37 @@
+id: check-health
+name: Health Check Workflow
+description: Comprehensive health check for bot systems
+
+steps:
+  - id: check_api
+    description: Verify API server is responding
+    action_type: api_call
+    parameters:
+      endpoint: /api/v1/health/healthz
+      method: GET
+    validation:
+      expected_status: healthy
+
+  - id: check_bot_state
+    description: Query bot state to ensure data is fresh
+    action_type: api_call
+    parameters:
+      endpoint: /api/v1/state
+      method: GET
+    validation:
+      max_data_age: 60
+
+  - id: check_config
+    description: Verify bot configuration is valid
+    action_type: api_call
+    parameters:
+      endpoint: /api/v1/config
+      method: GET
+    validation:
+      required_fields: [risk_per_trade, max_position_size]
+
+  - id: validate_result
+    description: Log health check completion
+    action_type: validation
+    parameters:
+      message: Health check completed successfully
