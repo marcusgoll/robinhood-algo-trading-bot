@@ -10,7 +10,7 @@ deployment:
   model: remote-direct
   
 workflow:
-  phase: plan
+  phase: implement
   status: in_progress
   phases:
     spec-flow:
@@ -20,14 +20,20 @@ workflow:
     clarify:
       status: not_started
     plan:
-      status: in_progress
+      status: completed
       started: "2025-10-24T00:05:00Z"
+      completed: "2025-10-24T00:20:00Z"
     tasks:
-      status: not_started
+      status: completed
+      started: "2025-10-24T00:20:00Z"
+      completed: "2025-10-24T00:23:00Z"
     analyze:
-      status: not_started
+      status: completed
+      started: "2025-10-24T00:23:00Z"
+      completed: "2025-10-24T00:26:00Z"
     implement:
-      status: not_started
+      status: in_progress
+      started: "2025-10-24T00:26:00Z"
     optimize:
       status: not_started
     preview:
@@ -50,8 +56,8 @@ quality_gates:
 
 artifacts:
   spec: "specs/029-llm-friendly-bot-operations/spec.md"
-  plan: ""
-  tasks: ""
-  analysis: ""
+  plan: "specs/029-llm-friendly-bot-operations/plan.md"
+  tasks: "specs/029-llm-friendly-bot-operations/tasks.md"
+  analysis: "specs/029-llm-friendly-bot-operations/analysis-report.md"
   optimization: ""
   ship_report: ""

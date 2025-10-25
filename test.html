@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Letter Page Mockup (MDX → Print CSS) v3</title>
+  <style>
+    :root{
+      --page-width: 8.5in;
+      --page-height: 11in;
+      --margin-top: 0.75in;
+      --margin-right: 0.7in;
+      --margin-bottom: 0.75in;
+      --margin-left: 0.7in;
+
+      --header-height: 0.5in;
+      --header-bg: #2563eb; /* blue */
+
+      --text-color: #111827;
+      --muted: #6b7280;
+      --bg: #e5e7eb;
+      --sheet-shadow: 0 2px 10px rgba(0,0,0,.15);
+      --base-font: 12pt;
+      --line: 1.45;
+    }
+    *{ box-sizing: border-box; }
+    html, body { height: 100%; }
+    body{
+      margin:0;
+      color: var(--text-color);
+      background: var(--bg);
+      font: var(--base-font)/var(--line) system-ui, -apple-system, "Segoe UI", Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    #viewer{
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+      place-items: center;
+    }
+    @media (min-width: 1100px){
+      #viewer{ grid-template-columns: repeat(2, 1fr); }
+    }
+    .sheet{
+      position: relative;
+      background: #fff;
+      width: var(--page-width);
+      height: var(--page-height);
+      box-shadow: var(--sheet-shadow);
+      overflow: hidden;
+    }
+    .sheet .header{
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: var(--header-height);
+      background: var(--header-bg);
+      color: #fff;
+    }
+    .sheet .page-num{
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 10.5pt;
+      font-weight: 600;
+      opacity: .95;
+    }
+    /* alignments based on sheet parity */
+    .sheet.odd  .page-num{ right: var(--margin-right); left: auto; text-align: right; }
+    .sheet.even .page-num{ left: var(--margin-left);  right: auto; text-align: left;  }
+
+    .sheet .content{
+      position: absolute;
+      top: calc(var(--margin-top) + var(--header-height));
+      left: var(--margin-left);
+      width: calc(var(--page-width) - var(--margin-left) - var(--margin-right));
+      height: calc(var(--page-height) - var(--margin-top) - var(--margin-bottom) - var(--header-height));
+      overflow: hidden;
+    }
+    .sheet canvas.guides{
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .counter{ display: none; } /* moved to header */
+
+    /* Typography */
+    .content h1, .content h2, .content h3, .content h4{
+      line-height: 1.2;
+      margin: 0 0 0.3rem;
+    }
+    .content h1{ font-size: 20pt; }
+    .content h2{ font-size: 16pt; }
+    .content h3{ font-size: 13.5pt; }
+    .content p{ margin: 0 0 0.5rem; }
+    .content small{ color: var(--muted); }
+    .content ul, .content ol{
+      margin: 0 0 0.5rem 1.2rem;
+      padding: 0;
+    }
+    .content table{
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 0.5rem;
+      font-size: 11pt;
+    }
+    .content th, .content td{
+      border: 1px solid #e5e7eb;
+      padding: 6px 8px;
+      vertical-align: top;
+    }
+    .content img, .content svg, .content canvas{
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 0.25rem 0;
+    }
+    .content h1, .content h2, .content h3,
+    .content table, .content pre, .content blockquote,
+    .content img, .content ul, .content ol, .content figure{
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .page-break{ break-before: page; page-break-before: always; }
+    .autoscale{ transform-origin: top left; display: inline-block; }
+
+    /* PRINT */
+    @page{
+      size: 8.5in 11in;
+      margin: 0;
+    }
+    @media print{
+      body{ background: #fff; }
+      #viewer{ display: block; padding: 0; }
+      .sheet{
+        box-shadow: none;
+        width: 8.5in !important;
+        height: 11in !important;
+        break-after: page;
+        page-break-after: always;
+        margin: 0;
+      }
+      /* Let content use padding so browsers honor page area exactly */
+      .sheet .content{
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        padding: calc(var(--margin-top) + var(--header-height)) var(--margin-right) var(--margin-bottom) var(--margin-left);
+      }
+      .sheet canvas.guides{ display: none !important; }
+      .autoscale{ transform: none !important; }
+      *{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+    .hide-guides .sheet canvas.guides{ display: none; }
+  </style>
+</head>
+<body>
+  <div id="viewer"></div>
+
+  <div id="source" style="display:none">
+    <h1>Sample Title</h1>
+    <p>This is placeholder content. Replace #source with your compiled MDX HTML.</p>
+    <p>The engine paginates into fixed letter-size sheets with strict margins and no overflow.</p>
+    <h2>Bulleted List</h2>
+    <ul>
+      <li>Exact page size: 8.5in × 11in.</li>
+      <li>Safe printable margins set via CSS variables.</li>
+      <li>Canvas overlay draws guides and crop marks.</li>
+      <li>Use <code>.page-break</code> to force a new page where needed.</li>
+    </ul>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur feugiat nisl at massa consectetur, vitae dignissim lorem sollicitudin. Sed gravida, arcu eget porta elementum, nulla ligula molestie mi, non gravida justo eros nec velit.</p>
+    <p>Repeat paragraphs to demonstrate pagination.</p>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec mauris a eros gravida aliquet. Sed euismod, nunc at efficitur pulvinar, ipsum lorem dictum metus, vel varius lorem lacus vel sapien. Vestibulum pellentesque risus id sapien aliquet porttitor.</p>
+    <p>Etiam ut imperdiet neque. Nulla facilisi. Vivamus luctus lorem id arcu malesuada, ut sagittis justo vestibulum.</p>
+    <p>Phasellus id tellus nec magna tristique consectetur. Sed luctus pulvinar semper. Integer at enim quis ipsum convallis hendrerit.</p>
+    <p>Aliquam erat volutpat. Suspendisse potenti. Donec consequat lorem in lectus hendrerit, porttitor pretium lectus fringilla.</p>
+    <p>Proin vitae suscipit odio. Ut viverra sem non sem aliquet, non luctus lectus condimentum.</p>
+    <p class="page-break"></p>
+    <h2>Tables</h2>
+    <table>
+      <thead><tr><th>Item</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Width</td><td>8.5in</td></tr>
+        <tr><td>Height</td><td>11in</td></tr>
+        <tr><td>Margins</td><td>0.75in / 0.7in / 0.75in / 0.7in</td></tr>
+      </tbody>
+    </table>
+    <p>More filler below to create multiple pages.</p>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec mauris a eros gravida aliquet. Sed euismod, nunc at efficitur pulvinar, ipsum lorem dictum metus, vel varius lorem lacus vel sapien. Vestibulum pellentesque risus id sapien aliquet porttitor.</p>
+    <p>Etiam ut imperdiet neque. Nulla facilisi. Vivamus luctus lorem id arcu malesuada, ut sagittis justo vestibulum.</p>
+    <p>Phasellus id tellus nec magna tristique consectetur. Sed luctus pulvinar semper. Integer at enim quis ipsum convallis hendrerit.</p>
+    <p>Aliquam erat volutpat. Suspendisse potenti. Donec consequat lorem in lectus hendrerit, porttitor pretium lectus fringilla.</p>
+    <p>Proin vitae suscipit odio. Ut viverra sem non sem aliquet, non luctus lectus condimentum.</p>
+  </div>
+
+  <script>
+    function cssPixelsPerInch(){
+      const probe = document.createElement('div');
+      probe.style.width = '1in';
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      document.body.appendChild(probe);
+      const ppi = probe.getBoundingClientRect().width;
+      document.body.removeChild(probe);
+      return ppi || 96;
+    }
+
+    function readInches(v){
+      if(!v) return 0;
+      if(v.endsWith('in')) return parseFloat(v);
+      if(v.endsWith('px')) return parseFloat(v)/cssPixelsPerInch();
+      return parseFloat(v);
+    }
+
+    function getHeaderHeightInches(){
+      const cs = getComputedStyle(document.documentElement);
+      return readInches(cs.getPropertyValue('--header-height').trim());
+    }
+
+    function newSheet(){
+      const sheet = document.createElement('div');
+      sheet.className = 'sheet';
+
+      const header = document.createElement('div');
+      header.className = 'header';
+      const pnum = document.createElement('div');
+      pnum.className = 'page-num';
+      header.appendChild(pnum);
+
+      const canvas = document.createElement('canvas');
+      canvas.className = 'guides';
+      const content = document.createElement('div');
+      content.className = 'content';
+
+      const counter = document.createElement('div');
+      counter.className = 'counter';
+
+      sheet.appendChild(header);
+      sheet.appendChild(canvas);
+      sheet.appendChild(content);
+      sheet.appendChild(counter);
+      document.getElementById('viewer').appendChild(sheet);
+      drawGuides(sheet);
+      return sheet;
+    }
+
+    function drawGuides(sheet){
+      const canvas = sheet.querySelector('canvas.guides');
+      const cs = getComputedStyle(document.documentElement);
+      const ppi = cssPixelsPerInch();
+
+      const pageW_in = readInches(cs.getPropertyValue('--page-width').trim());
+      const pageH_in = readInches(cs.getPropertyValue('--page-height').trim());
+      const mTop_in = readInches(cs.getPropertyValue('--margin-top').trim());
+      const mRight_in = readInches(cs.getPropertyValue('--margin-right').trim());
+      const mBottom_in = readInches(cs.getPropertyValue('--margin-bottom').trim());
+      const mLeft_in = readInches(cs.getPropertyValue('--margin-left').trim());
+      const header_in = getHeaderHeightInches();
+
+      const W = Math.round(pageW_in * ppi);
+      const H = Math.round(pageH_in * ppi);
+      canvas.width = W;
+      canvas.height = H;
+
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0,0,W,H);
+
+      // Page border
+      ctx.strokeStyle = '#d1d5db';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0.5, 0.5, W-1, H-1);
+
+      // Margin/content box (starts below header)
+      const mx = Math.round(mLeft_in * ppi);
+      const my = Math.round((mTop_in + header_in) * ppi);
+      const mw = Math.round((pageW_in - mLeft_in - mRight_in) * ppi);
+      const mh = Math.round((pageH_in - (mTop_in + header_in) - mBottom_in) * ppi);
+
+      ctx.strokeStyle = '#9ca3af';
+      ctx.setLineDash([5,4]);
+      ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
+      ctx.setLineDash([]);
+
+      // Crop marks
+      const cropLen = Math.round(0.2 * ppi);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1;
+
+      // top-left
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(cropLen, 0);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, cropLen);
+      ctx.stroke();
+
+      // top-right
+      ctx.beginPath();
+      ctx.moveTo(W, 0);
+      ctx.lineTo(W - cropLen, 0);
+      ctx.moveTo(W, 0);
+      ctx.lineTo(W, cropLen);
+      ctx.stroke();
+
+      // bottom-left
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      ctx.lineTo(cropLen, H);
+      ctx.moveTo(0, H);
+      ctx.lineTo(0, H - cropLen);
+      ctx.stroke();
+
+      // bottom-right
+      ctx.beginPath();
+      ctx.moveTo(W, H);
+      ctx.lineTo(W - cropLen, H);
+      ctx.moveTo(W, H);
+      ctx.lineTo(W, H - cropLen);
+      ctx.stroke();
+
+      // Baseline grid (optional)
+      const leading_in = 14 / 72;
+      const step = leading_in * ppi;
+      ctx.strokeStyle = 'rgba(148,163,184,0.2)';
+      ctx.lineWidth = 1;
+      for(let y = my + step; y < my + mh; y += step){
+        ctx.beginPath();
+        ctx.moveTo(mx, Math.round(y)+0.5);
+        ctx.lineTo(mx + mw, Math.round(y)+0.5);
+        ctx.stroke();
+      }
+    }
+
+    function paginate(){
+      const viewer = document.getElementById('viewer');
+      viewer.innerHTML = '';
+      const src = document.getElementById('source');
+      const nodes = Array.from(src.childNodes);
+      src.innerHTML = '';
+
+      let sheet = newSheet();
+      let content = sheet.querySelector('.content');
+
+      const fits = () => content.scrollHeight <= content.clientHeight + 0.5;
+      const isIgnorable = (n) =>
+        (n.nodeType === 3 && !/\S/.test(n.nodeValue)) || (n.nodeType === 8);
+
+      function placeOnNewPage(node){
+        sheet = newSheet();
+        content = sheet.querySelector('.content');
+        content.appendChild(node);
+        if(content.scrollHeight > content.clientHeight + 0.5){
+          const scale = content.clientHeight / content.scrollHeight;
+          node.classList.add('autoscale');
+          node.style.transform = `scale(${Math.max(0.01, scale - 0.01)})`;
+          node.style.width = '100%';
+        }
+      }
+
+      for(const node of nodes){
+        if(isIgnorable(node)) continue;
+
+        if(node.nodeType === 1 && node.classList.contains('page-break')){
+          if(content.childNodes.length > 0){
+            sheet = newSheet();
+            content = sheet.querySelector('.content');
+          }
+          continue;
+        }
+
+        content.appendChild(node);
+
+        if(!fits()){
+          content.removeChild(node);
+          placeOnNewPage(node);
+        }
+      }
+
+      // Set page numbers and alternate alignment
+      const pages = Array.from(document.querySelectorAll('.sheet'));
+      pages.forEach((s, i) => {
+        const n = i + 1;
+        s.classList.remove('odd', 'even');
+        s.classList.add(n % 2 === 1 ? 'odd' : 'even');
+        const el = s.querySelector('.page-num');
+        if(el) el.textContent = String(n);
+      });
+    }
+
+    window.addEventListener('load', paginate);
+    window.addEventListener('resize', paginate);
+
+    function enterPrint(){ document.documentElement.classList.add('print-mode'); }
+    function exitPrint(){ document.documentElement.classList.remove('print-mode'); paginate(); }
+    if('onbeforeprint' in window){
+      window.onbeforeprint = enterPrint;
+      window.onafterprint = exitPrint;
+    }else{
+      const mql = window.matchMedia('print');
+      mql.addEventListener('change', e => { if(e.matches) enterPrint(); else exitPrint(); });
+    }
+
+    // Public API
+    window.Mockup = {
+      setHTML(html){
+        const src = document.getElementById('source');
+        src.innerHTML = html;
+      },
+      render: paginate,
+      setMargins({top, right, bottom, left}){
+        const root = document.documentElement;
+        if(top) root.style.setProperty('--margin-top', top);
+        if(right) root.style.setProperty('--margin-right', right);
+        if(bottom) root.style.setProperty('--margin-bottom', bottom);
+        if(left) root.style.setProperty('--margin-left', left);
+        paginate();
+      },
+      setBaseFont(pt){
+        document.documentElement.style.setProperty('--base-font', pt + 'pt');
+        paginate();
+      },
+      setHeader({height, bg}){
+        const root = document.documentElement;
+        if(height) root.style.setProperty('--header-height', height);
+        if(bg) root.style.setProperty('--header-bg', bg);
+        paginate();
+      },
+      hideGuides(state=true){
+        document.body.classList.toggle('hide-guides', state);
+      }
+    };
+  </script>
+</body>
+</html>
+

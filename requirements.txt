@@ -45,3 +45,10 @@ PyYAML==6.0.1  # YAML config for dashboard targets
 
 # Order Flow Monitoring (level-2-order-flow-i)
 polygon-api-client==1.12.5  # Polygon.io SDK for Level 2 and Time & Sales data
+
+# LLM-Friendly Bot Operations (029-llm-friendly-bot-operations)
+fastapi==0.104.1  # REST API framework
+uvicorn[standard]==0.24.0  # ASGI server with WebSocket support
+pydantic==2.5.0  # Data validation (v2)
+websockets==12.0  # WebSocket protocol support
+jsonschema==4.20.0  # JSON schema validation for config

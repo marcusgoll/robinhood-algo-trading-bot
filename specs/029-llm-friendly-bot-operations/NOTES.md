@@ -123,6 +123,18 @@ The implementation builds on existing infrastructure (dashboard, logging, perfor
 
 2025-10-24T21:45:00
 
+## Phase 4: Implementation (2025-10-24)
+
+**Batch 1: Setup** (Complete)
+- T001: Install FastAPI dependencies in requirements.txt
+- T002: Create directory structure for new modules
+- T003: Add new environment variables to .env.example
+
+**Batch 2: Foundational** (Complete)
+- T005: Create SemanticError dataclass in src/trading_bot/logging/semantic_error.py
+- T006: Create error formatter in src/trading_bot/logging/error_formatter.py
+- T007: Extend API key auth in api/app/core/auth.py (verify_api_key function)
+
 ## Phase 2: Tasks (2025-10-24)
 
 **Summary**:
