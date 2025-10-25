@@ -92,13 +92,16 @@ class PerformanceMetricsResponse(BaseModel):
 class HealthStatus(BaseModel):
     """Health status of the trading bot."""
 
-    status: Literal["healthy", "degraded", "unhealthy"] = Field(
+    status: Literal["healthy", "degraded", "offline"] = Field(
         ..., description="Overall health status"
     )
     circuit_breaker_active: bool = Field(..., description="Circuit breaker status")
     api_connected: bool = Field(..., description="Robinhood API connection status")
     last_trade_timestamp: Optional[datetime] = Field(
         None, description="Timestamp of last trade execution"
+    )
+    last_heartbeat: datetime = Field(
+        ..., description="Timestamp of last health check heartbeat"
     )
     error_count_last_hour: int = Field(
         0, description="Number of errors in the last hour"
@@ -111,6 +114,7 @@ class HealthStatus(BaseModel):
                 "circuit_breaker_active": False,
                 "api_connected": True,
                 "last_trade_timestamp": "2025-10-24T10:25:00Z",
+                "last_heartbeat": "2025-10-24T10:30:00Z",
                 "error_count_last_hour": 0,
             }
         }
@@ -130,6 +134,12 @@ class BotStateResponse(BaseModel):
     )
     market_status: Literal["OPEN", "CLOSED"] = Field(..., description="Market status")
     timestamp: datetime = Field(..., description="Response generation timestamp")
+    data_age_seconds: float = Field(
+        ..., description="Age of data in seconds since collection (for staleness detection)"
+    )
+    warnings: List[str] = Field(
+        default_factory=list, description="Active warnings or alerts"
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -187,10 +197,10 @@ class BotStateResponse(BaseModel):
 class BotSummaryResponse(BaseModel):
     """Compressed bot summary for GET /api/v1/summary (<10KB target)."""
 
-    health_status: Literal["healthy", "degraded", "unhealthy"] = Field(
+    health_status: Literal["healthy", "degraded", "offline"] = Field(
         ..., description="Overall health status"
     )
-    positions_count: int = Field(..., description="Number of open positions")
+    position_count: int = Field(..., description="Number of open positions")
     open_orders_count: int = Field(..., description="Number of open orders")
     daily_pnl: Decimal = Field(..., description="Today's profit/loss")
     circuit_breaker_status: str = Field(..., description="Circuit breaker status")

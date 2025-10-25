@@ -75,3 +75,18 @@ Add unit tests for edge case: bot just started, no trades yet. Validate all exte
 - Spec: FR-001 (state API must return valid response)
 - Code: api/app/services/state_aggregator.py:45
 - Commit: abc1234
+
+### Entry 1: 2025-10-24 - Contract Violations from Code Review
+
+**Failure**: Three critical API contract violations preventing schema validation
+**Symptom**: Code review reported CRITICAL issues in SemanticError, BotState, and HealthStatus schemas failing to match OpenAPI contract spec
+**Learning**: Contract-first development requires validating implementation against spec before optimization. Missing fields: severity enum in SemanticError, data_age_seconds and warnings in BotState, last_heartbeat in HealthStatus. Enum value mismatch: "unhealthy" vs contract-required "offline"
+**Ghost Context Cleanup**: None - pure additions to match contract
+
+**From /optimize → /debug auto-fix flow**
+
+**Files changed**:
+- src/trading_bot/logging/semantic_error.py: Added ErrorSeverity enum and severity field
+- api/app/schemas/state.py: Added data_age_seconds, warnings to BotStateResponse; added last_heartbeat to HealthStatus; fixed enum "unhealthy" → "offline"; fixed "positions_count" → "position_count"
+
+**Fix time**: 20 minutes (schema corrections)

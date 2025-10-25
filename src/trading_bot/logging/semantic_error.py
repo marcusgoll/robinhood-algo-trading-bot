@@ -6,7 +6,17 @@ This module provides a structured format for errors that includes semantic conte
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Dict, Any, Optional
+
+
+class ErrorSeverity(str, Enum):
+    """Error severity levels for prioritization and alerting."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
 
 
 @dataclass
@@ -20,6 +30,7 @@ class SemanticError:
         cause: Root cause explanation (why this happened)
         impact: Impact description (what this affects)
         remediation: Suggested fix or next steps
+        severity: Error severity level (low, medium, high, critical)
         context: Additional context dict (e.g., position_id, symbol, threshold)
         timestamp: When the error occurred (UTC)
     """
@@ -30,6 +41,7 @@ class SemanticError:
     cause: str
     impact: str
     remediation: str
+    severity: ErrorSeverity = ErrorSeverity.MEDIUM
     context: Dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -46,6 +58,7 @@ class SemanticError:
             "cause": self.cause,
             "impact": self.impact,
             "remediation": self.remediation,
+            "severity": self.severity.value,
             "context": self.context,
             "timestamp": self.timestamp.isoformat(),
         }
