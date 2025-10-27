@@ -105,8 +105,21 @@ def main() -> int:
         if result.status == "ready":
             if args.dry_run:
                 return 0  # Success - dry run complete
-            # TODO: Enter trading loop here (future work)
-            return 0
+
+            # Enter trading loop
+            if hasattr(orchestrator, 'bot') and orchestrator.bot:
+                try:
+                    orchestrator.bot.start()
+                    return 0
+                except KeyboardInterrupt:
+                    print("\n\n⚠️  Trading interrupted by user")
+                    return 130
+                except Exception as e:
+                    print(f"\n❌ Trading error: {e}")
+                    return 3
+            else:
+                print("\n❌ Bot not initialized")
+                return 3
         else:
             # Startup blocked
             if not args.json:
