@@ -228,3 +228,18 @@ Ready for /plan - specification is complete, validated, and unambiguous.
 - MessageFormatter: Bold text, 🚨 emoji, Markdown code blocks for values
 
 **Status**: 13/13 tasks complete (Batch 1+2+3+4+5 - MVP scope), ready for polish tasks
+
+### Batch 6: Polish and Testing (Completed)
+- ✅ T050: Add async fire-and-forget delivery (already implemented with asyncio.create_task)
+- ✅ T051: Add graceful degradation (already implemented in NotificationService.__init__)
+- ✅ T052: Add rate limiting (already implemented with error_cache dict)
+- ✅ T053: Unit tests for MessageFormatter (13 tests: formatting, emoji, truncation, duration, escaping)
+- ✅ T054: Unit tests for TelegramClient (6 tests: success, timeout, errors, validation)
+- ✅ T055: Integration tests for NotificationService (4 tests: disabled, credentials, rate limiting, degradation)
+
+**Testing Coverage**:
+- test_message_formatter.py: 13 test cases (formatting, emoji, escaping, truncation)
+- test_telegram_client.py: 6 test cases (async send, timeout, errors)
+- test_notification_service.py: 4 test cases (config, rate limiting, degradation)
+
+**Status**: 19/19 tasks complete (Batch 1-6), ready for deployment prep
