@@ -1,0 +1,80 @@
+# Docker ignore file - exclude unnecessary files from build context
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.json
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs (will be mounted as volume)
+logs/
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Credentials (NEVER include in Docker image!)
+.env
+.robinhood.pickle
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Examples and tests
+examples/
+tests/
+backtests/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Spec-Flow artifacts (project management)
+.spec-flow/
+specs/
+
+# Data files (mount as volume if needed)
+data/
+*.csv
+*.db
+*.sqlite
+
+# Backups
+backups/
+*.backup
+
+# Node modules (if any)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore
