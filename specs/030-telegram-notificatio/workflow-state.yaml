@@ -1,0 +1,81 @@
+feature:
+  slug: telegram-notificatio
+  title: telegram-notifications
+  description: telegram-notifications
+  branch_name: feature/030-telegram-notificatio
+  created_at: 2025-10-27T00:00:00Z
+  updated_at: 2025-10-27T14:50:00Z
+
+deployment:
+  model: remote-direct
+
+workflow:
+  phase: ship
+  status: in_progress
+  phases:
+    spec-flow:
+      status: completed
+      started_at: 2025-10-27T00:00:00Z
+      completed_at: 2025-10-27T00:03:00Z
+    clarify:
+      status: skipped
+    plan:
+      status: completed
+      started_at: 2025-10-27T00:03:00Z
+      completed_at: 2025-10-27T00:06:00Z
+    tasks:
+      status: completed
+      started_at: 2025-10-27T00:06:00Z
+      completed_at: 2025-10-27T00:09:00Z
+    analyze:
+      status: completed
+      started_at: 2025-10-27T00:09:00Z
+      completed_at: 2025-10-27T00:12:00Z
+    implement:
+      status: completed
+      started_at: 2025-10-27T00:12:00Z
+      completed_at: 2025-10-27T01:12:00Z
+    optimize:
+      status: completed
+      started_at: 2025-10-27T01:12:00Z
+      completed_at: 2025-10-27T14:35:00Z
+    preview:
+      status: completed
+      started_at: 2025-10-27T14:35:00Z
+      completed_at: 2025-10-27T14:45:00Z
+    ship:
+      status: in_progress
+      started_at: 2025-10-27T14:50:00Z
+
+quality_gates:
+  pre_flight:
+    passed: true
+    timestamp: 2025-10-27T14:35:00Z
+  code_review:
+    passed: true
+    timestamp: 2025-10-27T14:30:00Z
+  security:
+    passed: true
+    timestamp: 2025-10-27T14:32:00Z
+  performance:
+    passed: true
+    timestamp: 2025-10-27T14:28:00Z
+
+manual_gates:
+  preview:
+    status: approved
+    approved_at: 2025-10-27T14:45:00Z
+    approved_by: Claude Code
+
+artifacts:
+  spec: "specs/030-telegram-notificatio/spec.md"
+  notes: "specs/030-telegram-notificatio/NOTES.md"
+  plan: "specs/030-telegram-notificatio/plan.md"
+  research: "specs/030-telegram-notificatio/research.md"
+  data_model: "specs/030-telegram-notificatio/data-model.md"
+  tasks: "specs/030-telegram-notificatio/tasks.md"
+  analysis: "specs/030-telegram-notificatio/analysis-report.md"
+  optimization: "specs/030-telegram-notificatio/optimization-report.md"
+  code_review: "specs/030-telegram-notificatio/code-review.md"
+  preview_checklist: "specs/030-telegram-notificatio/preview-checklist.md"
+  release_notes: ""

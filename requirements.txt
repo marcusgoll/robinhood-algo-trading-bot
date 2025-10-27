@@ -52,3 +52,6 @@ uvicorn[standard]==0.24.0  # ASGI server with WebSocket support
 pydantic==2.5.0  # Data validation (v2)
 websockets==12.0  # WebSocket protocol support
 jsonschema==4.20.0  # JSON schema validation for config
+
+# Telegram Notifications (030-telegram-notifications)
+python-telegram-bot==20.7  # Async Telegram Bot API wrapper

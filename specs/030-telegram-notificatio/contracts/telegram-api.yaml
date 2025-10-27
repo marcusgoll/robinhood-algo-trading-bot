@@ -1,0 +1,177 @@
+openapi: 3.0.0
+info:
+  title: Telegram Bot API - sendMessage Endpoint
+  description: Subset of Telegram Bot API used for notification delivery
+  version: 7.0.0
+  contact:
+    url: https://core.telegram.org/bots/api
+servers:
+  - url: https://api.telegram.org
+    description: Telegram Bot API production server
+paths:
+  /bot{token}/sendMessage:
+    post:
+      summary: Send text message to Telegram chat
+      operationId: sendMessage
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: Bot API token from BotFather
+          schema:
+            type: string
+            example: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - chat_id
+                - text
+              properties:
+                chat_id:
+                  type: string
+                  description: Unique identifier for target chat (numeric string)
+                  example: "123456789"
+                text:
+                  type: string
+                  description: Text of message to send (1-4096 characters)
+                  minLength: 1
+                  maxLength: 4096
+                  example: "📈 **Position Opened**\\n\\n**Symbol**: AAPL\\n**Entry**: $150.25"
+                parse_mode:
+                  type: string
+                  description: Message formatting mode
+                  enum:
+                    - Markdown
+                    - MarkdownV2
+                    - HTML
+                  example: "Markdown"
+                disable_notification:
+                  type: boolean
+                  description: Send message silently (users receive without notification sound)
+                  default: false
+      responses:
+        200:
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  result:
+                    type: object
+                    properties:
+                      message_id:
+                        type: integer
+                        description: Unique message identifier
+                        example: 12345
+                      chat:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            example: 123456789
+                          type:
+                            type: string
+                            example: "private"
+                      date:
+                        type: integer
+                        description: Unix timestamp when message was sent
+                        example: 1730048035
+                      text:
+                        type: string
+                        description: Message text
+        400:
+          description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramError'
+              examples:
+                invalid_chat_id:
+                  summary: Invalid chat ID
+                  value:
+                    ok: false
+                    error_code: 400
+                    description: "Bad Request: chat not found"
+                message_too_long:
+                  summary: Message exceeds 4096 character limit
+                  value:
+                    ok: false
+                    error_code: 400
+                    description: "Bad Request: message is too long"
+        401:
+          description: Unauthorized (invalid bot token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramError'
+              examples:
+                invalid_token:
+                  summary: Invalid bot token
+                  value:
+                    ok: false
+                    error_code: 401
+                    description: "Unauthorized"
+        429:
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramError'
+              examples:
+                rate_limited:
+                  summary: Rate limit exceeded
+                  value:
+                    ok: false
+                    error_code: 429
+                    description: "Too Many Requests: retry after 30"
+                    parameters:
+                      retry_after: 30
+        500:
+          description: Internal server error (Telegram API issue)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramError'
+
+components:
+  schemas:
+    TelegramError:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: false
+        error_code:
+          type: integer
+          description: HTTP status code
+          example: 400
+        description:
+          type: string
+          description: Human-readable error message
+          example: "Bad Request: chat not found"
+        parameters:
+          type: object
+          description: Optional error parameters (e.g., retry_after for 429)
+          properties:
+            retry_after:
+              type: integer
+              description: Seconds to wait before retry
+              example: 30
+
+  securitySchemes:
+    BotToken:
+      type: apiKey
+      in: path
+      name: token
+      description: Bot API token obtained from @BotFather
+
+security:
+  - BotToken: []
