@@ -258,6 +258,18 @@ class TradingBot:
             except ImportError:
                 logger.warning("MarketDataService not available - live trading will be limited")
 
+        # T020: Initialize Telegram NotificationService with graceful degradation
+        try:
+            from trading_bot.notifications import get_notification_service
+            self.notification_service = get_notification_service()
+            if self.notification_service.is_enabled():
+                logger.info("Telegram notifications enabled")
+            else:
+                logger.info("Telegram notifications disabled (TELEGRAM_ENABLED=false)")
+        except Exception as e:
+            logger.warning(f"Telegram notifications unavailable: {e}")
+            self.notification_service = None
+
         logger.info(
             f"TradingBot initialized | "
             f"Paper Trading: {self.paper_trading} | "
@@ -642,6 +654,16 @@ class TradingBot:
 
         # T034: Log to structured logger (JSONL)
         self.structured_logger.log_trade(trade_record)
+
+        # T020: Send Telegram notification for position entry (non-blocking)
+        if action.upper() == "BUY" and hasattr(self, 'notification_service'):
+            try:
+                import asyncio
+                asyncio.create_task(self.notification_service.send_position_entry(trade_record))
+                logger.debug(f"Telegram position entry notification queued for {symbol}")
+            except Exception as e:
+                # Never block trading operations on notification failure
+                logger.warning(f"Telegram notification failed for {symbol}: {e}")
 
         # Log trade decision with reasoning (§Audit_Everything) - Text logging maintained
         logger.info(

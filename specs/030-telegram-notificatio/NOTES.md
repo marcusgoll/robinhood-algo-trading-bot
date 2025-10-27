@@ -195,3 +195,14 @@ Ready for /plan - specification is complete, validated, and unambiguous.
 - NotificationService: Fire-and-forget pattern with asyncio.create_task(), error_cache dict for rate limiting, graceful degradation
 
 **Status**: 6/6 tasks complete (Batch 1+2), ready for US1 implementation
+
+### Batch 3: US1 Position Entry (Completed)
+- ✅ T020: Added position entry notification to bot.py (after trade logging, fire-and-forget async)
+- ✅ T021: Created notification log file logs/telegram-notifications.jsonl
+
+**Integration Points**:
+- bot.py line 646-654: Send notification after BUY orders with asyncio.create_task()
+- bot.py line 261-271: Initialize NotificationService in __init__ with graceful degradation
+- Non-blocking: Notification failures never block trade execution (wrapped in try/except)
+
+**Status**: 8/8 tasks complete (Batch 1+2+3), ready for US2 implementation
