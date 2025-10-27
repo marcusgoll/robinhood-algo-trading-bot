@@ -8,10 +8,14 @@ feature:
 
 deployment:
   model: remote-direct
+  pull_request: https://github.com/marcusgoll/robinhood-algo-trading-bot/pull/37
+  pr_merged_at: 2025-10-27T12:12:13Z
+  target_branch: main
+  status: merged_to_main
 
 workflow:
   phase: ship
-  status: in_progress
+  status: completed
   phases:
     spec-flow:
       status: completed
@@ -44,8 +48,9 @@ workflow:
       started_at: 2025-10-27T14:35:00Z
       completed_at: 2025-10-27T14:45:00Z
     ship:
-      status: in_progress
+      status: completed
       started_at: 2025-10-27T14:50:00Z
+      completed_at: 2025-10-27T12:12:00Z
 
 quality_gates:
   pre_flight:
