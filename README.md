@@ -6,6 +6,104 @@ A Python-based algorithmic trading bot using the `robin_stocks` library, built w
 
 ---
 
+## Table of Contents
+
+- [What's New](#whats-new)
+- [API Documentation](#-api-documentation-new-in-v180)
+- [Constitution](#-constitution-v100)
+- [Features](#features)
+  - [Backtesting Engine](#-backtesting-engine)
+  - [Support/Resistance Mapping](#-supportresistance-zone-mapping)
+  - [Daily Profit Goals](#-daily-profit-goal-management)
+  - [Emotional Control](#-emotional-control-mechanisms)
+- [Quick Start](#-quick-start)
+- [Usage](#usage)
+- [Configuration](#️-configuration-system)
+- [Trading Modes](#-trading-mode-paper-vs-live)
+- [Phase Progression](#-phase-progression)
+- [Logging](#-logging-system)
+- [Security](#-security)
+- [Development](#-development-workflow)
+- [Testing](#-testing-strategy)
+- [Commands](#️-commands)
+- [Support](#-support)
+
+---
+
+## What's New
+
+### Version 1.8.0 (Latest) - LLM-Friendly Bot Operations 🤖
+
+**New API for AI Assistants and Operators!**
+
+Control and monitor your trading bot through a comprehensive REST API with WebSocket streaming, natural language commands, and LLM-optimized responses.
+
+**Key Features**:
+- 📊 **State API**: Real-time positions, performance, health monitoring
+- 🔧 **Configuration Management**: Validate, diff, and rollback config changes
+- 🤖 **Natural Language CLI**: "Show today's performance", "Check bot health"
+- 📡 **WebSocket Streaming**: Live metrics updates every 5 seconds
+- 🛠️ **Workflow Automation**: Predefined maintenance workflows
+- 📖 **OpenAPI Docs**: Interactive Swagger UI at `/api/docs`
+
+👉 **[Full API Documentation](docs/API.md)**
+
+### Version 1.7.0 - Level 2 Order Flow Integration
+
+Real-time institutional selling pressure detection using Polygon.io market microstructure data.
+
+**Features**: Large seller detection (>10k shares), red burst volume spikes, exit signal generation
+
+---
+
+## 📡 API Documentation (NEW in v1.8.0)
+
+The Trading Bot API enables AI assistants and operators to monitor and control the bot through structured interfaces.
+
+### Quick Start
+
+```bash
+# 1. Configure API token
+echo "BOT_API_AUTH_TOKEN=your-secure-token" >> .env
+
+# 2. Start API service
+bash scripts/start_api.sh
+
+# 3. Access Swagger UI
+open http://localhost:8000/api/docs
+
+# 4. Make your first request
+curl -H "X-API-Key: your-token" http://localhost:8000/api/v1/summary
+```
+
+### Key Endpoints
+
+| Endpoint | Description | Response Size |
+|----------|-------------|---------------|
+| `GET /api/v1/summary` | Bot summary optimized for LLMs | <10KB |
+| `GET /api/v1/state` | Complete bot state (positions, performance, health) | ~50KB |
+| `GET /api/v1/health` | Health check status | <1KB |
+| `GET /api/v1/config` | Current configuration | ~5KB |
+| `POST /api/v1/workflows/{id}/execute` | Execute maintenance workflows | Varies |
+| `WebSocket /api/v1/stream` | Real-time metrics streaming (5s updates) | Streaming |
+
+### Natural Language CLI
+
+```bash
+# Ask questions in plain English
+python -m src.trading_bot.cli.nl_commands "show today's performance"
+python -m src.trading_bot.cli.nl_commands "check bot health"
+python -m src.trading_bot.cli.nl_commands "what positions are open?"
+```
+
+### Documentation
+
+- **[Complete API Reference](docs/API.md)** - Full endpoint documentation
+- **[Quickstart Guide](specs/029-llm-friendly-bot-operations/quickstart.md)** - Step-by-step setup
+- **[Feature Spec](specs/029-llm-friendly-bot-operations/spec.md)** - Technical specifications
+
+---
+
 ## 🛡️ Constitution v1.0.0
 
 This project follows strict development principles defined in [`.specify/memory/constitution.md`](.specify/memory/constitution.md):
