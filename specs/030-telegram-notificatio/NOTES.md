@@ -131,3 +131,46 @@ Ready for /plan - specification is complete, validated, and unambiguous.
 - contracts/telegram-api.yaml: OpenAPI spec for Telegram Bot API sendMessage endpoint
 - quickstart.md: 5 integration scenarios (setup, testing, debugging, rollback, production deployment)
 - error-log.md: Initialized error tracking template
+
+## Phase 2: Tasks (2025-10-27 00:25)
+
+**Summary**:
+- Total tasks: 28
+- User story tasks: 11 (US1: 2, US2: 2, US3: 3, Polish: 4, Deployment: 2)
+- Parallel opportunities: 20 tasks marked [P]
+- Setup tasks: 3
+- Task file: specs/030-telegram-notificatio/tasks.md
+
+**Task Breakdown**:
+- Phase 1 (Setup): 3 tasks - Module structure, dependencies, environment config
+- Phase 2 (Foundational): 3 tasks - TelegramClient, MessageFormatter, NotificationService
+- Phase 3 (US1): 2 tasks - Position entry notifications
+- Phase 4 (US2): 2 tasks - Position exit notifications with P&L
+- Phase 5 (US3): 3 tasks - Risk alert notifications (circuit breaker + performance alerts)
+- Phase 6 (Polish): 8 tasks - Error handling, rate limiting, testing (3 test files)
+- Documentation: 1 task - NOTES.md update
+
+**Dependency Graph**:
+1. Setup tasks (T001-T003) → Foundational (T010-T012) → User stories (T020-T042)
+2. Critical path: T010 (TelegramClient) → T020 (US1) → T030 (US2)
+3. Parallel paths: US3 (T040-T042) independent of US1/US2
+
+**REUSE Opportunities**:
+- 7 existing components: TradeRecord, AlertEvaluator, CircuitBreaker, retry.py, logging, dotenv, Pydantic
+- 5 new components: TelegramClient, MessageFormatter, NotificationService, tests/, validate_config.py
+
+**MVP Strategy**: Implement US1-US3 (position entry/exit + risk alerts), validate delivery reliability >99%, then deploy to production. Defer US4-US7 based on usage feedback.
+
+**Checkpoint**:
+- ✅ Tasks generated: 28 concrete tasks
+- ✅ User story organization: Complete (organized by phase and priority)
+- ✅ Dependency graph: Created (setup → foundational → stories → polish)
+- ✅ Parallel execution opportunities: 20 tasks marked [P]
+- ✅ MVP strategy: Defined (US1-US3 only for first release)
+- 📋 Ready for: /analyze
+
+**Testing Strategy**:
+- Unit tests: test_message_formatter.py, test_telegram_client.py (T053, T054)
+- Integration tests: test_notification_service.py (T055)
+- Manual tests: validate_config.py CLI tool (T056), test_telegram_notification.py script (T057)
+- Coverage target: >90% (Constitution requirement)
