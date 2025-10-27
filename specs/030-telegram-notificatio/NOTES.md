@@ -243,3 +243,14 @@ Ready for /plan - specification is complete, validated, and unambiguous.
 - test_notification_service.py: 4 test cases (config, rate limiting, degradation)
 
 **Status**: 19/19 tasks complete (Batch 1-6), ready for deployment prep
+
+### Batch 7: Deployment Prep (Completed)
+- ✅ T056: Created validate_config.py CLI tool (5-step validation: enabled, token, chat_id, API connection, test message)
+- ✅ T057: Created manual test script scripts/test_telegram_notification.py (tests all 3 notification types)
+- ✅ T058: Updated NOTES.md with comprehensive implementation checkpoint
+
+**Deployment Tools**:
+- validate_config.py: Validates credentials, sends test message, exit code 0/1
+- test_telegram_notification.py: Tests position entry/exit + risk alerts with delivery timing
+
+**Status**: 22/28 tasks complete (all MVP + deployment prep tasks)
