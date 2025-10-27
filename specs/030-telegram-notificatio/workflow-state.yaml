@@ -1,0 +1,42 @@
+feature:
+  slug: telegram-notificatio
+  title: telegram-notifications
+  description: telegram-notifications
+  branch_name: feature/030-telegram-notificatio
+  created_at: 2025-10-27T00:00:00Z
+  updated_at: 2025-10-27T00:00:00Z
+
+deployment:
+  model: remote-direct
+
+workflow:
+  phase: spec-flow
+  status: in_progress
+  phases:
+    spec-flow:
+      status: in_progress
+      started_at: 2025-10-27T00:00:00Z
+    clarify:
+      status: not_started
+    plan:
+      status: not_started
+    tasks:
+      status: not_started
+    analyze:
+      status: not_started
+    implement:
+      status: not_started
+    optimize:
+      status: not_started
+    preview:
+      status: not_started
+    ship:
+      status: not_started
+
+artifacts:
+  spec: ""
+  plan: ""
+  tasks: ""
+  analysis: ""
+  optimization: ""
+  release_notes: ""
