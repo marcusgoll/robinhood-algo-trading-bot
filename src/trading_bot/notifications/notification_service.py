@@ -104,6 +104,7 @@ class NotificationService:
 
         # Rate limiting cache: {error_type: last_sent_timestamp}
         self.error_cache: dict[str, datetime] = {}
+        self.error_cache_lock = asyncio.Lock()  # Protect concurrent cache access
 
         # Notification log file
         self.log_file = Path("logs/telegram-notifications.jsonl")
@@ -215,14 +216,15 @@ class NotificationService:
         if not self.enabled or not self.notify_alerts:
             return
 
-        # Check rate limit
+        # Check rate limit (thread-safe with lock)
         breach_type = alert_event.get("breach_type", "unknown")
-        if self._is_rate_limited(breach_type):
-            logger.debug(
-                f"Risk alert '{breach_type}' rate limited "
-                f"(max 1 per {self.error_rate_limit_minutes} minutes)"
-            )
-            return
+        async with self.error_cache_lock:
+            if self._is_rate_limited(breach_type):
+                logger.debug(
+                    f"Risk alert '{breach_type}' rate limited "
+                    f"(max 1 per {self.error_rate_limit_minutes} minutes)"
+                )
+                return
 
         # Extract data
         alert_data = RiskAlertData(
@@ -243,8 +245,9 @@ class NotificationService:
             )
         )
 
-        # Update rate limit cache
-        self.error_cache[breach_type] = datetime.utcnow()
+        # Update rate limit cache (thread-safe with lock)
+        async with self.error_cache_lock:
+            self.error_cache[breach_type] = datetime.utcnow()
 
     def _is_rate_limited(self, error_type: str) -> bool:
         """
@@ -347,16 +350,32 @@ class NotificationService:
 
     def _append_log(self, log_entry: dict) -> None:
         """
-        Append log entry to JSONL file.
+        Append log entry to JSONL file with fallback.
 
         Args:
             log_entry: Log entry dict
 
         Returns:
             None - catches all exceptions to prevent I/O errors from blocking
+
+        Fallback: If file write fails (disk full, permission error),
+                  logs entry to application logger instead
         """
         try:
             with open(self.log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_entry) + "\n")
+        except (OSError, IOError) as e:
+            # Disk full, permission denied, or other I/O errors
+            # Fall back to application logger
+            logger.error(
+                f"Failed to write notification log to JSONL file: {type(e).__name__}: {e}. "
+                f"Falling back to application logger. "
+                f"Notification: {log_entry.get('notification_type')} - "
+                f"{log_entry.get('delivery_status')}"
+            )
         except Exception as e:
-            logger.error(f"Failed to write notification log: {e}")
+            # Other unexpected errors (JSON serialization, etc)
+            logger.error(
+                f"Unexpected error while logging notification: {type(e).__name__}: {e}. "
+                f"Notification: {log_entry.get('notification_type')}"
+            )

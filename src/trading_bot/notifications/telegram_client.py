@@ -104,6 +104,20 @@ class TelegramClient:
 
         actual_timeout = timeout if timeout is not None else self.timeout
 
+        # Validate contract: chat_id format
+        if not isinstance(chat_id, str) or not chat_id.lstrip('-').isdigit():
+            return TelegramResponse(
+                success=False,
+                error_message=f"Invalid chat_id format: must be numeric string, got '{chat_id}'"
+            )
+
+        # Validate contract: message length
+        if len(text) > 4096:
+            return TelegramResponse(
+                success=False,
+                error_message=f"Message exceeds Telegram limit: {len(text)} > 4096 characters"
+            )
+
         try:
             # Send message with timeout
             message = await asyncio.wait_for(

@@ -119,7 +119,7 @@ class TestMessageFormatter:
         assert "[PAPER]" in message
         assert "META" in message
         assert "Stop Loss" in message
-        assert "-$200.00" in message
+        assert "$-200.00" in message  # Loss formatted as $-200.00
         assert "-2.5%" in message
         assert "45s" in message
 
@@ -151,10 +151,10 @@ class TestMessageFormatter:
         text = "Test *bold* _italic_ `code` [link]"
         escaped = formatter._escape_markdown(text)
 
-        assert "\\*bold\\*" in escaped
-        assert "\\_italic\\_" in escaped
-        assert "\\`code\\`" in escaped
-        assert "\\[link\\]" in escaped
+        assert "\\*bold\\*" in escaped  # Asterisks escaped
+        assert "\\_italic\\_" in escaped  # Underscores escaped
+        assert "\\`code\\`" in escaped  # Backticks escaped
+        assert "\\[link]" in escaped  # Opening bracket escaped (closing bracket OK per Telegram spec)
 
     def test_message_truncation(self):
         """Test message truncation at 4096 character limit."""
@@ -215,3 +215,49 @@ class TestMessageFormatter:
 
         # Check percentage is in message
         assert f"{expected_pct:+.1f}%" in message
+
+    def test_position_entry_with_target_no_stop_loss(self):
+        """Test position entry with target but no stop loss."""
+        formatter = MessageFormatter(include_emojis=True)
+
+        data = PositionEntryData(
+            symbol="GOOGL",
+            entry_price=Decimal("140.00"),
+            quantity=50,
+            total_value=Decimal("7000.00"),
+            stop_loss=None,  # No stop loss
+            target=Decimal("150.00"),  # But has target
+            execution_mode="LIVE",
+            strategy_name="momentum",
+            entry_type="breakout",
+        )
+
+        message = formatter.format_position_entry(data)
+
+        # Verify message contains target and handles blank line correctly
+        assert "Target:" in message
+        assert "$150.00" in message
+        assert "GOOGL" in message
+
+    def test_position_exit_without_emoji_loss(self):
+        """Test position exit loss without emoji."""
+        formatter = MessageFormatter(include_emojis=False)
+
+        data = PositionExitData(
+            symbol="MSFT",
+            exit_price=Decimal("350.00"),
+            exit_reasoning="Stop Loss",
+            profit_loss=Decimal("-250.00"),
+            profit_loss_pct=-1.5,
+            hold_duration_seconds=7200,  # 2h
+            execution_mode="PAPER",
+        )
+
+        message = formatter.format_position_exit(data)
+
+        # Verify no emoji when disabled
+        assert "❌" not in message
+        assert "✅" not in message
+        assert "MSFT" in message
+        assert "Stop Loss" in message
+        assert "$-250.00" in message

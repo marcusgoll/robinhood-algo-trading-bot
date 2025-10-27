@@ -330,3 +330,55 @@ None - all tasks completed successfully.
 5. Execute test trade and verify notification delivery
 6. Monitor logs/telegram-notifications.jsonl for delivery stats
 7. After 24h validation, deploy to production
+
+---
+
+## Deployment Metadata
+
+### Deploy History
+**Status**: Not yet deployed
+
+**Deployment tracking template** (populate on first deployment):
+- **Deploy ID**: [auto-generated on deployment, format: deploy-YYYYMMDD-HHMMSS]
+- **Timestamp**: [ISO 8601 format]
+- **Commit SHA**: [git commit hash]
+- **Docker Image**: [image tag if using Docker, e.g., ghcr.io/user/trading-bot:abc1234]
+- **Deployment Method**: [manual SSH / automated CI/CD]
+- **Deployed By**: [username or CI system name]
+- **Environment**: [production / staging]
+
+### Rollback Commands
+
+**Option 1: Disable notifications (keep code, turn off feature)**
+```bash
+ssh user@vps
+cd /opt/trading-bot
+sed -i 's/TELEGRAM_ENABLED=true/TELEGRAM_ENABLED=false/' .env
+docker-compose restart trading-bot
+# Or without Docker: systemctl restart trading-bot
+```
+
+**Option 2: Revert to previous version (remove code)**
+```bash
+ssh user@vps
+cd /opt/trading-bot
+git checkout <previous-commit-sha>
+docker-compose down
+docker-compose build
+docker-compose up -d
+```
+
+**Option 3: Use previous Docker image (if using Docker)**
+```bash
+ssh user@vps
+cd /opt/trading-bot
+docker-compose down
+docker pull ghcr.io/user/trading-bot:<previous-sha>
+docker-compose up -d
+```
+
+### Special Considerations
+- No migration needed (file-based logs, no schema changes)
+- No feature flag infrastructure (simple boolean TELEGRAM_ENABLED)
+- Data loss acceptable (notification logs ephemeral, can be deleted)
+- Rollback window: Unlimited (no breaking changes to existing functionality)
