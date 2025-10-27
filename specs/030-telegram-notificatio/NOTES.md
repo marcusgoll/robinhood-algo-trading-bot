@@ -183,3 +183,15 @@ Ready for /plan - specification is complete, validated, and unambiguous.
 - ✅ T003: Added TELEGRAM_* environment variables to .env.example (8 config variables)
 
 **Status**: 3/3 tasks complete, ready for Batch 2
+
+### Batch 2: Foundational Infrastructure (Completed)
+- ✅ T010: Implemented TelegramClient (async send_message, timeout, error handling, validate_credentials)
+- ✅ T011: Implemented MessageFormatter (position entry/exit, risk alerts, emoji, Markdown escaping, truncation)
+- ✅ T012: Implemented NotificationService (config validation, orchestration, rate limiting, JSONL logging)
+
+**Key Implementation Details**:
+- TelegramClient: 5s timeout, HTTPXRequest async handler, TelegramResponse dataclass for delivery status
+- MessageFormatter: 4096 char limit, duration formatting (2h 15m), P&L percentage calculation, escape special chars
+- NotificationService: Fire-and-forget pattern with asyncio.create_task(), error_cache dict for rate limiting, graceful degradation
+
+**Status**: 6/6 tasks complete (Batch 1+2), ready for US1 implementation
