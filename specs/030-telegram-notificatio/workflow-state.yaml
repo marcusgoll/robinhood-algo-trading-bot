@@ -83,4 +83,5 @@ artifacts:
   optimization: "specs/030-telegram-notificatio/optimization-report.md"
   code_review: "specs/030-telegram-notificatio/code-review.md"
   preview_checklist: "specs/030-telegram-notificatio/preview-checklist.md"
+  deployment_summary: "specs/030-telegram-notificatio/DEPLOYMENT_SUMMARY.md"
   release_notes: ""
