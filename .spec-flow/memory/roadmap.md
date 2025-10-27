@@ -1,6 +1,6 @@
 # Robinhood Trading Bot Roadmap
 
-**Last updated**: 2025-10-22 (emotional-control-me v1.6.0 shipped with 68/68 tests passing, 89.39% core coverage, zero vulnerabilities)
+**Last updated**: 2025-10-24 (llm-friendly-bot-operations v1.8.0 shipped with comprehensive API coverage, 100% contract compliance, zero vulnerabilities)
 **Constitution**: v1.0.0
 
 > Features from brainstorm → shipped. Managed via `/roadmap`
@@ -706,6 +706,71 @@
   - Production-ready, local-only deployment (merged to main branch)
   - Documentation: spec, plan, tasks, analysis-report, optimization-report, ship-summary, quickstart
 
+### level-2-order-flow-integration
+- **Title**: Level 2 order flow integration
+- **Area**: api
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-22
+- **Release**: v1.7.0 - Level 2 Order Flow Integration with institutional selling pressure detection
+- **Spec**: specs/028-level-2-order-flow-i/
+- **Delivered**:
+  - **PolygonClient**: API wrapper for Level 2 order book and Time & Sales data
+  - **OrderFlowDetector**: Large seller detection logic (>10k shares) with exit signal generation
+  - **TapeMonitor**: Volume spike detection (3x average) and red burst pattern recognition (4x threshold)
+  - **OrderFlowConfig**: Configuration system with environment variable support
+  - **Data Models**: OrderBookSnapshot, TimeAndSalesRecord, OrderFlowAlert with validation
+  - **Validators**: Timestamp, price, and sequence validation for data integrity
+  - **Integration**: Position-only monitoring mode (does not monitor watchlist continuously)
+  - **Rate Limiting**: Respects Polygon.io API limits with @with_retry exponential backoff
+  - **Alert System**: 120-second alert window with structured JSONL logging
+  - **Pattern Reuse**: CatalystDetector architecture, MarketDataService API wrapper pattern
+  - **Tests**: 78/78 passing (100% pass rate, 1.40s runtime)
+  - **Coverage**: 86% order_flow module
+  - **Type Safety**: MyPy type stubs for requests library
+  - **Security**: 0 vulnerabilities (Bandit scan)
+  - **Performance**: <2s alert latency (p95), <50MB memory overhead
+  - **Dependencies**: polygon-api-client==1.12.5, types-requests
+  - **Configuration**: POLYGON_API_KEY (required), 5 optional threshold parameters
+  - Full Constitution v1.0.0 compliance (§Data_Integrity, §Audit_Everything, §Safety_First, §Risk_Management)
+  - Backward compatible, opt-in feature (requires POLYGON_API_KEY)
+  - Production-ready, remote-direct deployment (merged to main branch)
+  - Documentation: spec, plan, tasks, analysis-report, optimization-report, ship-report, release-notes, quickstart
+
+### llm-friendly-bot-operations
+- **Title**: LLM-Friendly Bot Operations and Monitoring
+- **Area**: api, infra
+- **Role**: all
+- **Intra**: No
+- **Date**: 2025-10-24
+- **Release**: v1.8.0 - Comprehensive monitoring and operations API for AI assistants
+- **Spec**: specs/029-llm-friendly-bot-operations/
+- **Delivered**:
+  - **State API**: GET /api/v1/state (complete bot state), /api/v1/health (health check), /api/v1/summary (compressed <10KB)
+  - **Semantic Logging**: JSONL format with cause, impact, remediation, severity fields (LOW, MEDIUM, HIGH, CRITICAL)
+  - **OpenAPI Documentation**: Interactive Swagger UI at /api/docs with complete endpoint coverage
+  - **Configuration Management**: GET/POST/diff/rollback endpoints with schema validation
+  - **WebSocket Streaming**: Real-time metrics broadcast every 5 seconds at /api/v1/stream
+  - **Workflow Automation**: YAML-based engine with 4 predefined workflows (check-health, export-logs, restart-bot, update-targets)
+  - **Natural Language CLI**: Intent extraction for conversational commands ("show today's performance", "check bot health")
+  - **FastAPI Service**: Separate API process with authentication, rate limiting, CORS support
+  - **StateAggregator**: Service composing positions, orders, account, health, performance data
+  - **Data Models**: Pydantic schemas with validation (BotStateResponse, BotSummaryResponse, HealthStatus, PerformanceMetrics)
+  - **Authentication**: BOT_API_AUTH_TOKEN with constant-time comparison
+  - **Middleware**: Semantic error handler, rate limiter (100 req/min)
+  - **Tests**: Comprehensive coverage (unit, integration, performance, smoke tests)
+  - **Contract Compliance**: 100% (5/5 endpoints matching OpenAPI spec)
+  - **Security**: A-/90% (0 critical vulnerabilities, proper auth implementation)
+  - **Performance**: <100ms P95 latency validated
+  - **Response Size**: Summary endpoint <10KB target met
+  - **Implementation Stats**: 47/47 tasks (100%), 13 commits, 60 files changed, 13,101 insertions
+  - **Dependencies**: FastAPI, WebSockets, pydantic
+  - **Configuration**: BOT_API_PORT, BOT_API_AUTH_TOKEN, BOT_API_CORS_ORIGINS, BOT_STATE_CACHE_TTL
+  - Full Constitution v1.0.0 compliance (§Safety_First, §Code_Quality, §Risk_Management, §Testing_Requirements, §Audit_Everything, §Security, §Data_Integrity)
+  - Backward compatible, additive-only (no breaking changes to bot core)
+  - Production-ready, remote-direct deployment (merged to main branch)
+  - Documentation: spec, plan, tasks, analysis-report, optimization-report, code-review, quickstart, contracts/api.yaml
+
 ## In Progress
 
 <!-- Currently implementing -->
@@ -753,19 +818,6 @@
   - Identify daily/4H support and resistance levels
   - Track rejection and breakout patterns
   - [DEPENDS ON: technical-indicators (shipped)]
-
-### level2-integration
-- **Title**: Level 2 order flow integration
-- **Area**: api
-- **Role**: all
-- **Intra**: No
-- **Impact**: 4 | **Effort**: 4 | **Confidence**: 0.6 | **Score**: 0.60
-- **Requirements**:
-  - Monitor order flow for large seller alerts
-  - Track Time & Sales for volume spikes
-  - Trigger exits on red burst patterns
-  - [BLOCKED: market-data-module]
-  - [CLARIFY: Does Robinhood API provide Level 2 data?]
 
 ### backtesting-engine
 - **Title**: Strategy backtesting engine
