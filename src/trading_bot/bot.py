@@ -665,6 +665,16 @@ class TradingBot:
                 # Never block trading operations on notification failure
                 logger.warning(f"Telegram notification failed for {symbol}: {e}")
 
+        # T030: Send Telegram notification for position exit (non-blocking)
+        if action.upper() == "SELL" and hasattr(self, 'notification_service'):
+            try:
+                import asyncio
+                asyncio.create_task(self.notification_service.send_position_exit(trade_record))
+                logger.debug(f"Telegram position exit notification queued for {symbol}")
+            except Exception as e:
+                # Never block trading operations on notification failure
+                logger.warning(f"Telegram notification failed for {symbol}: {e}")
+
         # Log trade decision with reasoning (§Audit_Everything) - Text logging maintained
         logger.info(
             f"TRADE EXECUTED | "

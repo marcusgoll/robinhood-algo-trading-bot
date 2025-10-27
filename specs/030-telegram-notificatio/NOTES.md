@@ -206,3 +206,13 @@ Ready for /plan - specification is complete, validated, and unambiguous.
 - Non-blocking: Notification failures never block trade execution (wrapped in try/except)
 
 **Status**: 8/8 tasks complete (Batch 1+2+3), ready for US2 implementation
+
+### Batch 4: US2 Position Exit (Completed)
+- ✅ T030: Added position exit notification to bot.py (after SELL orders, fire-and-forget async)
+- ✅ T031: Format position exit message with P&L calculation (implemented in MessageFormatter.format_position_exit)
+
+**Integration Points**:
+- bot.py line 668-676: Send notification after SELL orders with asyncio.create_task()
+- MessageFormatter: P&L percentage calc, duration formatting, profit/loss emoji (✅/❌)
+
+**Status**: 10/10 tasks complete (Batch 1+2+3+4), ready for US3 implementation
