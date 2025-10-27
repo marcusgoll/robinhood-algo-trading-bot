@@ -25,7 +25,8 @@ class AlertEvaluator:
     def __init__(
         self,
         targets_file: Path = Path("config/dashboard-targets.yaml"),
-        alert_log: Path = Path("logs/performance-alerts.jsonl")
+        alert_log: Path = Path("logs/performance-alerts.jsonl"),
+        notification_service=None
     ) -> None:
         """
         Initialize the alert evaluator.
@@ -33,9 +34,11 @@ class AlertEvaluator:
         Args:
             targets_file: Path to targets YAML config
             alert_log: Path to alert JSONL log file
+            notification_service: Optional NotificationService for Telegram alerts (T041)
         """
         self.targets_file = targets_file
         self.alert_log = alert_log
+        self.notification_service = notification_service
 
         # Load targets
         self.targets = self._load_targets()
@@ -117,6 +120,22 @@ class AlertEvaluator:
         # Write alerts to JSONL
         if alerts:
             self._write_alerts(alerts)
+
+            # T041: Send Telegram risk alert notifications (non-blocking)
+            if self.notification_service and self.notification_service.is_enabled():
+                try:
+                    import asyncio
+                    for alert in alerts:
+                        alert_event = {
+                            "breach_type": f"{alert.metric}_threshold",
+                            "current_value": str(alert.actual),
+                            "threshold": str(alert.target),
+                            "timestamp": alert.raised_at.isoformat() + "Z"
+                        }
+                        asyncio.create_task(self.notification_service.send_risk_alert(alert_event))
+                except Exception:
+                    # Never block alert evaluation on notification failure
+                    pass
 
         return alerts
 

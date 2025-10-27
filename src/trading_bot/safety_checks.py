@@ -407,7 +407,7 @@ class SafetyChecks:
 
         From: spec.md FR-007
         Pattern: Set flag, persist to file, log event
-        Task: T025 [GREEN→T014,T015]
+        Task: T025 [GREEN→T014,T015], T040 [Telegram integration]
         """
         self._circuit_breaker_active = True
 
@@ -424,6 +424,24 @@ class SafetyChecks:
                 json.dump(state, f, indent=2)
         except Exception:
             pass  # Fail silently (state still in memory)
+
+        # T040: Send Telegram risk alert notification (non-blocking)
+        try:
+            from trading_bot.notifications import get_notification_service
+            import asyncio
+
+            notification_service = get_notification_service()
+            if notification_service.is_enabled():
+                alert_event = {
+                    "breach_type": "circuit_breaker",
+                    "current_value": "TRIGGERED",
+                    "threshold": "N/A",
+                    "timestamp": datetime.now(pytz.UTC).isoformat() + "Z"
+                }
+                asyncio.create_task(notification_service.send_risk_alert(alert_event))
+        except Exception:
+            # Never block circuit breaker on notification failure
+            pass
 
     def reset_circuit_breaker(self) -> None:
         """

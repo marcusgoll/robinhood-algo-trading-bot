@@ -216,3 +216,15 @@ Ready for /plan - specification is complete, validated, and unambiguous.
 - MessageFormatter: P&L percentage calc, duration formatting, profit/loss emoji (✅/❌)
 
 **Status**: 10/10 tasks complete (Batch 1+2+3+4), ready for US3 implementation
+
+### Batch 5: US3 Risk Alerts (Completed)
+- ✅ T040: Integrated with CircuitBreaker (safety_checks.py trigger_circuit_breaker method)
+- ✅ T041: Integrated with AlertEvaluator (performance/alerts.py evaluate method)
+- ✅ T042: Format risk alert message with urgent styling (implemented in MessageFormatter.format_risk_alert)
+
+**Integration Points**:
+- safety_checks.py line 428-444: Send alert when circuit breaker triggers
+- performance/alerts.py line 29,41,124-138: Telegram notification on performance threshold breaches
+- MessageFormatter: Bold text, 🚨 emoji, Markdown code blocks for values
+
+**Status**: 13/13 tasks complete (Batch 1+2+3+4+5 - MVP scope), ready for polish tasks
