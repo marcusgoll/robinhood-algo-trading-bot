@@ -69,9 +69,16 @@ workflow:
       approved: "2025-10-24T23:45:00Z"
       notes: "Manual preview testing passed - all endpoints functional"
     ship-prod:
-      status: not_started
+      status: completed
+      started: "2025-10-26T00:00:00Z"
+      completed: "2025-10-26T01:00:00Z"
+      notes: "v1.8.0 released - PR merged, tag created, GitHub release published, roadmap updated"
+      release_url: "https://github.com/marcusgoll/robinhood-algo-trading-bot/releases/tag/v1.8.0"
+      pr_url: "https://github.com/marcusgoll/robinhood-algo-trading-bot/pull/35"
     finalize:
-      status: not_started
+      status: completed
+      completed: "2025-10-26T01:00:00Z"
+      notes: "Feature complete - all phases passed, production deployed"
 
 manual_gates:
   preview:
@@ -100,7 +107,7 @@ artifacts:
   code_review: "specs/029-llm-friendly-bot-operations/code-review.md"
   error_log: "specs/029-llm-friendly-bot-operations/error-log.md"
   implementation_notes: "specs/029-llm-friendly-bot-operations/NOTES.md"
-  ship_report: ""
+  ship_report: "specs/029-llm-friendly-bot-operations/ship-report.md"
 
-production_ready: false
-next_phase: preview
+production_ready: true
+next_phase: completed
