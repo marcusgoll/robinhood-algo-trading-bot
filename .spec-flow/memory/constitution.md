@@ -123,7 +123,50 @@
 
 **Constitution is SSOT** - All templates and commands reference these principles.
 
+---
+
+## Project Documentation
+
+**Location**: `docs/project/`
+
+Comprehensive project-level design documentation:
+- `overview.md` - Vision, users, scope, success metrics
+- `system-architecture.md` - Components, integrations, Mermaid diagrams, C4 models
+- `tech-stack.md` - Technology choices with rationale
+- `data-architecture.md` - Data sources, storage strategy, log schemas, data lifecycle
+- `api-strategy.md` - REST patterns, auth, versioning, external API integrations
+- `capacity-planning.md` - Micro → scale tiers, cost projections
+- `deployment-strategy.md` - CI/CD, environments, rollback, disaster recovery
+- `development-workflow.md` - Git flow, PR process, Definition of Done
+
+**Created**: 2025-10-26 via `/init-project`
+
+**Maintenance**: Update docs when:
+- Adding new module/component (system-architecture.md)
+- Changing tech stack or dependencies (tech-stack.md)
+- Scaling to next tier (capacity-planning.md)
+- Adjusting deployment strategy (deployment-strategy.md)
+- Modifying data schemas or adding storage (data-architecture.md)
+
+**Workflow Integration**:
+All features MUST align with project architecture:
+- `/roadmap` - Checks overview.md for vision alignment
+- `/spec` - References project docs during research phase
+- `/plan` - Heavily integrates with all 8 docs for architecture decisions
+- `/tasks` - Follows patterns from tech-stack.md, api-strategy.md
+- `/implement` - Validates against system-architecture.md, data-architecture.md
+
+**Cross-Document Consistency**:
+Project docs form a coherent system:
+- Tech choices (tech-stack.md) must support architecture (system-architecture.md)
+- API design (api-strategy.md) must align with data model (data-architecture.md)
+- Capacity planning (capacity-planning.md) must reflect deployment platform (deployment-strategy.md)
+- Development workflow (development-workflow.md) must enforce quality gates (§Pre_Commit, §Pre_Deploy)
+
+---
+
 <!-- SYNC IMPACT: v1.0.0
 Initial constitution for trading bot project
 Last updated: 2025-10-07
+Project documentation added: 2025-10-26
 -->
