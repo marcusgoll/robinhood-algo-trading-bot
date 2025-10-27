@@ -10,16 +10,18 @@ deployment:
   model: remote-direct
 
 workflow:
-  phase: spec-flow
+  phase: plan
   status: in_progress
   phases:
     spec-flow:
-      status: in_progress
+      status: completed
       started_at: 2025-10-27T00:00:00Z
+      completed_at: 2025-10-27T00:03:00Z
     clarify:
-      status: not_started
+      status: skipped
     plan:
-      status: not_started
+      status: in_progress
+      started_at: 2025-10-27T00:03:00Z
     tasks:
       status: not_started
     analyze:
@@ -34,7 +36,8 @@ workflow:
       status: not_started
 
 artifacts:
-  spec: ""
+  spec: "specs/030-telegram-notificatio/spec.md"
+  notes: "specs/030-telegram-notificatio/NOTES.md"
   plan: ""
   tasks: ""
   analysis: ""
