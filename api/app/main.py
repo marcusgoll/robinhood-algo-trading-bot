@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
 
-from .routes import orders, state, config, metrics, workflows
+from .routes import orders, state, config, metrics, workflows, commands
 from .core.websocket import manager as ws_manager
 from .services.state_aggregator import StateAggregator
 
@@ -94,6 +94,10 @@ app = FastAPI(
             "description": "YAML-based workflow execution and tracking",
         },
         {
+            "name": "commands",
+            "description": "Bot control commands (pause/resume trading)",
+        },
+        {
             "name": "orders",
             "description": "Order execution and management endpoints",
         },
@@ -124,6 +128,7 @@ app.include_router(state.router)
 app.include_router(config.router, prefix="/api/v1")
 app.include_router(metrics.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
+app.include_router(commands.router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health/healthz")
