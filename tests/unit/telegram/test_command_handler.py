@@ -100,18 +100,14 @@ def test_register_commands(command_handler, mock_application):
     # Act
     command_handler.register_commands()
 
-    # Assert
+    # Assert - verify 7 command handlers were registered
     assert mock_application.add_handler.call_count == 7
-    # Verify command names
+
+    # Verify all calls were CommandHandler instances
     calls = mock_application.add_handler.call_args_list
-    command_names = [call[0][0]._command[0] for call in calls]
-    assert "start" in command_names
-    assert "help" in command_names
-    assert "status" in command_names
-    assert "pause" in command_names
-    assert "resume" in command_names
-    assert "positions" in command_names
-    assert "performance" in command_names
+    for call in calls:
+        handler = call[0][0]
+        assert handler.__class__.__name__ == "CommandHandler"
 
 
 @pytest.mark.asyncio

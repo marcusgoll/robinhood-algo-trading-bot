@@ -133,7 +133,7 @@ _Updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC_"""
                 pnl_sign = "+"
             elif unrealized_pnl < 0:
                 pnl_emoji = "🔴"
-                pnl_sign = ""
+                pnl_sign = "-"
             else:
                 pnl_emoji = "⚪"
                 pnl_sign = ""
@@ -143,7 +143,7 @@ _Updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC_"""
 
             position_block = f"""**{symbol}** {pnl_emoji}
 Entry: ${entry_price:.2f} | Current: ${current_price:.2f}
-P/L: {pnl_sign}${unrealized_pnl:.2f} ({pnl_sign}{pnl_pct:.2f}%)
+P/L: {pnl_sign}${abs(unrealized_pnl):.2f} ({pnl_sign}{abs(pnl_pct):.2f}%)
 Size: {quantity} shares | Hold: {hold_display}"""
 
             message_lines.append(position_block)
@@ -154,8 +154,8 @@ Size: {quantity} shares | Hold: {hold_display}"""
 
         # Aggregate totals
         avg_pnl_pct = total_pnl_pct_sum / len(positions) if positions else 0.0
-        pnl_sign = "+" if total_pnl >= 0 else ""
-        message_lines.append(f"**Total P/L**: {pnl_sign}${total_pnl:.2f} ({pnl_sign}{avg_pnl_pct:.2f}%)")
+        pnl_sign = "+" if total_pnl > 0 else ("-" if total_pnl < 0 else "")
+        message_lines.append(f"**Total P/L**: {pnl_sign}${abs(total_pnl):.2f} ({pnl_sign}{abs(avg_pnl_pct):.2f}%)")
         message_lines.append("")
         message_lines.append(f"_Updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC_")
 
@@ -199,12 +199,13 @@ Size: {quantity} shares | Hold: {hold_display}"""
         else:
             streak_display = "None"
 
-        pnl_sign = "+" if total_pnl >= 0 else ""
+        pnl_sign = "+" if total_pnl > 0 else ("-" if total_pnl < 0 else "")
+        pnl_pct_sign = "+" if total_pnl_pct > 0 else ("-" if total_pnl_pct < 0 else "")
 
         message = f"""📈 **Performance Metrics**
 
 **Win Rate**: {win_rate:.1f}% ({total_wins}W / {total_losses}L)
-**Total P/L**: {pnl_sign}${total_pnl:,.2f} ({pnl_sign}{total_pnl_pct:.1f}%)
+**Total P/L**: {pnl_sign}${abs(total_pnl):,.2f} ({pnl_pct_sign}{abs(total_pnl_pct):.1f}%)
 **Streak**: {streak_display}
 **Best Trade**: +${best_trade:,.2f} ({best_symbol})
 **Worst Trade**: -${abs(worst_trade):,.2f} ({worst_symbol})
