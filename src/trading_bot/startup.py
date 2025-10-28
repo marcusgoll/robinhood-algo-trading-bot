@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from .bot import CircuitBreaker, TradingBot
     from .config import Config
     from .mode_switcher import ModeSwitcher
+    from .telegram.command_handler import TelegramCommandHandler
 
 
 @dataclass
@@ -306,6 +307,64 @@ class StartupOrchestrator:
             self.errors.append(f"Trading bot initialization failed: {e}")
             raise
 
+    def _initialize_telegram_commands(self) -> Optional['TelegramCommandHandler']:
+        """Initialize Telegram command handler (Feature #031).
+
+        Conditionally starts Telegram command handler if TELEGRAM_ENABLED=true.
+
+        Returns:
+            TelegramCommandHandler instance or None if disabled
+
+        Raises:
+            Exception: If command handler initialization fails
+        """
+        import os
+        from .telegram.command_handler import TelegramCommandHandler
+
+        step = StartupStep(name="Initializing Telegram command handler", status="running")
+        self.steps.append(step)
+
+        # Check if Telegram is enabled
+        telegram_enabled = os.getenv("TELEGRAM_ENABLED", "false").lower() == "true"
+        if not telegram_enabled:
+            step.status = "success"
+            step.error_message = "Skipped (TELEGRAM_ENABLED=false)"
+            self.component_states["telegram_commands"] = {
+                "status": "disabled",
+                "enabled": False
+            }
+            return None
+
+        try:
+            import asyncio
+
+            # Initialize command handler
+            handler = TelegramCommandHandler.from_env()
+            handler.register_commands()
+
+            # Start command handler in background
+            asyncio.create_task(handler.start())
+
+            step.status = "success"
+            self.component_states["telegram_commands"] = {
+                "status": "ready",
+                "enabled": True,
+                "commands_registered": 7
+            }
+            self.telegram_command_handler = handler
+            return handler
+        except Exception as e:
+            # Non-blocking failure - log warning but continue startup
+            step.status = "success"
+            step.error_message = f"Failed to initialize (non-blocking): {e}"
+            self.warnings.append(f"Telegram command handler initialization failed: {e}")
+            self.component_states["telegram_commands"] = {
+                "status": "failed",
+                "enabled": False,
+                "error": str(e)
+            }
+            return None
+
     def run(self) -> StartupResult:
         """Execute the full startup sequence.
 
@@ -317,8 +376,9 @@ class StartupOrchestrator:
         5. Initialize mode switcher
         6. Initialize circuit breakers
         7. Initialize trading bot
-        8. Verify component health
-        9. Display summary (if not json_output)
+        8. Initialize Telegram command handler (Feature #031)
+        9. Verify component health
+        10. Display summary (if not json_output)
 
         Returns:
             StartupResult with status="ready" or "blocked"
@@ -346,6 +406,7 @@ class StartupOrchestrator:
             self._initialize_mode_switcher()
             self._initialize_circuit_breakers()
             self._initialize_bot()
+            self._initialize_telegram_commands()  # Feature #031
             self._verify_health()
 
             # Display summary

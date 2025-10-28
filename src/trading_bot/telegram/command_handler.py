@@ -299,3 +299,64 @@ class TelegramCommandHandler:
         """Send unauthorized error message."""
         error_message = self.formatter.format_error("unauthorized")
         await update.message.reply_text(error_message, parse_mode="Markdown")
+
+    @classmethod
+    def from_env(cls) -> 'TelegramCommandHandler':
+        """
+        Create TelegramCommandHandler from environment variables.
+
+        Reads TELEGRAM_BOT_TOKEN from environment and creates Application instance.
+
+        Returns:
+            TelegramCommandHandler instance configured from environment
+
+        Raises:
+            ValueError: If TELEGRAM_BOT_TOKEN not set
+        """
+        import os
+
+        token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if not token:
+            raise ValueError("TELEGRAM_BOT_TOKEN environment variable not set")
+
+        # Create Application instance
+        application = Application.builder().token(token).build()
+
+        # Create handler with default middleware
+        handler = cls(
+            application=application,
+            auth_middleware=CommandAuthMiddleware(),
+            rate_limiter=CommandRateLimiter(),
+            formatter=ResponseFormatter(),
+            api_client_factory=InternalAPIClient
+        )
+
+        logger.info("TelegramCommandHandler created from environment")
+        return handler
+
+    async def start(self) -> None:
+        """
+        Start the Telegram bot command handler.
+
+        Initializes the Application and starts polling for updates.
+        Non-blocking - runs polling in background task.
+        """
+        import asyncio
+
+        # Initialize application
+        await self.application.initialize()
+        await self.application.start()
+
+        # Start polling in background task
+        asyncio.create_task(self.application.updater.start_polling(drop_pending_updates=True))
+
+        logger.info("Telegram command handler started (polling)")
+
+    async def stop(self) -> None:
+        """
+        Stop the Telegram bot command handler.
+
+        Gracefully shuts down the Application and stops polling.
+        """
+        await self.application.stop()
+        logger.info("Telegram command handler stopped")
