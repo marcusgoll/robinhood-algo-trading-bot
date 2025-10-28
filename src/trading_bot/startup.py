@@ -336,14 +336,12 @@ class StartupOrchestrator:
             return None
 
         try:
-            import asyncio
-
             # Initialize command handler
             handler = TelegramCommandHandler.from_env()
             handler.register_commands()
 
-            # Start command handler in background
-            asyncio.create_task(handler.start())
+            # Start command handler in background thread
+            handler.start()
 
             step.status = "success"
             self.component_states["telegram_commands"] = {

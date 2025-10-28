@@ -334,23 +334,25 @@ class TelegramCommandHandler:
         logger.info("TelegramCommandHandler created from environment")
         return handler
 
-    async def start(self) -> None:
+    def start(self) -> None:
         """
         Start the Telegram bot command handler.
 
-        Initializes the Application and starts polling for updates.
-        Non-blocking - runs polling in background task.
+        Starts polling for updates in a background thread.
+        Non-blocking - returns immediately while bot runs in background.
         """
-        import asyncio
+        import threading
 
-        # Initialize application
-        await self.application.initialize()
-        await self.application.start()
+        def run_bot():
+            """Run bot polling in separate thread with its own event loop."""
+            logger.info("Starting Telegram bot polling...")
+            self.application.run_polling(drop_pending_updates=True, stop_signals=None)
 
-        # Start polling in background task
-        asyncio.create_task(self.application.updater.start_polling(drop_pending_updates=True))
+        # Start polling in background thread (daemon so it exits with main process)
+        bot_thread = threading.Thread(target=run_bot, daemon=True, name="TelegramBotThread")
+        bot_thread.start()
 
-        logger.info("Telegram command handler started (polling)")
+        logger.info("Telegram command handler started (polling in background thread)")
 
     async def stop(self) -> None:
         """
