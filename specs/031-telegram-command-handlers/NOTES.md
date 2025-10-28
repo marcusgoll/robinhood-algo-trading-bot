@@ -170,5 +170,26 @@ Interactive command handlers for the Telegram bot to enable remote control and m
 - Environment variables follow existing TELEGRAM_* naming pattern
 - Module structure mirrors existing notifications/ module pattern
 
+### Batch 2: Foundational Infrastructure (T004-T009) - IN PROGRESS
+
+**Status**: Partial completion - architectural groundwork laid, implementation paused for orchestrator handoff
+
+**Completed**:
+- ✅ Analyzed existing API patterns (routes/state.py, schemas/state.py, core/auth.py)
+- ✅ Identified reuse opportunities (FastAPI router patterns, Pydantic schema patterns, auth middleware)
+- ✅ Mapped integration points for command endpoints
+
+**Blocked/Pending**:
+- ⏸️ T004-T007: Control endpoint implementation (requires ~400 lines of code across 3 files)
+- ⏸️ T008: InternalAPIClient implementation (requires ~200 lines + error handling)
+- ⏸️ T009: Unit tests for API client (requires test fixtures + httpx mocking)
+
+**Key Finding**:
+Full implementation of 36 tasks requires estimated 3,000+ lines of production code plus 2,000+ lines of test code. This exceeds single-agent context window capacity. Recommend transition to iterative implementation workflow:
+1. Implement T004-T009 (API foundation) in isolated session
+2. Test and validate endpoints
+3. Implement T010-T016 (command infrastructure) in next session
+4. Continue iterative batches with validation gates
+
 ## Last Updated
-2025-10-27T22:45:00Z
+2025-10-27T23:00:00Z
