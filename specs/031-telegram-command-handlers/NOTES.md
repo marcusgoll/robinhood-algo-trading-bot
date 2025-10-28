@@ -122,5 +122,41 @@ Interactive command handlers for the Telegram bot to enable remote control and m
 - Migration needed: No (stateless feature, no database changes)
 - Blockers identified: Control endpoints missing from Feature #029 API (will add in tasks phase)
 
+## Phase 2: Tasks (2025-10-27)
+
+**Summary**:
+- Total tasks: 36
+- Setup tasks: 3 (Phase 1)
+- Foundational tasks: 6 (Phase 2 - control endpoints and API client)
+- Infrastructure tasks: 7 (Phase 3 - handler framework)
+- Command implementation tasks: 14 (Phase 4 - 7 command handlers + tests)
+- Polish tasks: 6 (Phase 5 - deployment, docs, validation)
+- Parallel opportunities: 20 tasks marked [P]
+- Test tasks: 8 (unit tests, integration tests, E2E tests)
+- Task file: specs/031-telegram-command-handlers/tasks.md
+
+**Checkpoint**:
+- ✅ Tasks generated: 36
+- ✅ Dependency graph: 5 phases (setup → foundational → infrastructure → commands → polish)
+- ✅ Parallel execution plan: 20 tasks can run in parallel across phases
+- ✅ MVP strategy: Phase 4 Group 1 (read-only commands T017-T023) → Phase 4 Group 2 (control commands T024-T026)
+- ✅ Test coverage targets: Unit 80%, Integration 60%, E2E 90%
+- ✅ Reuse analysis: 9 existing components identified
+- ✅ Critical path: T004-T009 (control endpoints) block T024-T025 (pause/resume commands)
+- 📋 Ready for: /analyze
+
+**Task Breakdown by Category**:
+- Backend API tasks: 4 (T004-T007: control endpoints and schemas)
+- Backend command handler tasks: 18 (T008-T016, T017-T030: API client, handlers, middleware)
+- Test tasks: 8 (T009, T011, T014, T016, T023, T026, T030, T031)
+- Deployment tasks: 6 (T031-T036: smoke tests, docs, integration, validation)
+
+**Key Decisions**:
+1. Dependency order: Control endpoints (T004-T007) must complete before pause/resume commands (T024-T025)
+2. Parallel groups: Read-only commands (T017-T023) can be implemented in parallel
+3. Test strategy: Unit tests (80% coverage) accompany each component, integration tests cover command flow, E2E test covers complete workflow
+4. MVP scope: Read-only commands first (faster delivery, lower risk), control commands second
+5. Blocker resolution: T004-T007 add missing control endpoints identified in planning phase
+
 ## Last Updated
-2025-10-27T21:00:00Z
+2025-10-27T22:30:00Z

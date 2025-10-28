@@ -379,8 +379,8 @@ Each command handler needs different data from the REST API:
 | /status | GET | /api/v1/summary | <10KB | <200ms |
 | /positions | GET | /api/v1/state | <50KB | <300ms |
 | /performance | GET | /api/v1/state | <50KB | <300ms |
-| /pause | POST | /api/v1/control/pause | <1KB | <100ms |
-| /resume | POST | /api/v1/control/resume | <1KB | <100ms |
+| /pause | POST | /api/v1/commands/pause | <1KB | <100ms |
+| /resume | POST | /api/v1/commands/resume | <1KB | <100ms |
 
 **Note**: Control endpoints (/pause, /resume) will need to be verified or created in Feature #029 API. If missing, will use workflow execution endpoints as fallback.
 

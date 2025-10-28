@@ -130,7 +130,7 @@ Task completion order:
   - Tests: get_summary() success (200), get_state() success, pause() success, resume() success
   - Tests: Timeout handling, auth failure (401), server error (500)
   - Mock: httpx.AsyncClient using pytest-httpx or respx
-  - Coverage: ≥80% (new code must be 100%)
+  - Coverage: ≥90% (per constitution §Code_Quality, new code must be 100%)
   - Pattern: Existing test patterns from src/trading_bot/risk_management/tests/
   - From: plan.md [TESTING STRATEGY] lines 701-709
 
@@ -158,7 +158,7 @@ Task completion order:
   - Tests: format_performance_response() with various metrics
   - Tests: Emoji rendering (check for correct emoji in output)
   - Tests: Markdown escaping (special characters like ., _, *, [, ], (, ), ~, `, >, #, +, -, =, |, {, })
-  - Coverage: ≥80% (new code must be 100%)
+  - Coverage: ≥90% (per constitution §Code_Quality, new code must be 100%)
   - Pattern: Unit test structure from src/trading_bot/risk_management/tests/test_calculator_atr.py
   - From: plan.md [TESTING STRATEGY] lines 693-699
 
@@ -189,7 +189,7 @@ Task completion order:
   - Tests (rate): First command allowed, second within cooldown rejected, second after cooldown allowed
   - Tests (rate): Timestamp updated on success, multiple users tracked independently
   - Mock: Telegram Update and Context objects
-  - Coverage: ≥80% (new code must be 100%)
+  - Coverage: ≥90% (per constitution §Code_Quality, new code must be 100%)
   - Pattern: Unit test structure from src/trading_bot/risk_management/tests/
   - From: plan.md [TESTING STRATEGY] lines 680-691
 
@@ -212,7 +212,7 @@ Task completion order:
   - Tests: Lifecycle (start, stop, graceful shutdown)
   - Tests: Error handling (Telegram API errors, unexpected exceptions)
   - Mock: python-telegram-bot Application
-  - Coverage: ≥80% (new code must be 100%)
+  - Coverage: ≥90% (per constitution §Code_Quality, new code must be 100%)
   - Pattern: Unit test structure from src/trading_bot/risk_management/tests/
   - From: plan.md [TESTING STRATEGY] lines 673-678
 
@@ -429,7 +429,7 @@ Task completion order:
 
 **Coverage Requirements:**
 - New code: 100% coverage (no untested lines in new features)
-- Unit tests: ≥80% line coverage
+- Unit tests: ≥90% line coverage (per constitution §Code_Quality)
 - Integration tests: ≥60% line coverage
 - E2E tests: ≥90% critical path coverage
 
