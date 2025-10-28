@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -17,10 +19,57 @@ from .exceptions import (
 )
 from .models import OrderEnvelope, OrderRequest, OrderStatus, PriceOffsetConfig
 
+logger = logging.getLogger(__name__)
+
 try:  # pragma: no cover - import guarded for runtime only
     import robin_stocks.robinhood as _robin_stocks  # type: ignore
 except ImportError:  # pragma: no cover
     _robin_stocks = None  # type: ignore
+
+
+def _create_mock_order_response(
+    symbol: str,
+    side: str,
+    quantity: int,
+    limit_price: Decimal,
+) -> dict[str, Any]:
+    """Create a mock order response for paper trading mode.
+
+    Returns a simulated order response that mimics Robinhood API format
+    without making any actual API calls.
+
+    Args:
+        symbol: Stock ticker symbol
+        side: Order side (buy/sell)
+        quantity: Number of shares
+        limit_price: Limit price per share
+
+    Returns:
+        Mock order response dict compatible with OrderEnvelope
+    """
+    order_id = f"paper-{uuid.uuid4()}"
+    timestamp = datetime.now(UTC).isoformat()
+
+    logger.info(
+        f"[PAPER] Mock {side.upper()} order created: {quantity} shares of {symbol} @ ${limit_price}"
+    )
+
+    return {
+        "id": order_id,
+        "symbol": symbol,
+        "side": side,
+        "quantity": str(quantity),
+        "price": str(limit_price),
+        "state": "filled",  # Paper trades auto-fill immediately
+        "type": "limit",
+        "time_in_force": "gtc",
+        "created_at": timestamp,
+        "updated_at": timestamp,
+        "cumulative_quantity": str(quantity),  # Instantly filled
+        "average_price": str(limit_price),
+        "fees": "0.00",
+        "paper_trading": True,
+    }
 
 
 def submit_limit_buy(
@@ -29,10 +78,45 @@ def submit_limit_buy(
     *,
     execution_mode: str,
 ) -> OrderEnvelope:
-    """Submit a limit BUY order via robin_stocks and return envelope."""
+    """Submit a limit BUY order.
 
-    broker = _require_broker()
+    In PAPER mode: Returns mock order without calling Robinhood API.
+    In LIVE mode: Submits real order via robin_stocks.
+
+    Args:
+        order: Order request details
+        offsets: Price offset configuration
+        execution_mode: "PAPER" or "LIVE"
+
+    Returns:
+        OrderEnvelope with order details
+    """
     limit_price = compute_limit_price(order, offsets)
+    submitted_at = datetime.now(UTC)
+
+    # PAPER MODE: Use mock order, NO Robinhood API calls
+    if execution_mode.upper() == "PAPER":
+        response = _create_mock_order_response(
+            symbol=order.symbol,
+            side="buy",
+            quantity=order.quantity,
+            limit_price=limit_price,
+        )
+        order_id = _extract_order_id(response)
+
+        return OrderEnvelope(
+            order_id=order_id,
+            symbol=order.symbol,
+            side=order.side,
+            quantity=order.quantity,
+            limit_price=limit_price,
+            execution_mode="PAPER",  # type: ignore[arg-type]
+            submitted_at=submitted_at,
+            raw=response,
+        )
+
+    # LIVE MODE: Call Robinhood API
+    broker = _require_broker()
 
     @with_retry()
     def _call() -> dict[str, Any]:
@@ -53,7 +137,6 @@ def submit_limit_buy(
         raise OrderSubmissionError(str(exc)) from exc
 
     order_id = _extract_order_id(response)
-    submitted_at = datetime.now(UTC)
 
     return OrderEnvelope(
         order_id=order_id,
@@ -73,10 +156,45 @@ def submit_limit_sell(
     *,
     execution_mode: str,
 ) -> OrderEnvelope:
-    """Submit a limit SELL order via robin_stocks and return envelope."""
+    """Submit a limit SELL order.
 
-    broker = _require_broker()
+    In PAPER mode: Returns mock order without calling Robinhood API.
+    In LIVE mode: Submits real order via robin_stocks.
+
+    Args:
+        order: Order request details
+        offsets: Price offset configuration
+        execution_mode: "PAPER" or "LIVE"
+
+    Returns:
+        OrderEnvelope with order details
+    """
     limit_price = compute_limit_price(order, offsets)
+    submitted_at = datetime.now(UTC)
+
+    # PAPER MODE: Use mock order, NO Robinhood API calls
+    if execution_mode.upper() == "PAPER":
+        response = _create_mock_order_response(
+            symbol=order.symbol,
+            side="sell",
+            quantity=order.quantity,
+            limit_price=limit_price,
+        )
+        order_id = _extract_order_id(response)
+
+        return OrderEnvelope(
+            order_id=order_id,
+            symbol=order.symbol,
+            side=order.side,
+            quantity=order.quantity,
+            limit_price=limit_price,
+            execution_mode="PAPER",  # type: ignore[arg-type]
+            submitted_at=submitted_at,
+            raw=response,
+        )
+
+    # LIVE MODE: Call Robinhood API
+    broker = _require_broker()
 
     @with_retry()
     def _call() -> dict[str, Any]:
@@ -97,7 +215,6 @@ def submit_limit_sell(
         raise OrderSubmissionError(str(exc)) from exc
 
     order_id = _extract_order_id(response)
-    submitted_at = datetime.now(UTC)
 
     return OrderEnvelope(
         order_id=order_id,

@@ -197,17 +197,11 @@ class Config:
             ValueError: If required environment variables missing
             FileNotFoundError: If config.json missing (will use defaults)
         """
-        # Load credentials from .env (required)
-        username = os.getenv("ROBINHOOD_USERNAME")
-        password = os.getenv("ROBINHOOD_PASSWORD")
+        # Check if paper trading mode is enabled (from ENV or config.json)
+        # Paper trading doesn't require Robinhood credentials
+        paper_trading_env = os.getenv("PAPER_TRADING", "").lower() in ("true", "1", "yes")
 
-        if not username or not password:
-            raise ValueError(
-                "Missing required environment variables: "
-                "ROBINHOOD_USERNAME and ROBINHOOD_PASSWORD must be set in .env file"
-            )
-
-        # Load trading parameters from config.json (optional)
+        # Load trading parameters from config.json to check mode
         config_data: dict[str, Any] = {}
         config_path = Path(config_file)
 
@@ -217,6 +211,30 @@ class Config:
 
         # Extract parameters from JSON with defaults
         trading = config_data.get("trading", {})
+        paper_trading_config = trading.get("mode", "paper") == "paper"
+
+        # Determine if we're in paper trading mode (ENV takes precedence)
+        is_paper_trading = paper_trading_env or paper_trading_config
+
+        # Load credentials from .env (only required for LIVE trading)
+        username = os.getenv("ROBINHOOD_USERNAME")
+        password = os.getenv("ROBINHOOD_PASSWORD")
+
+        # Validate credentials only if NOT in paper trading mode
+        if not is_paper_trading:
+            if not username or not password:
+                raise ValueError(
+                    "Missing required environment variables: "
+                    "ROBINHOOD_USERNAME and ROBINHOOD_PASSWORD must be set in .env file "
+                    "for LIVE trading mode"
+                )
+        elif not username or not password:
+            # Paper mode without credentials - use placeholder values
+            logger = logging.getLogger(__name__)
+            logger.info("Paper trading mode enabled - Robinhood credentials not required")
+            username = "paper-trading-placeholder"
+            password = "paper-trading-placeholder"
+
         risk = config_data.get("risk_management", {})
         phase = config_data.get("phase_progression", {})
         current_phase_name = phase.get("current_phase", "experience")
@@ -233,13 +251,13 @@ class Config:
         max_trades_per_day = 999 if max_trades is None else int(max_trades)
 
         return cls(
-            # Credentials from .env
+            # Credentials from .env (placeholders used in paper mode if not provided)
             robinhood_username=username,
             robinhood_password=password,
             robinhood_mfa_secret=os.getenv("ROBINHOOD_MFA_SECRET"),
             robinhood_device_token=os.getenv("ROBINHOOD_DEVICE_TOKEN"),
-            # Trading mode
-            paper_trading=trading.get("mode", "paper") == "paper",
+            # Trading mode (computed earlier from ENV or config)
+            paper_trading=is_paper_trading,
             # Trading hours
             trading_start_time=trading.get("hours", {}).get("start_time", "07:00"),
             trading_end_time=trading.get("hours", {}).get("end_time", "10:00"),
