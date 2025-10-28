@@ -16,6 +16,8 @@ Tasks: T015 [GREEN], T016 [GREEN] - CatalystDetector service with error handling
 import logging
 from datetime import UTC, datetime, timedelta
 
+import httpx
+
 from ..error_handling.retry import with_retry
 from .config import MomentumConfig
 from .logging.momentum_logger import MomentumLogger
@@ -108,11 +110,11 @@ class CatalystDetector:
             )
             raise  # Re-raise ValueError to fail fast
 
-        # T016: Check if NEWS_API_KEY is configured (graceful degradation)
-        if not self.config.news_api_key:
+        # T016: Check if Alpaca API credentials are configured (graceful degradation)
+        if not self.config.alpaca_api_key or not self.config.alpaca_secret_key:
             logger.warning(
-                "NEWS_API_KEY not configured, catalyst detection skipped. "
-                "Set NEWS_API_KEY environment variable to enable catalyst detection."
+                "Alpaca API credentials not configured, catalyst detection skipped. "
+                "Set ALPACA_API_KEY and ALPACA_SECRET_KEY environment variables to enable catalyst detection."
             )
             return []  # Graceful degradation: return empty list, don't crash
 
@@ -252,8 +254,8 @@ class CatalystDetector:
     async def _fetch_news_from_alpaca(self, symbols: list[str]) -> dict:
         """Fetch news from Alpaca API with retry logic.
 
-        This method is used for mocking in tests. In production, it will make
-        actual HTTP requests to Alpaca News API.
+        This method makes actual HTTP requests to Alpaca News API.
+        API endpoint: https://data.alpaca.markets/v1beta1/news
 
         Args:
             symbols: List of stock ticker symbols
@@ -274,10 +276,66 @@ class CatalystDetector:
 
         Raises:
             ConnectionError: If API request fails
+            TimeoutError: If request times out
+            ValueError: If API credentials are missing
         """
-        # TODO: Implement actual Alpaca API call using httpx/aiohttp
-        # For now, this is a stub that will be mocked in tests
-        raise NotImplementedError("Alpaca API integration pending")
+        # Check if Alpaca API credentials are configured
+        if not self.config.alpaca_api_key or not self.config.alpaca_secret_key:
+            logger.warning(
+                "Alpaca API credentials not configured. Set ALPACA_API_KEY and "
+                "ALPACA_SECRET_KEY environment variables to enable news catalyst detection."
+            )
+            return {"news": []}  # Return empty news list (graceful degradation)
+
+        # Calculate 24-hour lookback window
+        now = datetime.now(UTC)
+        start_time = now - timedelta(hours=24)
+
+        # Build API request
+        url = "https://data.alpaca.markets/v1beta1/news"
+        headers = {
+            "APCA-API-KEY-ID": self.config.alpaca_api_key,
+            "APCA-API-SECRET-KEY": self.config.alpaca_secret_key,
+        }
+        params = {
+            "symbols": ",".join(symbols),  # Comma-separated symbol list
+            "start": start_time.isoformat(),
+            "limit": 50,  # Fetch up to 50 news items
+            "sort": "desc",  # Most recent first
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(url, headers=headers, params=params)
+                response.raise_for_status()  # Raise HTTPError for 4xx/5xx responses
+
+                data = response.json()
+                logger.info(
+                    f"Fetched {len(data.get('news', []))} news items from Alpaca for "
+                    f"{len(symbols)} symbols"
+                )
+                return data
+
+        except httpx.TimeoutException as e:
+            logger.error(f"Alpaca News API request timed out after 10 seconds: {e}")
+            raise TimeoutError(f"Alpaca News API timeout: {e}") from e
+
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"Alpaca News API returned HTTP {e.response.status_code}: "
+                f"{e.response.text}"
+            )
+            raise ConnectionError(
+                f"Alpaca News API HTTP error {e.response.status_code}"
+            ) from e
+
+        except httpx.RequestError as e:
+            logger.error(f"Alpaca News API request failed: {e}")
+            raise ConnectionError(f"Alpaca News API request error: {e}") from e
+
+        except Exception as e:
+            logger.error(f"Unexpected error fetching news from Alpaca: {e}")
+            raise
 
     def _process_news_data(self, news_data: dict, symbols: list[str]) -> list[MomentumSignal]:
         """Process raw news data and build MomentumSignal objects.

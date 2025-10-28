@@ -22,6 +22,8 @@ class MomentumConfig:
 
     Attributes:
         news_api_key: API key for news data provider (NewsAPI, Finnhub, or Alpaca)
+        alpaca_api_key: Alpaca API key for news data
+        alpaca_secret_key: Alpaca API secret key for news data
         market_data_source: Source for market data ("alpaca", "polygon", or "iex")
         min_catalyst_strength: Minimum catalyst strength score (0-100)
         min_premarket_change_pct: Minimum pre-market price change % (FR-005)
@@ -35,6 +37,8 @@ class MomentumConfig:
     """
 
     news_api_key: str = ""
+    alpaca_api_key: str = ""
+    alpaca_secret_key: str = ""
     market_data_source: str = "alpaca"
     min_catalyst_strength: float = 5.0
     min_premarket_change_pct: float = 5.0
@@ -84,6 +88,8 @@ class MomentumConfig:
 
         Environment Variables:
             NEWS_API_KEY: API key for news data provider
+            ALPACA_API_KEY: Alpaca API key for news data
+            ALPACA_SECRET_KEY: Alpaca API secret key for news data
             MARKET_DATA_SOURCE: Source for market data (default: "alpaca")
 
         Returns:
@@ -91,11 +97,13 @@ class MomentumConfig:
 
         Example:
             >>> config = MomentumConfig.from_env()
-            >>> config.news_api_key
+            >>> config.alpaca_api_key
             'your-api-key-from-env'
         """
         return cls(
             news_api_key=os.getenv("NEWS_API_KEY", ""),
+            alpaca_api_key=os.getenv("ALPACA_API_KEY", ""),
+            alpaca_secret_key=os.getenv("ALPACA_SECRET_KEY", ""),
             market_data_source=os.getenv("MARKET_DATA_SOURCE", "alpaca"),
             # All other fields use class defaults
         )
