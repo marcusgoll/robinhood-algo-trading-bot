@@ -228,25 +228,44 @@ Interactive command handlers for the Telegram bot to enable remote control and m
 - `optimization-report.md`: Comprehensive production readiness report
 - `code-review-report.md`: (Pending - will be generated during senior code review)
 
-## Phase 6: Preview (2025-10-28) - READY
+## Phase 6: Preview (2025-10-28) - IN PROGRESS
 
-**Status**: Ready for manual testing
+**Status**: Manual testing checklist generated
+
+**Backend-Only Feature**: No web UI routes (Telegram bot commands only)
+
+**Testing Approach**:
+- Manual Telegram command testing (7 commands)
+- Security validation (auth, rate limiting)
+- API integration verification
+- Mobile UX testing (emoji, markdown)
+- Performance measurement (response times)
+- Logging and error handling validation
+
+**Artifacts Generated**:
+- ✅ `preview-checklist.md`: Comprehensive testing checklist (59 test items)
+- Scenarios: 7 command tests
+- Security: 3 test categories (auth, rate limit, error handling)
+- Integration: 3 test categories (lifecycle, API, logging)
+- Mobile UX: Telegram app rendering validation
+- Performance: Response time targets for all commands
 
 **Prerequisites Met**:
 - ✅ All implementation complete
-- ✅ All unit tests passing
+- ✅ All unit tests passing (77/77, 100%)
 - ✅ Integration with bot main loop complete
 - ✅ Environment variables documented
 - ✅ Deployment blockers resolved
 
 **Next Steps**:
-1. Run `/preview` to start manual UI/UX testing
-2. Test all 7 commands with real Telegram bot
-3. Verify mobile UX (emoji, markdown formatting)
-4. Validate auth rejection works
-5. Verify rate limiting works
-6. Check logs for errors
-7. Proceed to `/ship-staging` after validation
+1. ✅ Review preview-checklist.md
+2. Set up Telegram bot environment variables
+3. Start bot: `python -m trading_bot`
+4. Test all 7 commands manually
+5. Document results in checklist
+6. Proceed to `/ship-staging` when tests pass
+
+**Note**: This feature requires manual testing with a real Telegram bot account. Automated E2E tests not feasible due to Telegram's interactive nature. Unit test coverage (90%) provides strong confidence in code quality.
 
 ## Last Updated
-2025-10-28T15:30:00Z
+2025-10-28T15:45:00Z
