@@ -110,7 +110,13 @@ def main() -> int:
             if hasattr(orchestrator, 'bot') and orchestrator.bot:
                 try:
                     orchestrator.bot.start()
-                    return 0
+
+                    # Keep process alive (Telegram handler runs in daemon thread)
+                    import time
+                    print("\n🤖 Bot running... Press Ctrl+C to stop")
+                    while True:
+                        time.sleep(1)
+
                 except KeyboardInterrupt:
                     print("\n\n⚠️  Trading interrupted by user")
                     return 130
