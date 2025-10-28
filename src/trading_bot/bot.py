@@ -926,6 +926,8 @@ class TradingBot:
 
         Logs scan results to JSONL for audit/debug purposes.
         """
+        import time
+
         if self.momentum_ranker is None:
             logger.warning("Momentum scan skipped: MomentumRanker not initialized")
             return
@@ -949,8 +951,8 @@ class TradingBot:
                 "signals": [
                     {
                         "symbol": s.symbol,
-                        "score": float(s.composite_score),
-                        "detectors": s.detected_by
+                        "score": float(s.strength),
+                        "signal_type": s.signal_type.value
                     }
                     for s in signals
                 ],
@@ -968,7 +970,7 @@ class TradingBot:
                     f"Momentum scan complete | "
                     f"Signals={len(signals)} | "
                     f"TopSymbol={top_signal.symbol} | "
-                    f"Score={top_signal.composite_score:.2f}"
+                    f"Score={top_signal.strength:.2f}"
                 )
             else:
                 logger.info("Momentum scan complete | No signals detected")
@@ -1006,11 +1008,10 @@ class TradingBot:
             "signals": [
                 {
                     "symbol": s.symbol,
-                    "score": float(s.composite_score),
-                    "detectors": s.detected_by,
-                    "catalyst_score": float(s.catalyst_score) if hasattr(s, 'catalyst_score') else None,
-                    "premarket_score": float(s.premarket_score) if hasattr(s, 'premarket_score') else None,
-                    "bull_flag_score": float(s.bull_flag_score) if hasattr(s, 'bull_flag_score') else None,
+                    "strength": float(s.strength),
+                    "signal_type": s.signal_type.value,
+                    "detected_at": s.detected_at.isoformat(),
+                    "details": s.details,
                 }
                 for s in signals[:10]  # Top 10 signals only
             ]
