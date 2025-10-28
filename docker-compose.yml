@@ -24,6 +24,8 @@ services:
     volumes:
       # Persist logs
       - ./logs:/app/logs
+      # Mount .env for startup validation
+      - ./.env:/app/.env:ro
       # Persist configuration
       - ./config.json:/app/config.json:ro
       # Persist Robinhood session (avoid re-auth)
