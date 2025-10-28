@@ -55,7 +55,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./logs:/app/logs:ro  # Read-only logs access
+      - ./logs:/app/logs  # Writable for state files (pause/resume commands)
+      - ./.env:/app/.env:ro
       - ./config.json:/app/config.json:ro
     depends_on:
       - redis
