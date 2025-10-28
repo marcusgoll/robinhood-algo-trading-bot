@@ -109,19 +109,23 @@ def main() -> int:
             # Enter trading loop
             if hasattr(orchestrator, 'bot') and orchestrator.bot:
                 try:
+                    import asyncio
+
                     orchestrator.bot.start()
 
-                    # Keep process alive (Telegram handler runs in daemon thread)
-                    import time
-                    print("\n🤖 Bot running... Press Ctrl+C to stop")
-                    while True:
-                        time.sleep(1)
+                    # Run async trading loop with heartbeat and momentum scanning
+                    print("\n🤖 Bot running with heartbeat and momentum scanning... Press Ctrl+C to stop")
+                    asyncio.run(orchestrator.bot.run_trading_loop())
 
                 except KeyboardInterrupt:
                     print("\n\n⚠️  Trading interrupted by user")
+                    orchestrator.bot.stop()
                     return 130
                 except Exception as e:
                     print(f"\n❌ Trading error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    orchestrator.bot.stop()
                     return 3
             else:
                 print("\n❌ Bot not initialized")

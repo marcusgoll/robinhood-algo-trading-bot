@@ -132,3 +132,168 @@ async def get_health(
         HealthStatus with health indicators
     """
     return await aggregator.get_health_status()
+
+
+@router.get(
+    "/heartbeat",
+    summary="Get last heartbeat from bot logs",
+    description="""
+    Returns the last heartbeat log entry proving bot is alive and functioning.
+
+    **Authentication**: Requires X-API-Key header
+
+    **Use case**: Verify bot trading loop is running (not just container alive)
+
+    **Example**:
+    ```bash
+    curl -H "X-API-Key: your-api-key" http://localhost:8000/api/v1/heartbeat
+    ```
+    """,
+)
+async def get_heartbeat():
+    """
+    Get last heartbeat from bot logs.
+
+    Reads the most recent heartbeat entry from trading_bot.log to verify
+    the bot's trading loop is actively running.
+
+    Returns:
+        dict: Last heartbeat data with timestamp and status
+    """
+    import re
+    from pathlib import Path
+    from datetime import datetime, timezone
+
+    log_path = Path("/app/logs/trading_bot.log")
+    if not log_path.exists():
+        return {
+            "error": "Log file not found",
+            "status": "unknown",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    # Read last 100 lines and find most recent heartbeat
+    try:
+        with open(log_path, 'r') as f:
+            lines = f.readlines()
+            heartbeat_lines = [l for l in lines if "HEARTBEAT" in l]
+
+            if not heartbeat_lines:
+                return {
+                    "error": "No heartbeat found in logs",
+                    "status": "no_heartbeat",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+
+            # Parse last heartbeat line
+            last_heartbeat = heartbeat_lines[-1]
+
+            # Extract structured data from heartbeat log
+            # Format: "💓 HEARTBEAT | Status=running | Market=OPEN | Positions=0 | ..."
+            parts = {}
+            for part in last_heartbeat.split(" | "):
+                if "=" in part:
+                    key, value = part.split("=", 1)
+                    parts[key.strip()] = value.strip()
+
+            return {
+                "status": "alive",
+                "log_line": last_heartbeat.strip(),
+                "parsed_data": parts,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "status": "error",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+
+@router.get(
+    "/scans",
+    summary="Get recent momentum scan results",
+    description="""
+    Returns recent momentum scan activity from JSONL logs.
+
+    **Authentication**: Requires X-API-Key header
+
+    **Use case**: Verify momentum scanning is working and see detected signals
+
+    **Query Parameters**:
+    - limit: Number of recent scans to return (default: 10, max: 100)
+
+    **Example**:
+    ```bash
+    curl -H "X-API-Key: your-api-key" http://localhost:8000/api/v1/scans?limit=5
+    ```
+    """,
+)
+async def get_scans(limit: int = 10):
+    """
+    Get recent momentum scan results.
+
+    Reads from daily JSONL scan activity logs to show recent momentum
+    detection results.
+
+    Args:
+        limit: Number of recent scans to return (default: 10, max: 100)
+
+    Returns:
+        dict: Recent scan results with signals
+    """
+    import json
+    from pathlib import Path
+    from datetime import datetime, timezone
+
+    limit = min(limit, 100)  # Cap at 100
+    log_dir = Path("/app/logs")
+
+    if not log_dir.exists():
+        return {
+            "error": "Log directory not found",
+            "scans": [],
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    # Find today's scan log
+    today = datetime.now().strftime("%Y-%m-%d")
+    scan_log_path = log_dir / f"scan_activity_{today}.jsonl"
+
+    if not scan_log_path.exists():
+        # Try yesterday's log as fallback
+        from datetime import timedelta
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        scan_log_path = log_dir / f"scan_activity_{yesterday}.jsonl"
+
+        if not scan_log_path.exists():
+            return {
+                "error": "No scan logs found for today or yesterday",
+                "scans": [],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+
+    # Read JSONL file
+    try:
+        scans = []
+        with open(scan_log_path, 'r') as f:
+            for line in f:
+                if line.strip():
+                    scans.append(json.loads(line))
+
+        # Return most recent N scans
+        recent_scans = scans[-limit:] if len(scans) > limit else scans
+
+        return {
+            "status": "ok",
+            "scans": recent_scans,
+            "total_scans_today": len(scans),
+            "returned_count": len(recent_scans),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "scans": [],
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }

@@ -270,6 +270,39 @@ class TradingBot:
             logger.warning(f"Telegram notifications unavailable: {e}")
             self.notification_service = None
 
+        # Initialize MomentumRanker for momentum scanning
+        self.momentum_ranker: Any | None = None
+        self.last_scan_time: float | None = None
+        self.last_scan_results: dict[str, Any] = {"signals": [], "count": 0}
+        if config is not None and self.market_data is not None:
+            try:
+                from trading_bot.momentum.config import MomentumConfig
+                from trading_bot.momentum.momentum_ranker import MomentumRanker
+                from trading_bot.momentum.catalyst_detector import CatalystDetector
+                from trading_bot.momentum.premarket_scanner import PreMarketScanner
+                from trading_bot.momentum.bull_flag_detector import BullFlagDetector
+                from trading_bot.momentum.logging.momentum_logger import MomentumLogger
+
+                momentum_config = MomentumConfig.from_env()
+                momentum_logger = MomentumLogger()
+
+                # Initialize detectors
+                catalyst_detector = CatalystDetector(momentum_config, momentum_logger)
+                premarket_scanner = PreMarketScanner(momentum_config, self.market_data, momentum_logger)
+                bull_flag_detector = BullFlagDetector(momentum_config, self.market_data, momentum_logger)
+
+                # Initialize ranker with all detectors
+                self.momentum_ranker = MomentumRanker(
+                    catalyst_detector=catalyst_detector,
+                    premarket_scanner=premarket_scanner,
+                    bull_flag_detector=bull_flag_detector,
+                    momentum_logger=momentum_logger
+                )
+                logger.info("MomentumRanker initialized with all detectors")
+            except Exception as e:
+                logger.warning(f"MomentumRanker initialization failed: {e}")
+                self.momentum_ranker = None
+
         logger.info(
             f"TradingBot initialized | "
             f"Paper Trading: {self.paper_trading} | "
@@ -780,3 +813,213 @@ class TradingBot:
             return
 
         self.order_manager.synchronize_open_orders()
+
+    async def run_trading_loop(self) -> None:
+        """
+        Main trading loop with heartbeat logging and momentum scanning.
+
+        Features:
+        - Heartbeat logging every 5 minutes (proves bot is alive)
+        - Momentum scanning every 15 minutes during market hours
+        - Scan activity logging to JSONL for audit trail
+        - Graceful handling of momentum system unavailability
+        """
+        import asyncio
+        import time
+
+        last_scan: float | None = None
+        last_heartbeat = time.time()
+        scan_interval = 900  # 15 minutes
+        heartbeat_interval = 300  # 5 minutes
+
+        logger.info("Trading loop started with heartbeat and momentum scanning")
+
+        while self.is_running:
+            current_time = time.time()
+
+            # Heartbeat logging - proves bot is alive
+            if current_time - last_heartbeat >= heartbeat_interval:
+                self._log_heartbeat(last_scan)
+                last_heartbeat = current_time
+
+            # Momentum scanning - only during market hours
+            if self._is_market_hours() and (last_scan is None or current_time - last_scan >= scan_interval):
+                await self._run_momentum_scan()
+                last_scan = current_time
+
+            # Check every 30 seconds
+            await asyncio.sleep(30)
+
+        logger.info("Trading loop stopped")
+
+    def _is_market_hours(self) -> bool:
+        """
+        Check if currently within configured trading hours.
+
+        Returns:
+            True if within trading hours, False otherwise
+        """
+        import pytz
+        from datetime import datetime
+
+        if not hasattr(self, 'config') or self.config is None:
+            # Default to always true if config unavailable
+            return True
+
+        # Get current time in trading timezone
+        tz = pytz.timezone(self.config.trading_timezone)
+        now = datetime.now(tz)
+        current_time_str = now.strftime("%H:%M")
+
+        # Parse trading hours
+        start_time = self.config.trading_start_time
+        end_time = self.config.trading_end_time
+
+        # Check if current time within trading window
+        is_market_hours = start_time <= current_time_str <= end_time
+
+        return is_market_hours
+
+    def _log_heartbeat(self, last_scan: float | None) -> None:
+        """
+        Log periodic heartbeat to prove bot is alive and functioning.
+
+        Args:
+            last_scan: Timestamp of last momentum scan (None if never scanned)
+        """
+        import time
+
+        # Calculate time since last scan
+        if last_scan is not None:
+            time_since_scan = int(time.time() - last_scan)
+            scan_status = f"{time_since_scan}s ago"
+        else:
+            scan_status = "never"
+
+        # Get current position count
+        position_count = len(self.positions)
+
+        # Get circuit breaker status
+        circuit_breaker_status = "TRIPPED" if self.circuit_breaker.is_tripped else "OK"
+
+        # Check if in market hours
+        market_status = "OPEN" if self._is_market_hours() else "CLOSED"
+
+        logger.info(
+            f"💓 HEARTBEAT | "
+            f"Status=running | "
+            f"Market={market_status} | "
+            f"Positions={position_count} | "
+            f"LastScan={scan_status} | "
+            f"CircuitBreaker={circuit_breaker_status} | "
+            f"PaperMode={self.paper_trading}"
+        )
+
+    async def _run_momentum_scan(self) -> None:
+        """
+        Execute momentum scan and log results to audit trail.
+
+        Uses MomentumRanker to aggregate signals from:
+        - CatalystDetector (news-driven events)
+        - PreMarketScanner (price/volume movers)
+        - BullFlagDetector (chart patterns)
+
+        Logs scan results to JSONL for audit/debug purposes.
+        """
+        if self.momentum_ranker is None:
+            logger.warning("Momentum scan skipped: MomentumRanker not initialized")
+            return
+
+        # Define scan universe (top 100 liquid stocks for now)
+        # TODO: Make this configurable or dynamic based on volume
+        scan_symbols = [
+            "AAPL", "MSFT", "GOOGL", "AMZN", "META",
+            "TSLA", "NVDA", "AMD", "INTC", "NFLX",
+            "DIS", "BA", "JPM", "V", "MA",
+        ]
+
+        logger.info(f"Starting momentum scan for {len(scan_symbols)} symbols")
+
+        try:
+            # Run momentum scan
+            signals = await self.momentum_ranker.scan_and_rank(scan_symbols)
+
+            # Update last scan results for monitoring
+            self.last_scan_results = {
+                "signals": [
+                    {
+                        "symbol": s.symbol,
+                        "score": float(s.composite_score),
+                        "detectors": s.detected_by
+                    }
+                    for s in signals
+                ],
+                "count": len(signals),
+                "timestamp": time.time(),
+            }
+
+            # Log to structured JSONL file for audit trail
+            self._log_scan_activity(signals)
+
+            # Log summary
+            if signals:
+                top_signal = signals[0]
+                logger.info(
+                    f"Momentum scan complete | "
+                    f"Signals={len(signals)} | "
+                    f"TopSymbol={top_signal.symbol} | "
+                    f"Score={top_signal.composite_score:.2f}"
+                )
+            else:
+                logger.info("Momentum scan complete | No signals detected")
+
+        except Exception as e:
+            logger.error(f"Momentum scan failed: {e}", exc_info=True)
+            self.last_scan_results = {
+                "error": str(e),
+                "timestamp": time.time(),
+            }
+
+    def _log_scan_activity(self, signals: list[Any]) -> None:
+        """
+        Log scan results to JSONL file for audit trail.
+
+        Args:
+            signals: List of MomentumSignal objects from scan
+        """
+        import json
+        from datetime import datetime
+        from pathlib import Path
+
+        # Ensure logs directory exists
+        logs_dir = Path("logs")
+        logs_dir.mkdir(exist_ok=True)
+
+        # Create scan activity log file (one file per day)
+        today = datetime.now().strftime("%Y-%m-%d")
+        scan_log_path = logs_dir / f"scan_activity_{today}.jsonl"
+
+        # Prepare log entry
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "scan_count": len(signals),
+            "signals": [
+                {
+                    "symbol": s.symbol,
+                    "score": float(s.composite_score),
+                    "detectors": s.detected_by,
+                    "catalyst_score": float(s.catalyst_score) if hasattr(s, 'catalyst_score') else None,
+                    "premarket_score": float(s.premarket_score) if hasattr(s, 'premarket_score') else None,
+                    "bull_flag_score": float(s.bull_flag_score) if hasattr(s, 'bull_flag_score') else None,
+                }
+                for s in signals[:10]  # Top 10 signals only
+            ]
+        }
+
+        # Append to JSONL file
+        try:
+            with open(scan_log_path, 'a') as f:
+                f.write(json.dumps(log_entry) + '\n')
+            logger.debug(f"Scan activity logged to {scan_log_path}")
+        except Exception as e:
+            logger.warning(f"Failed to log scan activity: {e}")
