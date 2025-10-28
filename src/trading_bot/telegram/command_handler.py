@@ -345,6 +345,12 @@ class TelegramCommandHandler:
 
         def run_bot():
             """Run bot polling in separate thread with its own event loop."""
+            import asyncio
+
+            # Create new event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
             logger.info("Starting Telegram bot polling...")
             self.application.run_polling(drop_pending_updates=True, stop_signals=None)
 
