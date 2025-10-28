@@ -1,0 +1,450 @@
+openapi: 3.0.0
+info:
+  title: Telegram Command Handlers - Internal API Contracts
+  version: 1.0.0
+  description: |
+    Internal API contracts for Telegram Command Handlers feature.
+
+    This feature calls existing REST API endpoints from Feature #029 (LLM-Friendly Bot Operations).
+    New endpoints needed: POST /api/v1/commands/pause and POST /api/v1/commands/resume.
+
+servers:
+  - url: http://localhost:8000
+    description: Local development (bot API server)
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /api/v1/summary:
+    get:
+      summary: Get compressed bot summary
+      description: |
+        Returns compressed bot state optimized for Telegram /status command.
+        Response size <10KB guaranteed.
+        Used by: /status command
+      operationId: getBotSummary
+      tags:
+        - State
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BotSummaryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/state:
+    get:
+      summary: Get complete bot state
+      description: |
+        Returns complete trading bot state including positions, performance metrics.
+        Used by: /positions and /performance commands
+      operationId: getBotState
+      tags:
+        - State
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BotStateResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/health:
+    get:
+      summary: Get bot health status
+      description: |
+        Returns bot health indicators (circuit breaker, API connectivity, error count).
+        Used by: /status command (fallback if summary unavailable)
+      operationId: getHealthStatus
+      tags:
+        - State
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/commands/pause:
+    post:
+      summary: Pause trading operations
+      description: |
+        Stops bot from accepting new signals. Existing positions remain open.
+        Used by: /pause command
+        **NEW ENDPOINT**: Needs to be added to Feature #029 API
+      operationId: pauseTrading
+      tags:
+        - Commands
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Reason for pause (e.g., "manual intervention via Telegram")
+                  example: "User paused trading via /pause command"
+                user_id:
+                  type: integer
+                  description: Telegram user ID who initiated pause
+                  example: 123456789
+              required:
+                - reason
+      responses:
+        '200':
+          description: Trading paused successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              example:
+                success: true
+                message: "Trading paused"
+                timestamp: "2025-10-27T14:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Conflict - bot already paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "Bot is already paused"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/commands/resume:
+    post:
+      summary: Resume trading operations
+      description: |
+        Resumes bot signal processing after manual pause.
+        Used by: /resume command
+        **NEW ENDPOINT**: Needs to be added to Feature #029 API
+      operationId: resumeTrading
+      tags:
+        - Commands
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  description: Telegram user ID who initiated resume
+                  example: 123456789
+      responses:
+        '200':
+          description: Trading resumed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              example:
+                success: true
+                message: "Trading resumed"
+                timestamp: "2025-10-27T14:35:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Conflict - bot already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "Bot is already running"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key from BOT_API_AUTH_TOKEN environment variable
+
+  schemas:
+    BotSummaryResponse:
+      type: object
+      description: Compressed bot state for Telegram /status command
+      properties:
+        status:
+          type: string
+          enum: [running, paused, stopped, error]
+          description: Current bot operating mode
+        positions_count:
+          type: integer
+          description: Number of open positions
+          example: 2
+        total_unrealized_pnl:
+          type: number
+          format: decimal
+          description: Aggregate unrealized P&L across all positions
+          example: 125.50
+        account_balance:
+          type: number
+          format: decimal
+          description: Total account balance
+          example: 10500.00
+        buying_power:
+          type: number
+          format: decimal
+          description: Available buying power
+          example: 8200.00
+        last_signal_timestamp:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp of last signal processed
+          example: "2025-10-27T14:25:00Z"
+        circuit_breaker_active:
+          type: boolean
+          description: Whether circuit breaker is triggered
+          example: false
+      required:
+        - status
+        - positions_count
+        - total_unrealized_pnl
+        - account_balance
+        - buying_power
+        - circuit_breaker_active
+
+    BotStateResponse:
+      type: object
+      description: Complete bot state for /positions and /performance commands
+      properties:
+        status:
+          type: string
+          enum: [running, paused, stopped, error]
+        positions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PositionResponse'
+        account:
+          $ref: '#/components/schemas/AccountStatusResponse'
+        performance:
+          $ref: '#/components/schemas/PerformanceMetricsResponse'
+        health:
+          $ref: '#/components/schemas/HealthStatus'
+      required:
+        - status
+        - positions
+        - account
+        - performance
+        - health
+
+    PositionResponse:
+      type: object
+      description: Open position details
+      properties:
+        symbol:
+          type: string
+          example: "AAPL"
+        quantity:
+          type: integer
+          example: 100
+        entry_price:
+          type: number
+          format: decimal
+          example: 150.00
+        current_price:
+          type: number
+          format: decimal
+          example: 152.50
+        unrealized_pnl:
+          type: number
+          format: decimal
+          example: 250.00
+        unrealized_pnl_pct:
+          type: number
+          format: decimal
+          example: 1.67
+        stop_loss:
+          type: number
+          format: decimal
+          nullable: true
+          example: 148.00
+        target:
+          type: number
+          format: decimal
+          nullable: true
+          example: 156.00
+        hold_duration_seconds:
+          type: integer
+          description: Hold duration in seconds
+          example: 8100
+      required:
+        - symbol
+        - quantity
+        - entry_price
+        - current_price
+        - unrealized_pnl
+        - unrealized_pnl_pct
+        - hold_duration_seconds
+
+    AccountStatusResponse:
+      type: object
+      properties:
+        balance:
+          type: number
+          format: decimal
+        buying_power:
+          type: number
+          format: decimal
+      required:
+        - balance
+        - buying_power
+
+    PerformanceMetricsResponse:
+      type: object
+      description: Trading performance metrics for /performance command
+      properties:
+        total_trades:
+          type: integer
+          example: 46
+        wins:
+          type: integer
+          example: 30
+        losses:
+          type: integer
+          example: 16
+        win_rate:
+          type: number
+          format: decimal
+          description: Win rate as percentage (0-100)
+          example: 65.2
+        total_pnl:
+          type: number
+          format: decimal
+          example: 2450.00
+        total_pnl_pct:
+          type: number
+          format: decimal
+          example: 24.5
+        profit_factor:
+          type: number
+          format: decimal
+          description: Total wins / total losses
+          example: 2.1
+        consecutive_wins:
+          type: integer
+          example: 3
+        consecutive_losses:
+          type: integer
+          example: 0
+        best_trade_pnl:
+          type: number
+          format: decimal
+          example: 850.00
+        worst_trade_pnl:
+          type: number
+          format: decimal
+          example: -320.00
+      required:
+        - total_trades
+        - wins
+        - losses
+        - win_rate
+        - total_pnl
+        - total_pnl_pct
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        circuit_breaker_active:
+          type: boolean
+        api_connected:
+          type: boolean
+        last_trade_timestamp:
+          type: string
+          format: date-time
+          nullable: true
+        last_heartbeat:
+          type: string
+          format: date-time
+        error_count_last_hour:
+          type: integer
+      required:
+        - status
+        - circuit_breaker_active
+        - api_connected
+        - last_heartbeat
+        - error_count_last_hour
+
+    CommandResponse:
+      type: object
+      description: Response from pause/resume commands
+      properties:
+        success:
+          type: boolean
+          description: Whether command succeeded
+        message:
+          type: string
+          description: Human-readable confirmation message
+        timestamp:
+          type: string
+          format: date-time
+          description: UTC timestamp of command execution
+      required:
+        - success
+        - message
+        - timestamp
+
+    ErrorResponse:
+      type: object
+      description: Error response format (FastAPI standard)
+      properties:
+        detail:
+          type: string
+          description: Error message
+      required:
+        - detail
+
+  responses:
+    Unauthorized:
+      description: Unauthorized - invalid or missing API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Invalid API key"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Internal server error"
+
+tags:
+  - name: State
+    description: Bot state query endpoints (existing from Feature #029)
+  - name: Commands
+    description: Bot control commands (NEW - needs implementation)
