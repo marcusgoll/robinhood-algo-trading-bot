@@ -57,3 +57,6 @@ alembic==1.12.1  # Database migrations for API
 
 # Telegram Notifications (030-telegram-notifications)
 python-telegram-bot==20.7  # Async Telegram Bot API wrapper
+
+# Telegram Command Handlers (031-telegram-command-handlers)
+httpx==0.25.0  # Async HTTP client for internal API calls

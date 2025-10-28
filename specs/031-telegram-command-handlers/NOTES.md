@@ -158,5 +158,17 @@ Interactive command handlers for the Telegram bot to enable remote control and m
 4. MVP scope: Read-only commands first (faster delivery, lower risk), control commands second
 5. Blocker resolution: T004-T007 add missing control endpoints identified in planning phase
 
+## Phase 4: Implementation (2025-10-27)
+
+### Batch 1: Setup (T001-T003) - COMPLETED
+- ✅ T001: Added httpx==0.25.0 to requirements.txt
+- ✅ T002: Added TELEGRAM_AUTHORIZED_USER_IDS and TELEGRAM_COMMAND_COOLDOWN_SECONDS to .env.example
+- ✅ T003: Created src/trading_bot/telegram/ module structure with __init__.py
+
+**Key Decisions**:
+- httpx 0.25.0 selected for async HTTP client (compatible with Python 3.11)
+- Environment variables follow existing TELEGRAM_* naming pattern
+- Module structure mirrors existing notifications/ module pattern
+
 ## Last Updated
-2025-10-27T22:30:00Z
+2025-10-27T22:45:00Z
