@@ -42,28 +42,30 @@ class ResponseFormatter:
             **Positions**: 2 open (+$125.50 / +2.3%)
             ...
         """
-        mode = state.get("mode", "unknown")
-        mode_emoji = ResponseFormatter._get_mode_emoji(mode)
-        mode_display = mode.capitalize()
+        # Determine mode from config_summary.paper_trading
+        config_summary = state.get("config_summary", {})
+        paper_trading = config_summary.get("paper_trading", True)
+        mode = "Paper Trading" if paper_trading else "Live Trading"
+        mode_emoji = "📝" if paper_trading else "💰"
 
         # Calculate aggregate position P/L
         positions = state.get("positions", [])
         position_count = len(positions)
 
         if position_count > 0:
-            total_pnl = sum(p.get("unrealized_pnl", 0.0) for p in positions)
-            # Calculate percentage from total position value
-            total_value = sum(p.get("current_value", 0.0) for p in positions)
-            pnl_pct = (total_pnl / total_value * 100) if total_value > 0 else 0.0
+            total_pnl = sum(float(p.get("unrealized_pl", 0.0)) for p in positions)
+            # Calculate weighted average percentage
+            avg_pnl_pct = sum(float(p.get("unrealized_pl_pct", 0.0)) for p in positions) / position_count
 
             pnl_sign = "+" if total_pnl >= 0 else ""
-            positions_line = f"{position_count} open ({pnl_sign}${total_pnl:.2f} / {pnl_sign}{pnl_pct:.1f}%)"
+            positions_line = f"{position_count} open ({pnl_sign}${total_pnl:.2f} / {pnl_sign}{avg_pnl_pct:.1f}%)"
         else:
             positions_line = "0 open"
 
-        # Account info
-        balance = state.get("balance", 0.0)
-        buying_power = state.get("buying_power", 0.0)
+        # Account info from nested account object
+        account = state.get("account", {})
+        balance = float(account.get("account_balance", 0.0))
+        buying_power = float(account.get("buying_power", 0.0))
 
         # Last signal
         last_signal = state.get("last_signal_timestamp")
@@ -81,7 +83,7 @@ class ResponseFormatter:
 
         message = f"""📊 **Bot Status**
 
-**Mode**: {mode_emoji} {mode_display}
+**Mode**: {mode_emoji} {mode}
 **Positions**: {positions_line}
 **Account**: ${balance:,.2f} (BP: ${buying_power:,.2f})
 **Last Signal**: {last_signal_display}
@@ -120,12 +122,23 @@ _Updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC_"""
 
         for position in positions:
             symbol = position.get("symbol", "UNKNOWN")
-            entry_price = position.get("entry_price", 0.0)
-            current_price = position.get("current_price", 0.0)
-            unrealized_pnl = position.get("unrealized_pnl", 0.0)
-            pnl_pct = position.get("unrealized_pnl_pct", 0.0)
+            entry_price = float(position.get("entry_price", 0.0))
+            current_price = float(position.get("current_price", 0.0))
+            unrealized_pnl = float(position.get("unrealized_pl", 0.0))
+            pnl_pct = float(position.get("unrealized_pl_pct", 0.0))
             quantity = position.get("quantity", 0)
-            hold_duration = position.get("hold_duration_minutes", 0)
+
+            # Calculate hold duration from last_updated if available
+            last_updated = position.get("last_updated")
+            if last_updated:
+                try:
+                    updated_time = datetime.fromisoformat(last_updated.replace("Z", "+00:00"))
+                    now = datetime.now(timezone.utc)
+                    hold_duration = int((now - updated_time).total_seconds() / 60)
+                except:
+                    hold_duration = 0
+            else:
+                hold_duration = 0
 
             # P/L emoji
             if unrealized_pnl > 0:
