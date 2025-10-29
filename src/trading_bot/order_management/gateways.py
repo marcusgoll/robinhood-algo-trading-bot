@@ -8,8 +8,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from trading_bot.error_handling.exceptions import RetriableError
-from trading_bot.error_handling.retry import with_retry
+from ..error_handling.exceptions import RetriableError
+from ..error_handling.retry import with_retry
 
 from .calculator import compute_limit_price
 from .exceptions import (

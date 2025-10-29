@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import ROUND_HALF_UP, Decimal
 
-from trading_bot.config import OrderManagementConfig
+from ..config import OrderManagementConfig
 
 from .exceptions import UnsupportedOrderTypeError
 from .models import OrderRequest, PriceOffsetConfig

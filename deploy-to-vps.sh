@@ -149,7 +149,7 @@ deploy_bot() {
     print_info "Stopping existing containers..."
     ssh $VPS_HOST "
         cd $DEPLOY_DIR
-        docker-compose down 2>/dev/null || true
+        docker compose down 2>/dev/null || true
     "
     print_success "Existing containers stopped"
 
@@ -157,7 +157,7 @@ deploy_bot() {
     print_info "Building and starting containers..."
     ssh $VPS_HOST "
         cd $DEPLOY_DIR
-        docker-compose up -d --build
+        docker compose up -d --build
     "
     print_success "Containers started"
 
@@ -193,8 +193,8 @@ deploy_bot() {
     print_info "Useful commands:"
     echo "  - View logs: ssh $VPS_HOST 'docker logs trading-bot -f'"
     echo "  - Check status: ssh $VPS_HOST 'docker ps'"
-    echo "  - Restart: ssh $VPS_HOST 'cd $DEPLOY_DIR && docker-compose restart'"
-    echo "  - Stop: ssh $VPS_HOST 'cd $DEPLOY_DIR && docker-compose down'"
+    echo "  - Restart: ssh $VPS_HOST 'cd $DEPLOY_DIR && docker compose restart'"
+    echo "  - Stop: ssh $VPS_HOST 'cd $DEPLOY_DIR && docker compose down'"
 }
 
 show_logs() {
@@ -206,7 +206,7 @@ restart_bot() {
     print_header "Restarting Bot"
 
     print_info "Restarting containers..."
-    ssh $VPS_HOST "cd $DEPLOY_DIR && docker-compose restart"
+    ssh $VPS_HOST "cd $DEPLOY_DIR && docker compose restart"
     print_success "Containers restarted"
 
     print_info "Checking status..."

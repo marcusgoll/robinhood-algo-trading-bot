@@ -9,7 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from trading_bot.config import OrderManagementConfig
+from ..config import OrderManagementConfig
 
 from .calculator import (
     resolve_strategy_offsets,
