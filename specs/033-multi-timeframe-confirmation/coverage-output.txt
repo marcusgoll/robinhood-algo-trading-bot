@@ -1,0 +1,41 @@
+C:\Users\Marcus Gollahon\AppData\Local\Programs\Python\Python311\Lib\site-packages\pytest_asyncio\plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts =============================
+platform win32 -- Python 3.11.3, pytest-8.3.2, pluggy-1.5.0
+benchmark: 5.1.0 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: D:\Coding\Stocks
+configfile: pyproject.toml
+plugins: anyio-3.7.1, Faker-37.6.0, asyncio-0.24.0, benchmark-5.1.0, cov-6.1.1, html-4.1.1, metadata-3.1.1, mock-3.14.1, timeout-2.4.0, xdist-3.8.0
+asyncio: mode=Mode.STRICT, default_loop_scope=None
+collected 23 items
+
+tests\unit\validation\test_config.py .....                               [ 21%]
+tests\unit\validation\test_logger.py ....                                [ 39%]
+tests\unit\validation\test_models.py ......                              [ 65%]
+tests\unit\validation\test_multi_timeframe_validator.py ......s.
+ERROR: Coverage failure: total of 55.43 is less than fail-under=90.00
+                                                                         [100%]
+
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.11.3-final-0 _______________
+
+Name                                                      Stmts   Miss   Cover   Missing
+----------------------------------------------------------------------------------------
+src\trading_bot\order_management\__init__.py                  5      0 100.00%
+src\trading_bot\order_management\calculator.py               50     41  18.00%   18-27, 41-55, 63-92, 96-103
+src\trading_bot\order_management\exceptions.py               10      3  70.00%   26-30
+src\trading_bot\order_management\gateways.py                143    121  15.38%   50-57, 94-141, 172-219, 234-274, 280-297, 301-320, 334-347, 351-356, 360-362, 366-368
+src\trading_bot\order_management\manager.py                 105     71  32.38%   36-38, 54-76, 93, 102-126, 139-171, 174-199, 217-223, 232-263, 269-273, 276, 279-284, 289
+src\trading_bot\order_management\models.py                   47      0 100.00%
+src\trading_bot\validation\__init__.py                        0      0 100.00%
+src\trading_bot\validation\config.py                         14      0 100.00%
+src\trading_bot\validation\logger.py                         39      0 100.00%
+src\trading_bot\validation\models.py                         34      0 100.00%
+src\trading_bot\validation\multi_timeframe_validator.py      96      6  93.75%   88, 283, 337, 368-373
+----------------------------------------------------------------------------------------
+TOTAL                                                       543    242  55.43%
+Coverage HTML written to dir htmlcov
+FAIL Required test coverage of 90% not reached. Total coverage: 55.43%
+======================== 22 passed, 1 skipped in 1.26s ========================
