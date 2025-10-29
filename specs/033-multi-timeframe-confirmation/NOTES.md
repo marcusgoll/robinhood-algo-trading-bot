@@ -159,3 +159,13 @@ Multi-timeframe analysis adds higher-timeframe confirmation to momentum trades b
 - ✅ T004: Created TimeframeIndicators dataclass in models.py (immutable with frozen=True)
 - ✅ T005: Created TimeframeValidationResult dataclass in models.py (immutable with aggregate_score validation)
 - ✅ T006: Created MultiTimeframeConfig dataclass in config.py (from_env() classmethod with defaults)
+
+### Batch 2: US1 Unit Tests (T007-T012)
+- ✅ T007: test_timeframe_indicators_immutable (verifies frozen dataclass)
+- ✅ T008: test_validation_result_status_transitions (verifies enum values)
+- ✅ T009: test_scoring_logic_0_to_1_range (validates aggregate_score bounds)
+- ✅ T010: test_config_from_env_loads_defaults (config loading with defaults)
+- ✅ T011-T012: test_validate_daily_bearish_blocks_entry, test_validate_daily_bullish_passes (placeholder tests, awaiting implementation)
+
+**Tests passing**: 11/11 unit tests pass
+**Key fix**: Renamed 4h_score → h4_score, 4h_weight → h4_weight (Python identifiers cannot start with digits)

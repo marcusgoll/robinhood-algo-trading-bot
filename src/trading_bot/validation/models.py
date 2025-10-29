@@ -74,8 +74,8 @@ class TimeframeValidationResult:
         daily_indicators: Indicator values from daily timeframe
         symbol: Ticker symbol validated
         timestamp: When validation was performed
-        4h_score: 4-hour timeframe score (optional)
-        4h_indicators: Indicator values from 4H timeframe (optional)
+        h4_score: 4-hour timeframe score (optional)
+        h4_indicators: Indicator values from 4H timeframe (optional)
         reasons: List of human-readable validation reasons
         validation_duration_ms: How long validation took
 
@@ -99,8 +99,8 @@ class TimeframeValidationResult:
     daily_indicators: TimeframeIndicators
     symbol: str
     timestamp: datetime
-    4h_score: Optional[Decimal] = None
-    4h_indicators: Optional[TimeframeIndicators] = None
+    h4_score: Optional[Decimal] = None
+    h4_indicators: Optional[TimeframeIndicators] = None
     reasons: List[str] = field(default_factory=list)
     validation_duration_ms: Optional[int] = None
 
