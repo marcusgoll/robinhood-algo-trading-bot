@@ -65,6 +65,53 @@ class TestSentimentAnalyzerInit:
 class TestAnalyzePost:
     """Test suite for SentimentAnalyzer.analyze_post() method."""
 
+    def test_analyze_post_returns_none_when_model_not_loaded(self):
+        """Test that analyze_post returns None when model failed to load."""
+        # Reset singleton state to simulate load failure
+        from src.trading_bot.momentum.sentiment.sentiment_analyzer import SentimentAnalyzer as SA
+        SA._model_loaded = True  # Mark as attempted
+        SA._model = None  # But failed
+        SA._tokenizer = None
+
+        # Given: Analyzer with failed model load
+        analyzer = SentimentAnalyzer()
+
+        # When: Analyzing text
+        result = analyzer.analyze_post("AAPL news")
+
+        # Then: Returns None (graceful degradation)
+        assert result is None
+
+    @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.AutoTokenizer")
+    @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.AutoModelForSequenceClassification")
+    @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.torch")
+    def test_analyze_post_handles_inference_exception(self, mock_torch, mock_model_class, mock_tokenizer_class):
+        """Test that analyze_post returns None when inference fails."""
+        # Reset singleton state
+        from src.trading_bot.momentum.sentiment.sentiment_analyzer import SentimentAnalyzer as SA
+        SA._model_loaded = False
+        SA._model = None
+        SA._tokenizer = None
+
+        # Mock torch.cuda
+        mock_torch.cuda.is_available.return_value = False
+
+        # Given: Model that raises exception during inference
+        mock_tokenizer = MagicMock()
+        mock_tokenizer_class.from_pretrained.return_value = mock_tokenizer
+        mock_tokenizer.side_effect = Exception("CUDA error")
+
+        mock_model = MagicMock()
+        mock_model_class.from_pretrained.return_value = mock_model
+
+        analyzer = SentimentAnalyzer()
+
+        # When: Analyzing text (exception during tokenization)
+        result = analyzer.analyze_post("AAPL news")
+
+        # Then: Returns None (graceful degradation)
+        assert result is None
+
     @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.AutoTokenizer")
     @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.AutoModelForSequenceClassification")
     @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.torch")
@@ -135,6 +182,122 @@ class TestAnalyzePost:
 
 class TestAnalyzeBatch:
     """Test suite for SentimentAnalyzer.analyze_batch() method."""
+
+    def test_analyze_batch_returns_empty_when_model_not_loaded(self):
+        """Test that analyze_batch returns [] when model failed to load."""
+        # Reset singleton state to simulate load failure
+        from src.trading_bot.momentum.sentiment.sentiment_analyzer import SentimentAnalyzer as SA
+        SA._model_loaded = True  # Mark as attempted
+        SA._model = None  # But failed
+        SA._tokenizer = None
+
+        # Given: Analyzer with failed model load
+        analyzer = SentimentAnalyzer()
+
+        # When: Analyzing batch
+        results = analyzer.analyze_batch(["AAPL news", "TSLA update"])
+
+        # Then: Returns empty list (graceful degradation)
+        assert results == []
+
+    @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.AutoTokenizer")
+    @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.AutoModelForSequenceClassification")
+    def test_analyze_batch_handles_all_empty_texts(self, mock_model_class, mock_tokenizer_class):
+        """Test that analyze_batch handles all empty texts."""
+        # Reset singleton state
+        from src.trading_bot.momentum.sentiment.sentiment_analyzer import SentimentAnalyzer as SA
+        SA._model_loaded = False
+        SA._model = None
+        SA._tokenizer = None
+
+        # Given: Valid analyzer
+        mock_tokenizer = MagicMock()
+        mock_tokenizer_class.from_pretrained.return_value = mock_tokenizer
+
+        mock_model = MagicMock()
+        mock_model_class.from_pretrained.return_value = mock_model
+
+        analyzer = SentimentAnalyzer()
+
+        # When: Analyzing batch with all empty texts
+        results = analyzer.analyze_batch(["", "  ", "\t"])
+
+        # Then: Returns neutral sentiments for all
+        assert len(results) == 3
+        assert all(r == {"negative": 0.33, "neutral": 0.34, "positive": 0.33} for r in results)
+
+    @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.AutoTokenizer")
+    @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.AutoModelForSequenceClassification")
+    @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.torch")
+    def test_analyze_batch_handles_mixed_empty_and_valid_texts(self, mock_torch, mock_model_class, mock_tokenizer_class):
+        """Test that analyze_batch handles mix of empty and valid texts."""
+        # Reset singleton state
+        from src.trading_bot.momentum.sentiment.sentiment_analyzer import SentimentAnalyzer as SA
+        SA._model_loaded = False
+        SA._model = None
+        SA._tokenizer = None
+
+        # Mock torch.cuda
+        mock_torch.cuda.is_available.return_value = False
+
+        # Given: Mocked model
+        mock_tokenizer = MagicMock()
+        mock_tokenizer_class.from_pretrained.return_value = mock_tokenizer
+        mock_tokenizer.return_value = {"input_ids": MagicMock(), "attention_mask": MagicMock()}
+
+        mock_output = MagicMock()
+        mock_output.logits = [[0.2, 0.3, 0.5]]  # Only 1 post analyzed (valid text)
+
+        mock_model = MagicMock()
+        mock_model.return_value = mock_output
+        mock_model.eval = MagicMock()
+        mock_model_class.from_pretrained.return_value = mock_model
+
+        # Mock softmax
+        mock_prob = MagicMock()
+        mock_prob.__getitem__ = lambda self, idx: [0.2, 0.3, 0.5][idx]
+        mock_torch.nn.functional.softmax.return_value = [mock_prob]
+
+        analyzer = SentimentAnalyzer()
+
+        # When: Analyzing batch with empty and valid text
+        results = analyzer.analyze_batch(["", "AAPL news", "  "])
+
+        # Then: Empty texts get neutral, valid text gets analysis
+        assert len(results) == 3
+        assert results[0] == {"negative": 0.33, "neutral": 0.34, "positive": 0.33}
+        assert results[1] == {"negative": 0.2, "neutral": 0.3, "positive": 0.5}
+        assert results[2] == {"negative": 0.33, "neutral": 0.34, "positive": 0.33}
+
+    @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.AutoTokenizer")
+    @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.AutoModelForSequenceClassification")
+    @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.torch")
+    def test_analyze_batch_handles_exception(self, mock_torch, mock_model_class, mock_tokenizer_class):
+        """Test that analyze_batch returns [] when exception occurs."""
+        # Reset singleton state
+        from src.trading_bot.momentum.sentiment.sentiment_analyzer import SentimentAnalyzer as SA
+        SA._model_loaded = False
+        SA._model = None
+        SA._tokenizer = None
+
+        # Mock torch.cuda
+        mock_torch.cuda.is_available.return_value = False
+
+        # Given: Model that raises exception
+        mock_tokenizer = MagicMock()
+        mock_tokenizer_class.from_pretrained.return_value = mock_tokenizer
+        mock_tokenizer.side_effect = Exception("CUDA error")
+
+        mock_model = MagicMock()
+        mock_model_class.from_pretrained.return_value = mock_model
+
+        analyzer = SentimentAnalyzer()
+
+        # When: Analyzing batch (exception during processing)
+        results = analyzer.analyze_batch(["AAPL news", "TSLA update"])
+
+        # Then: Returns empty list (graceful degradation)
+        assert results == []
 
     @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.AutoTokenizer")
     @patch("src.trading_bot.momentum.sentiment.sentiment_analyzer.AutoModelForSequenceClassification")

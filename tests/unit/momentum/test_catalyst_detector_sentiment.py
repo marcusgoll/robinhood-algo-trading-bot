@@ -36,6 +36,7 @@ class TestCatalystDetectorSentiment:
         config.reddit_client_secret = "test-reddit-secret"
         config.reddit_user_agent = "test-user-agent"
         config.sentiment_threshold = 0.6
+        config.min_catalyst_strength = 60.0  # Add missing config value
         return config
 
     @pytest.fixture
@@ -45,14 +46,12 @@ class TestCatalystDetectorSentiment:
         config.alpaca_api_key = "test-api-key"
         config.alpaca_secret_key = "test-secret-key"
         config.sentiment_enabled = False
+        config.min_catalyst_strength = 60.0  # Add missing config value
         return config
 
     @pytest.mark.asyncio
     async def test_scan_populates_sentiment_score_when_available(self, mock_config):
         """Test T025: CatalystDetector.scan populates sentiment_score when sentiment available."""
-        # Given: CatalystDetector with sentiment enabled
-        detector = CatalystDetector(mock_config)
-
         # Mock news data (from Alpaca API)
         mock_news_data = {
             "news": [
@@ -67,45 +66,41 @@ class TestCatalystDetectorSentiment:
 
         # Mock sentiment data (from sentiment pipeline)
         now = datetime.now(UTC)
-        mock_sentiment_score = SentimentScore(
-            symbol="AAPL",
-            score=0.85,
-            confidence=0.95,
-            post_count=50,
-            timestamp=now
-        )
 
-        # Patch the fetch and sentiment methods
-        with patch.object(detector, '_fetch_news_from_alpaca', new_callable=AsyncMock) as mock_fetch:
-            with patch('src.trading_bot.momentum.catalyst_detector.SentimentFetcher') as mock_fetcher_class:
-                with patch('src.trading_bot.momentum.catalyst_detector.SentimentAnalyzer') as mock_analyzer_class:
-                    with patch('src.trading_bot.momentum.catalyst_detector.SentimentAggregator') as mock_aggregator_class:
-                        # Setup mocks
+        # Patch sentiment classes BEFORE creating CatalystDetector
+        with patch('src.trading_bot.momentum.catalyst_detector.SentimentFetcher') as mock_fetcher_class:
+            with patch('src.trading_bot.momentum.catalyst_detector.SentimentAnalyzer') as mock_analyzer_class:
+                with patch('src.trading_bot.momentum.catalyst_detector.SentimentAggregator') as mock_aggregator_class:
+                    # Setup mocks
+                    mock_fetcher = MagicMock()
+                    mock_fetcher.fetch_all.return_value = [
+                        SentimentPost(
+                            text="AAPL to the moon!",
+                            author="user1",
+                            timestamp=now,
+                            source="Twitter",
+                            symbol="AAPL"
+                        )
+                    ] * 50  # 50 posts
+
+                    mock_analyzer = MagicMock()
+                    mock_analyzer.analyze_batch.return_value = [
+                        {"negative": 0.1, "neutral": 0.2, "positive": 0.7}
+                    ] * 50
+
+                    mock_aggregator = MagicMock()
+                    mock_aggregator.aggregate.return_value = 0.85
+
+                    mock_fetcher_class.return_value = mock_fetcher
+                    mock_analyzer_class.return_value = mock_analyzer
+                    mock_aggregator_class.return_value = mock_aggregator
+
+                    # NOW create CatalystDetector with mocked sentiment classes
+                    detector = CatalystDetector(mock_config)
+
+                    # Patch the fetch method
+                    with patch.object(detector, '_fetch_news_from_alpaca', new_callable=AsyncMock) as mock_fetch:
                         mock_fetch.return_value = mock_news_data
-
-                        # Mock sentiment pipeline
-                        mock_fetcher = MagicMock()
-                        mock_fetcher.fetch_all.return_value = [
-                            SentimentPost(
-                                text="AAPL to the moon!",
-                                author="user1",
-                                timestamp=now,
-                                source="Twitter",
-                                symbol="AAPL"
-                            )
-                        ] * 50  # 50 posts
-
-                        mock_analyzer = MagicMock()
-                        mock_analyzer.analyze_batch.return_value = [
-                            {"negative": 0.1, "neutral": 0.2, "positive": 0.7}
-                        ] * 50
-
-                        mock_aggregator = MagicMock()
-                        mock_aggregator.aggregate.return_value = 0.85
-
-                        mock_fetcher_class.return_value = mock_fetcher
-                        mock_analyzer_class.return_value = mock_analyzer
-                        mock_aggregator_class.return_value = mock_aggregator
 
                         # When: scan is called
                         signals = await detector.scan(["AAPL"])
@@ -198,9 +193,6 @@ class TestCatalystDetectorSentiment:
     @pytest.mark.asyncio
     async def test_scan_with_multiple_symbols_includes_sentiment(self, mock_config):
         """Test T025: CatalystDetector handles multiple symbols with sentiment."""
-        # Given: CatalystDetector with sentiment enabled
-        detector = CatalystDetector(mock_config)
-
         # Mock news data for multiple symbols
         now = datetime.now(UTC)
         mock_news_data = {
@@ -220,36 +212,40 @@ class TestCatalystDetectorSentiment:
             ]
         }
 
-        # Patch methods
-        with patch.object(detector, '_fetch_news_from_alpaca', new_callable=AsyncMock) as mock_fetch:
-            with patch('src.trading_bot.momentum.catalyst_detector.SentimentFetcher') as mock_fetcher_class:
-                with patch('src.trading_bot.momentum.catalyst_detector.SentimentAnalyzer') as mock_analyzer_class:
-                    with patch('src.trading_bot.momentum.catalyst_detector.SentimentAggregator') as mock_aggregator_class:
-                        # Setup mocks
+        # Patch sentiment classes BEFORE creating CatalystDetector
+        with patch('src.trading_bot.momentum.catalyst_detector.SentimentFetcher') as mock_fetcher_class:
+            with patch('src.trading_bot.momentum.catalyst_detector.SentimentAnalyzer') as mock_analyzer_class:
+                with patch('src.trading_bot.momentum.catalyst_detector.SentimentAggregator') as mock_aggregator_class:
+                    # Setup mocks
+                    mock_fetcher = MagicMock()
+                    mock_fetcher.fetch_all.return_value = [
+                        SentimentPost(
+                            text="Sample post",
+                            author="user1",
+                            timestamp=now,
+                            source="Twitter",
+                            symbol="AAPL"
+                        )
+                    ] * 50
+
+                    mock_analyzer = MagicMock()
+                    mock_analyzer.analyze_batch.return_value = [
+                        {"negative": 0.1, "neutral": 0.2, "positive": 0.7}
+                    ] * 50
+
+                    mock_aggregator = MagicMock()
+                    mock_aggregator.aggregate.return_value = 0.75
+
+                    mock_fetcher_class.return_value = mock_fetcher
+                    mock_analyzer_class.return_value = mock_analyzer
+                    mock_aggregator_class.return_value = mock_aggregator
+
+                    # NOW create CatalystDetector with mocked sentiment classes
+                    detector = CatalystDetector(mock_config)
+
+                    # Patch the fetch method
+                    with patch.object(detector, '_fetch_news_from_alpaca', new_callable=AsyncMock) as mock_fetch:
                         mock_fetch.return_value = mock_news_data
-
-                        mock_fetcher = MagicMock()
-                        mock_fetcher.fetch_all.return_value = [
-                            SentimentPost(
-                                text="Sample post",
-                                author="user1",
-                                timestamp=now,
-                                source="Twitter",
-                                symbol="AAPL"
-                            )
-                        ] * 50
-
-                        mock_analyzer = MagicMock()
-                        mock_analyzer.analyze_batch.return_value = [
-                            {"negative": 0.1, "neutral": 0.2, "positive": 0.7}
-                        ] * 50
-
-                        mock_aggregator = MagicMock()
-                        mock_aggregator.aggregate.return_value = 0.75
-
-                        mock_fetcher_class.return_value = mock_fetcher
-                        mock_analyzer_class.return_value = mock_analyzer
-                        mock_aggregator_class.return_value = mock_aggregator
 
                         # When: scan is called with multiple symbols
                         signals = await detector.scan(["AAPL", "TSLA"])
