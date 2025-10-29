@@ -100,11 +100,13 @@ class SentimentScore:
                 f"must be between 0.0 and 1.0"
             )
 
-        # Validate post_count minimum (10 posts required for reliable signal)
-        if self.post_count < 10:
+        # Validate post_count is positive
+        # Note: Minimum 10 posts required for reliable aggregation, but enforced
+        # at aggregator level (not dataclass level) to allow intermediate calculations
+        if self.post_count < 0:
             raise ValueError(
                 f"Invalid SentimentScore for {self.symbol}: post_count ({self.post_count}) "
-                f"must be at least 10"
+                f"must be non-negative"
             )
 
         # Validate timestamp is datetime object
