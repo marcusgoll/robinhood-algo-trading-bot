@@ -27,7 +27,7 @@ ruff==0.14.1
 pylint==3.0.3
 
 # Security (§Security)
-python-dotenv==1.0.0
+python-dotenv==1.2.1
 bandit==1.7.6
 pyotp==2.9.0  # MFA TOTP generation (authentication-module)
 
