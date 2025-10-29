@@ -316,3 +316,90 @@ Manual UI/UX testing complete. All scenarios passed. Feature ready for staging d
 - ✅ No blocking issues
 - 📋 Ready for: /ship-staging
 
+## Phase 7: Production Deployment (2025-10-28)
+
+**Summary**:
+Direct production deployment complete. All services running on Hetzner VPS. Skipped staging per user request (option 2).
+
+**Deployment Timeline**:
+- Preview testing passed at ~22:00 CST (user confirmation: "Passed")
+- User selected option 2: Direct production deployment (skip staging)
+- Feature branch merged to main
+- Deployed to Hetzner server at 5.161.75.135
+- Resolved 5 deployment issues
+- All services healthy by 22:03 CST
+
+**Production Environment**:
+- Server: Hetzner VPS (5.161.75.135)
+- Frontend: http://5.161.75.135:3002
+- Backend API: http://5.161.75.135:8000
+- Container orchestration: Docker Compose
+- Deployment method: Git pull + docker compose rebuild
+
+**Services Status**:
+- ✅ trading-bot: Running (healthy)
+- ✅ trading-bot-api: Running (healthy, port 8000)
+- ✅ trading-bot-frontend: Running (healthy, port 3002)
+- ✅ trading-bot-redis: Running (healthy)
+
+**Deployment Issues Resolved**:
+1. **Import errors**: Fixed Python absolute imports → relative imports in api/app/services/__init__.py
+2. **Dockerfile syntax**: Fixed npm command from `npm ci --only=production=false` → `npm ci`
+3. **Missing files**: Force-added package.json, package-lock.json, tsconfig.json (were in .gitignore)
+4. **Port 3000 conflict**: Dokploy occupying port 3000, changed to 3001
+5. **Port 3001 conflict**: dockerd occupying port 3001, changed to 3002 (final)
+
+**Files Modified During Deployment**:
+- api/app/services/__init__.py (relative imports)
+- frontend/Dockerfile (npm command fix)
+- docker-compose.yml (port 3000→3001→3002)
+- Added to git: frontend/package.json, frontend/package-lock.json, frontend/tsconfig.json
+
+**Git Commits**:
+- `4677e40` - fix: change frontend port to 3002 (ports 3000-3001 occupied)
+- `e917fa7` - fix: change frontend port from 3000 to 3001 to avoid Dokploy conflict
+- Previous commits for Dockerfile and file additions
+
+**Health Check Results**:
+- API health endpoint: `{"status":"healthy","timestamp":"2025-10-29T03:03:41.157136+00:00"}`
+- Frontend serving: HTML + Vite assets confirmed (React app loads)
+- All container health checks passing (30s intervals)
+
+**Bundle Deployed**:
+- Frontend bundle: 572.73 KB (gzipped: 165.61 KB)
+- Backend: FastAPI + 2 new endpoints (/api/v1/backtests, /api/v1/backtests/:id)
+- Sample data: 3 backtest JSON files available in backtest_results/
+
+**Port Configuration**:
+- 3000: Dokploy (conflict)
+- 3001: dockerd (conflict)
+- 3002: Frontend (final working port)
+- 8000: Backend API
+- 6379: Redis (internal only)
+
+**Access URLs**:
+- Dashboard: http://5.161.75.135:3002
+- API: http://5.161.75.135:8000
+- API Health: http://5.161.75.135:8000/api/v1/health/healthz
+- API Docs: http://5.161.75.135:8000/docs
+
+**Known Limitations**:
+- No SSL/HTTPS (HTTP only on ports 3002 and 8000)
+- Port 3002 is non-standard (due to port conflicts)
+- No domain name (IP address only)
+- No reverse proxy/load balancer
+
+**Post-Deployment Verification**:
+- ✅ All 4 containers running
+- ✅ All health checks passing
+- ✅ API responding correctly
+- ✅ Frontend serving HTML/JS/CSS
+- ✅ No errors in container logs
+
+**Checkpoint**:
+- ✅ Production deployment complete
+- ✅ All services healthy
+- ✅ All deployment issues resolved
+- ✅ Feature 032 fully shipped to production
+- 📋 Status: Feature complete and live
+
