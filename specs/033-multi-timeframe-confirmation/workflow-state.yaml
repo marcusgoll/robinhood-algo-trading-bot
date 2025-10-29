@@ -1,0 +1,56 @@
+# Spec-Flow Workflow State
+# Schema version: 2.0.0
+# Created: 2025-10-29T04:00:37Z
+
+feature:
+  slug: multi-timeframe-confirmation
+  title: Multi-Timeframe Confirmation for Momentum Trades
+  branch_name: feature/033-multi-timeframe-confirmation
+  created: 2025-10-29T04:00:37Z
+  last_updated: 2025-10-29T04:00:37Z
+  roadmap_status: in_progress  # Options: backlog, next, in_progress, shipped
+
+deployment_model: direct-prod  # Options: staging-prod, direct-prod, local-only
+
+workflow:
+  phase: spec-flow
+  status: in_progress  # Options: in_progress, completed, failed, pending
+  completed_phases: []
+  failed_phases: []
+  manual_gates: {}
+
+context:
+  token_budget:
+    phase: planning
+    budget: 75000
+    estimated_usage: 0
+    compaction_needed: false
+
+deployment:
+  staging:
+    deployed: false
+    url: null
+    deployment_ids: {}
+    health_checks: {}
+  production:
+    deployed: false
+    version: null
+    url: null
+    deployment_ids: {}
+
+artifacts:
+  spec: specs/multi-timeframe-confirmation/spec.md
+  plan: null
+  tasks: null
+  optimization_report: null
+  staging_validation: null
+  ship_report: null
+
+quality_gates: {}
+
+metadata:
+  schema_version: "2.0.0"
+  workflow_version: "2.0.0"
+
+# GitHub Integration
+github_issue: 41
