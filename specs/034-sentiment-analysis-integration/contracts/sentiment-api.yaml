@@ -1,0 +1,215 @@
+openapi: 3.0.0
+info:
+  title: Sentiment Analysis Integration - Internal API
+  version: 1.0.0
+  description: |
+    Internal service contracts for sentiment analysis integration.
+    Not exposed as REST API (internal Python modules only).
+
+components:
+  schemas:
+    SentimentPost:
+      type: object
+      description: Social media post for sentiment analysis
+      required:
+        - text
+        - author
+        - timestamp
+        - source
+        - symbol
+      properties:
+        text:
+          type: string
+          description: Post content text
+          example: "AAPL crushing earnings, calls printing 🚀"
+          minLength: 1
+        author:
+          type: string
+          description: Username/handle of post author
+          example: "trader_123"
+        timestamp:
+          type: string
+          format: date-time
+          description: When post was published (UTC timezone, must be within last 30 min)
+          example: "2025-10-29T14:25:00Z"
+        source:
+          type: string
+          enum: ["Twitter", "Reddit"]
+          description: Platform source
+          example: "Twitter"
+        symbol:
+          type: string
+          pattern: "^[A-Z]{1,5}$"
+          description: Stock ticker symbol (1-5 uppercase letters)
+          example: "AAPL"
+
+    SentimentScore:
+      type: object
+      description: Aggregated sentiment result for a symbol
+      required:
+        - symbol
+        - score
+        - confidence
+        - post_count
+        - timestamp
+      properties:
+        symbol:
+          type: string
+          pattern: "^[A-Z]{1,5}$"
+          description: Stock ticker symbol
+          example: "AAPL"
+        score:
+          type: number
+          format: float
+          minimum: -1.0
+          maximum: 1.0
+          description: Aggregated sentiment score (-1.0 bearish to +1.0 bullish)
+          example: 0.75
+        confidence:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Confidence level based on FinBERT probabilities
+          example: 0.85
+        post_count:
+          type: integer
+          minimum: 10
+          description: Number of posts analyzed (minimum 10 for reliable signal)
+          example: 42
+        timestamp:
+          type: string
+          format: date-time
+          description: When analysis was performed (UTC timezone)
+          example: "2025-10-29T14:30:00Z"
+
+    CatalystEvent:
+      type: object
+      description: News catalyst event with optional sentiment score
+      required:
+        - headline
+        - catalyst_type
+        - published_at
+        - source
+      properties:
+        headline:
+          type: string
+          description: News headline text
+          example: "Apple reports record Q4 earnings, beats estimates"
+        catalyst_type:
+          type: string
+          enum: ["earnings", "fda", "merger", "product", "analyst"]
+          description: Type of catalyst event
+          example: "earnings"
+        published_at:
+          type: string
+          format: date-time
+          description: When news was published (UTC timezone)
+          example: "2025-10-29T13:00:00Z"
+        source:
+          type: string
+          description: News source name
+          example: "Alpaca News"
+        sentiment_score:
+          type: number
+          format: float
+          nullable: true
+          minimum: -1.0
+          maximum: 1.0
+          description: |
+            Aggregated sentiment score from social media posts.
+            -1.0 (very bearish) to +1.0 (very bullish).
+            null if sentiment analysis unavailable (graceful degradation).
+          example: 0.75
+
+    FinBERTOutput:
+      type: object
+      description: FinBERT model output for a single post
+      required:
+        - negative
+        - neutral
+        - positive
+      properties:
+        negative:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Probability of negative sentiment
+          example: 0.05
+        neutral:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Probability of neutral sentiment
+          example: 0.15
+        positive:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Probability of positive sentiment
+          example: 0.80
+
+    SentimentAnalysisEvent:
+      type: object
+      description: Log event for sentiment analysis (JSONL format)
+      required:
+        - event
+        - timestamp
+        - symbol
+      properties:
+        event:
+          type: string
+          enum:
+            - "sentiment.analysis_started"
+            - "sentiment.analysis_completed"
+            - "sentiment.api_error"
+            - "sentiment.model_loaded"
+          description: Event type
+          example: "sentiment.analysis_completed"
+        timestamp:
+          type: string
+          format: date-time
+          description: When event occurred (UTC timezone)
+          example: "2025-10-29T14:30:00Z"
+        symbol:
+          type: string
+          pattern: "^[A-Z]{1,5}$"
+          description: Stock ticker symbol (if applicable)
+          example: "AAPL"
+        score:
+          type: number
+          format: float
+          nullable: true
+          description: Sentiment score (for analysis_completed events)
+          example: 0.75
+        confidence:
+          type: number
+          format: float
+          nullable: true
+          description: Confidence level (for analysis_completed events)
+          example: 0.85
+        duration_ms:
+          type: integer
+          nullable: true
+          description: Analysis duration in milliseconds (for performance tracking)
+          example: 2500
+        post_count:
+          type: integer
+          nullable: true
+          description: Number of posts analyzed (for analysis_started/completed events)
+          example: 42
+        error_type:
+          type: string
+          nullable: true
+          enum: ["rate_limit", "timeout", "auth_failed", "parse_error"]
+          description: Error type (for api_error events)
+          example: "rate_limit"
+        source:
+          type: string
+          nullable: true
+          enum: ["Twitter", "Reddit", "FinBERT"]
+          description: API source that failed (for api_error events)
+          example: "Twitter"

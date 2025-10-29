@@ -100,15 +100,18 @@ class CatalystEvent:
         catalyst_type: Type of catalyst (EARNINGS, FDA, MERGER, PRODUCT, ANALYST)
         published_at: When news was published (UTC timezone)
         source: News source name (e.g., 'Alpaca News', 'Finnhub')
+        sentiment_score: Optional sentiment score from -1.0 (bearish) to +1.0 (bullish).
+                        None if sentiment analysis unavailable or disabled.
 
     Raises:
-        ValueError: If published_at is not a datetime object
+        ValueError: If published_at is not a datetime object or sentiment_score out of range
     """
 
     headline: str
     catalyst_type: CatalystType
     published_at: datetime
     source: str
+    sentiment_score: float | None = None
 
     def __post_init__(self) -> None:
         """Validate catalyst event after initialization."""
@@ -118,6 +121,14 @@ class CatalystEvent:
                 f"Invalid CatalystEvent: published_at must be a datetime object, "
                 f"got {type(self.published_at).__name__}"
             )
+
+        # Validate sentiment_score range if provided
+        if self.sentiment_score is not None:
+            if not (-1.0 <= self.sentiment_score <= 1.0):
+                raise ValueError(
+                    f"Invalid CatalystEvent: sentiment_score ({self.sentiment_score}) "
+                    f"must be between -1.0 and 1.0 or None"
+                )
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,50 @@
+# Spec-Flow Workflow State
+# Schema version: 2.0.0
+# Created: 2025-10-29T06:16:34Z
+
+feature:
+  slug: sentiment-analysis-integration
+  title: sentiment-analysis-integration
+  branch_name: feature/034-sentiment-analysis-integration
+  created: 2025-10-29T06:16:34Z
+  last_updated: 2025-10-29T06:16:34Z
+  roadmap_status: in_progress # Options: backlog, next, in_progress, shipped
+deployment_model: direct-prod # Options: staging-prod, direct-prod, local-only
+workflow:
+  phase: optimize
+  status: failed # Options: in_progress, completed, failed, pending
+  completed_phases: []
+  failed_phases:
+    - optimize
+  manual_gates: {}
+context:
+  token_budget:
+    phase: planning
+    budget: 75000
+    estimated_usage: 0
+    compaction_needed: false
+deployment:
+  staging:
+    deployed: false
+    url: null
+    deployment_ids: {}
+    health_checks: {}
+  production:
+    deployed: false
+    version: null
+    url: null
+    deployment_ids: {}
+artifacts:
+  spec: specs/sentiment-analysis-integration/spec.md
+  plan: null
+  tasks: null
+  optimization_report: null
+  staging_validation: null
+  ship_report: null
+quality_gates: {}
+metadata:
+  schema_version: "2.0.0"
+  workflow_version: "2.0.0"
+feature:
+  github_issue: 45
+  last_updated: "2025-10-29T07:20:45Z"

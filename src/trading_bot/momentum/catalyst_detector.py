@@ -23,6 +23,10 @@ from .config import MomentumConfig
 from .logging.momentum_logger import MomentumLogger
 from .schemas.momentum_signal import CatalystEvent, CatalystType, MomentumSignal, SignalType
 from .validation import validate_symbols
+from .sentiment.sentiment_fetcher import SentimentFetcher
+from .sentiment.sentiment_analyzer import SentimentAnalyzer
+from .sentiment.sentiment_aggregator import SentimentAggregator
+from .sentiment.models import SentimentScore
 
 # Module logger
 logger = logging.getLogger(__name__)
@@ -69,6 +73,19 @@ class CatalystDetector:
         """
         self.config = config
         self.logger = momentum_logger or MomentumLogger()
+
+        # Initialize sentiment pipeline if enabled
+        if self.config.sentiment_enabled:
+            try:
+                self.sentiment_fetcher = SentimentFetcher(config)
+                self.sentiment_analyzer = SentimentAnalyzer()
+                self.sentiment_aggregator = SentimentAggregator()
+                logger.info("Sentiment analysis pipeline initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize sentiment pipeline: {e}. Sentiment analysis disabled.")
+                self.config.sentiment_enabled = False
+        else:
+            logger.info("Sentiment analysis disabled via SENTIMENT_ENABLED=false")
 
     async def scan(self, symbols: list[str]) -> list[MomentumSignal]:
         """Scan for catalyst events in last 24 hours.
@@ -124,6 +141,10 @@ class CatalystDetector:
 
             # Filter news to last 24 hours and build signals
             signals = self._process_news_data(news_data, symbols)
+
+            # Enrich signals with sentiment scores (if sentiment enabled)
+            if self.config.sentiment_enabled:
+                signals = await self._enrich_with_sentiment(signals)
 
             # Log each detected signal
             for signal in signals:
@@ -533,3 +554,95 @@ class CatalystDetector:
             signals.append(signal)
 
         return signals
+
+    async def _enrich_with_sentiment(self, signals: list[MomentumSignal]) -> list[MomentumSignal]:
+        """Enrich catalyst signals with sentiment scores.
+
+        For each signal, fetches social media posts, analyzes sentiment, and adds
+        sentiment_score to signal details. Implements graceful degradation.
+
+        Args:
+            signals: List of MomentumSignal objects from catalyst detection
+
+        Returns:
+            List[MomentumSignal]: Same signals enriched with sentiment_score in details
+
+        Notes:
+            - Sentiment score added to signal.details["sentiment_score"]
+            - If sentiment analysis fails, sentiment_score=None (graceful degradation)
+            - Feature flag: Skip if self.config.sentiment_enabled=False
+        """
+        if not signals:
+            return signals
+
+        enriched_signals = []
+
+        for signal in signals:
+            symbol = signal.symbol
+
+            try:
+                # Fetch social media posts (Twitter + Reddit)
+                posts = self.sentiment_fetcher.fetch_all(symbol, minutes=30)
+
+                if not posts:
+                    # No posts found, set sentiment_score=None
+                    logger.debug(f"No social media posts found for {symbol}")
+                    signal.details["sentiment_score"] = None
+                    enriched_signals.append(signal)
+                    continue
+
+                # Analyze sentiment for each post
+                post_texts = [post.text for post in posts]
+                sentiment_results = self.sentiment_analyzer.analyze_batch(post_texts)
+
+                # Create one SentimentScore per post with actual timestamps
+                # This enables exponential decay weighting in the aggregator
+                sentiment_scores = []
+                for post, result in zip(posts, sentiment_results):
+                    if result is None:
+                        continue
+
+                    # Convert FinBERT output to score: positive - negative (range -1.0 to +1.0)
+                    score = result.get("positive", 0.0) - result.get("negative", 0.0)
+
+                    # Calculate confidence as max probability
+                    confidence = max(result.values())
+
+                    # Create SentimentScore with post's actual timestamp
+                    sentiment_scores.append(SentimentScore(
+                        symbol=symbol,
+                        score=score,
+                        confidence=confidence,
+                        post_count=1,  # One post per score object
+                        timestamp=post.timestamp  # Use actual post timestamp for recency weighting
+                    ))
+
+                if not sentiment_scores:
+                    # No valid sentiment scores
+                    signal.details["sentiment_score"] = None
+                    enriched_signals.append(signal)
+                    continue
+
+                # Aggregate with recency weighting (exponential decay on timestamps)
+                aggregated_score = self.sentiment_aggregator.aggregate(sentiment_scores)
+
+                # Add sentiment score to signal details
+                signal.details["sentiment_score"] = aggregated_score
+
+                logger.debug(
+                    f"Enriched {symbol} signal with sentiment: {aggregated_score:.3f} "
+                    f"(from {len(posts)} posts)"
+                )
+
+                enriched_signals.append(signal)
+
+            except Exception as e:
+                # Graceful degradation: Log error, set sentiment_score=None
+                logger.warning(
+                    f"Failed to fetch sentiment for {symbol}: {e}. "
+                    f"Continuing with sentiment_score=None"
+                )
+                signal.details["sentiment_score"] = None
+                enriched_signals.append(signal)
+
+        return enriched_signals
