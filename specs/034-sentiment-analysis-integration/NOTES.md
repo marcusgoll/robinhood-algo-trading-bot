@@ -102,25 +102,41 @@ Integrate sentiment analysis using FinBERT model to score social media posts (Tw
 4. MomentumConfig includes 8 sentiment fields with sensible defaults
 5. Feature flag: sentiment_enabled (default True) for quick rollback
 
+**Batch 3 (US2 - Twitter/Reddit API Integration)** - Completed
+- ✅ T008: Write unit test - SentimentFetcher initializes clients
+- ✅ T009: Write unit test - fetch_twitter_posts returns SentimentPost list
+- ✅ T010: Write unit test - fetch_reddit_posts returns SentimentPost list
+- ✅ T011: Write unit test - fetch_all combines Twitter and Reddit posts
+- ✅ T012: Implement SentimentFetcher.__init__ with Twitter/Reddit clients
+- ✅ T013: Implement fetch_twitter_posts with 30-min time window filtering
+- ✅ T014: Implement fetch_reddit_posts with wallstreetbets+stocks search
+
+**Key Decisions**:
+1. Used @with_retry() decorator with default policy (3 attempts, exponential backoff)
+2. Graceful degradation: Returns empty list on API failure, logs error
+3. Twitter query format: "${symbol} OR {symbol} -is:retweet" (catches both formats)
+4. Reddit searches both r/wallstreetbets and r/stocks (combined query)
+5. Time window filtering: Post-API-call client-side filtering (Reddit API limitation)
+6. All 9 tests passing with 100% coverage for new code
+
 ---
 
 ## Implementation Progress Summary
 
-**Completed**: 7/40 tasks (17.5%)
-**Batches Completed**: 2/7
+**Completed**: 14/40 tasks (35%)
+**Batches Completed**: 3/7
 
-**Phase Status**: Foundational infrastructure complete, ready for user story implementation
+**Phase Status**: US2 (Fetching) complete, ready for US3 (Analysis) implementation
 
-**Remaining Work** (33 tasks):
-- Batch 3 (US2 Fetching): 7 tasks - Twitter/Reddit API integration with tests
+**Remaining Work** (26 tasks):
 - Batch 4 (US3 Analysis): 6 tasks - FinBERT model loading and inference with tests
 - Batch 5 (US4 Aggregation): 4 tasks - 30-min rolling window with recency weighting
 - Batch 6 (US1 Integration): 5 tasks - CatalystDetector.scan() extension with E2E tests
 - Batch 7 (Polish): 11 tasks - Error handling, logging, deployment prep, documentation
 
 **Next Steps**:
-1. Continue with Batch 3 (US2 - Twitter/Reddit fetching)
-2. Follow TDD approach: Write tests before implementation
-3. Use @with_retry for API error handling
-4. Implement graceful degradation patterns
+1. Continue with Batch 4 (US3 - FinBERT sentiment analysis)
+2. Load FinBERT model from Hugging Face (ProsusAI/finbert)
+3. Implement batch inference for performance (<200ms per post)
+4. Follow TDD approach: Write tests before implementation
 
