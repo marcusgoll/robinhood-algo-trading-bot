@@ -595,34 +595,36 @@ class CatalystDetector:
                 post_texts = [post.text for post in posts]
                 sentiment_results = self.sentiment_analyzer.analyze_batch(post_texts)
 
-                # Convert sentiment results to scores
-                # FinBERT returns {negative, neutral, positive} probabilities
-                # Convert to score: positive - negative (range -1.0 to +1.0)
-                scores = []
-                for result in sentiment_results:
+                # Create one SentimentScore per post with actual timestamps
+                # This enables exponential decay weighting in the aggregator
+                sentiment_scores = []
+                for post, result in zip(posts, sentiment_results):
                     if result is None:
                         continue
-                    score = result.get("positive", 0.0) - result.get("negative", 0.0)
-                    scores.append(score)
 
-                if not scores:
+                    # Convert FinBERT output to score: positive - negative (range -1.0 to +1.0)
+                    score = result.get("positive", 0.0) - result.get("negative", 0.0)
+
+                    # Calculate confidence as max probability
+                    confidence = max(result.values())
+
+                    # Create SentimentScore with post's actual timestamp
+                    sentiment_scores.append(SentimentScore(
+                        symbol=symbol,
+                        score=score,
+                        confidence=confidence,
+                        post_count=1,  # One post per score object
+                        timestamp=post.timestamp  # Use actual post timestamp for recency weighting
+                    ))
+
+                if not sentiment_scores:
                     # No valid sentiment scores
                     signal.details["sentiment_score"] = None
                     enriched_signals.append(signal)
                     continue
 
-                # Create SentimentScore objects for aggregation
-                now = datetime.now(UTC)
-                sentiment_score_obj = SentimentScore(
-                    symbol=symbol,
-                    score=sum(scores) / len(scores),  # Simple average for now
-                    confidence=0.85,  # Placeholder confidence
-                    post_count=len(posts),
-                    timestamp=now
-                )
-
-                # Aggregate with recency weighting
-                aggregated_score = self.sentiment_aggregator.aggregate([sentiment_score_obj])
+                # Aggregate with recency weighting (exponential decay on timestamps)
+                aggregated_score = self.sentiment_aggregator.aggregate(sentiment_scores)
 
                 # Add sentiment score to signal details
                 signal.details["sentiment_score"] = aggregated_score
