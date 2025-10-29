@@ -149,7 +149,12 @@ class SentimentFetcher:
             List of SentimentPost objects from Reddit
 
         Notes:
-            - Searches r/wallstreetbets and r/stocks
+            - Searches multiple finance subreddits:
+              * r/wallstreetbets (19.5M) - retail sentiment, meme stocks
+              * r/stocks (6.5M) - general stock discussion
+              * r/investing (2.3M) - long-term investor sentiment
+              * r/StockMarket (2.6M) - broad market discussion
+              * r/options (800k) - derivatives sentiment (often predictive)
             - Combines title + selftext for full post content
             - Filters to last N minutes using created_utc
             - Returns empty list on API failure (graceful degradation)
@@ -162,8 +167,10 @@ class SentimentFetcher:
             # Calculate time cutoff
             cutoff_time = datetime.now(UTC) - timedelta(minutes=minutes)
 
-            # Search multiple subreddits
-            subreddits = self.reddit_client.subreddit("wallstreetbets+stocks")
+            # Search multiple finance subreddits (combined with + delimiter)
+            subreddits = self.reddit_client.subreddit(
+                "wallstreetbets+stocks+investing+StockMarket+options"
+            )
 
             # Search for symbol
             submissions = subreddits.search(
