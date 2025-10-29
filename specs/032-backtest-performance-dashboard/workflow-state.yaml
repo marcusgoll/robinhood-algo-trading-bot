@@ -1,0 +1,47 @@
+# Spec-Flow Workflow State
+# Schema version: 2.0.0
+# Created: 2025-10-29T00:04:54Z
+
+feature:
+  slug: backtest-performance-dashboard
+  title: Backtest Performance Dashboard with Equity Curves
+  branch_name: feature/032-backtest-performance-dashboard
+  created: 2025-10-29T00:04:54Z
+  last_updated: 2025-10-29T00:04:54Z
+  roadmap_status: in_progress # Options: backlog, next, in_progress, shipped
+  github_issue: 42
+deployment_model: direct-prod # Options: staging-prod, direct-prod, local-only
+workflow:
+  phase: spec-flow
+  status: in_progress # Options: in_progress, completed, failed, pending
+  completed_phases: []
+  failed_phases: []
+  manual_gates: {}
+context:
+  token_budget:
+    phase: planning
+    budget: 75000
+    estimated_usage: 0
+    compaction_needed: false
+deployment:
+  staging:
+    deployed: false
+    url: null
+    deployment_ids: {}
+    health_checks: {}
+  production:
+    deployed: false
+    version: null
+    url: null
+    deployment_ids: {}
+artifacts:
+  spec: specs/backtest-performance-dashboard/spec.md
+  plan: null
+  tasks: null
+  optimization_report: null
+  staging_validation: null
+  ship_report: null
+quality_gates: {}
+metadata:
+  schema_version: "2.0.0"
+  workflow_version: "2.0.0"
