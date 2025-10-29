@@ -1,0 +1,81 @@
+# UI Screens Inventory: Backtest Performance Dashboard
+# Feature: specs/032-backtest-performance-dashboard/
+# Created: 2025-10-28
+
+screens:
+  backtest_list:
+    id: backtest_list
+    name: Backtest List
+    route: /backtests
+    purpose: Browse all backtest runs, filter by strategy/date, select for viewing
+    primary_action: "View Details"
+    states:
+      - default: Shows list of all backtests with summary metrics
+      - loading: Skeleton loaders while fetching from API
+      - empty: "No backtests found" with prompt to run first backtest
+      - filtered: List filtered by strategy name or date range
+    components:
+      - Table (backtest list with sortable columns)
+      - SearchInput (filter by strategy name)
+      - DateRangePicker (filter by date range)
+      - Button (primary CTA: "View Details")
+      - Badge (strategy name tags)
+    copy:
+      heading: "Backtest Results"
+      subheading: "Compare strategy performance across historical periods"
+      cta_primary: "View Details"
+      empty_state: "No backtests yet. Run your first backtest to see performance data."
+
+  backtest_detail:
+    id: backtest_detail
+    name: Backtest Detail Dashboard
+    route: /backtests/:id
+    purpose: Display comprehensive backtest results with interactive charts and metrics
+    primary_action: "Export Report"
+    states:
+      - default: Shows all 5 charts and metrics table
+      - loading: Skeleton loaders for charts while fetching data
+      - compare_mode: Overlay 2-3 backtests on same charts for comparison
+      - filtered_trades: Trade list filtered by symbol, date, or win/loss
+    components:
+      - Card (container for each chart)
+      - LineChart (equity curve, drawdown chart)
+      - BarChart (win/loss distribution)
+      - Histogram (R-multiple distribution)
+      - Table (performance metrics, trade list)
+      - Tabs (switch between different chart views)
+      - FilterDropdown (filter trades by symbol, date, win/loss)
+      - Button (export to PNG/PDF)
+      - CompareToggle (enable/disable compare mode)
+    copy:
+      heading: "Backtest: [Strategy Name]"
+      subheading: "[Date Range] | [Symbol Count] symbols | [Trade Count] trades"
+      cta_primary: "Export Report"
+      chart_titles:
+        equity_curve: "Equity Curve"
+        drawdown: "Drawdown Analysis"
+        winloss: "Win/Loss Distribution"
+        rmultiple: "R-Multiple Histogram"
+      metrics_section: "Performance Metrics"
+
+  compare_view:
+    id: compare_view
+    name: Backtest Comparison
+    route: /backtests/compare
+    purpose: Overlay multiple backtests on same charts for side-by-side comparison
+    primary_action: "Export Comparison"
+    states:
+      - selecting: User selecting 2-3 backtests to compare
+      - comparing: Charts overlaid with different colors for each backtest
+      - max_selected: Maximum 3 backtests selected (disable further selection)
+    components:
+      - MultiSelect (select up to 3 backtests)
+      - LineChart (equity curves overlaid)
+      - Table (metrics comparison across backtests)
+      - Legend (color-coded backtest names)
+      - Button (export comparison report)
+    copy:
+      heading: "Compare Backtests"
+      subheading: "Select up to 3 backtests to compare side-by-side"
+      cta_primary: "Export Comparison"
+      selection_prompt: "Select 2-3 backtests from the dropdown to begin comparison"
