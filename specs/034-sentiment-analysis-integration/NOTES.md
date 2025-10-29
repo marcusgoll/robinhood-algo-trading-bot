@@ -89,3 +89,16 @@ Integrate sentiment analysis using FinBERT model to score social media posts (Tw
 2. Module structure follows existing momentum/ pattern
 3. Test structure mirrors existing test organization
 
+**Batch 2 (Foundational Models)** - Completed
+- ✅ T004: Create SentimentPost dataclass with validation
+- ✅ T005: Create SentimentScore dataclass with validation
+- ✅ T006: Add sentiment_score field to CatalystEvent
+- ✅ T007: Extend MomentumConfig with sentiment credentials
+
+**Key Decisions**:
+1. All models use frozen dataclasses with __post_init__ validation (follows existing pattern)
+2. SentimentScore requires min 10 posts for reliable signal
+3. CatalystEvent.sentiment_score is optional (None if unavailable)
+4. MomentumConfig includes 8 sentiment fields with sensible defaults
+5. Feature flag: sentiment_enabled (default True) for quick rollback
+
