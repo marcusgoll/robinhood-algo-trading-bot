@@ -191,6 +191,8 @@ class TestTradingBot:
             success=True,
             timestamp=datetime.now(UTC),
             latency_ms=10,
+            error_message=None,
+            reauth_triggered=False,
         )
 
         bot.start()
@@ -208,6 +210,8 @@ class TestTradingBot:
             success=True,
             timestamp=datetime.now(UTC),
             latency_ms=5,
+            error_message=None,
+            reauth_triggered=False,
         )
         bot.safety_checks = MagicMock()
         bot.safety_checks.validate_trade.return_value = SafetyResult(is_safe=True)

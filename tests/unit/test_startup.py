@@ -325,7 +325,7 @@ class TestStartupOrchestrator:
 
         # Verify result fields populated
         assert result.mode == "paper"
-        assert result.phase == "experience"
+        assert result.phase == "scaling"  # Phase from config.json
         assert result.startup_duration_seconds > 0
         assert result.timestamp is not None
         assert len(result.errors) == 0
