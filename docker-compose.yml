@@ -60,6 +60,7 @@ services:
       - ./logs:/app/logs  # Writable for state files (pause/resume commands)
       - ./.env:/app/.env:ro
       - ./config.json:/app/config.json:ro
+      - ./backtest_results:/app/backtest_results:ro  # Mount backtest results for API
     depends_on:
       - redis
     networks:
@@ -75,6 +76,31 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # Frontend Dashboard (React + Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: trading-bot-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - trading-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
   # Redis (for LLM caching)
   redis:

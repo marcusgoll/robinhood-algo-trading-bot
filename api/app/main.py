@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
 
-from .routes import orders, state, config, metrics, workflows, commands
+from .routes import orders, state, config, metrics, workflows, commands, backtests
 from .core.websocket import manager as ws_manager
 from .services.state_aggregator import StateAggregator
 
@@ -105,6 +105,10 @@ app = FastAPI(
             "name": "health",
             "description": "Health check endpoints for deployment monitoring",
         },
+        {
+            "name": "backtests",
+            "description": "Backtest result visualization and performance analysis",
+        },
     ],
 )
 
@@ -129,6 +133,7 @@ app.include_router(config.router, prefix="/api/v1")
 app.include_router(metrics.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
 app.include_router(commands.router, prefix="/api/v1")
+app.include_router(backtests.router)
 
 
 @app.get("/api/v1/health/healthz")
