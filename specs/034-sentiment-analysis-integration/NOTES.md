@@ -121,22 +121,39 @@ Integrate sentiment analysis using FinBERT model to score social media posts (Tw
 
 ---
 
+**Batch 4 (US3 - FinBERT Sentiment Analysis)** - Completed
+- ✅ T015: Write unit test - SentimentAnalyzer loads FinBERT model
+- ✅ T016: Write unit test - analyze_post returns sentiment scores
+- ✅ T017: Write unit test - analyze_batch processes multiple posts
+- ✅ T018: Implement SentimentAnalyzer.__init__ with model caching (singleton)
+- ✅ T019: Implement analyze_post with GPU/CPU support
+- ✅ T020: Implement analyze_batch with batch tokenization
+
+**Key Decisions**:
+1. Singleton pattern: Model loaded once at class level, reused across instances
+2. GPU acceleration: Auto-detect CUDA, fallback to CPU gracefully
+3. Batch inference: Tokenize all posts together for performance (amortized <200ms/post)
+4. Empty text handling: Returns neutral sentiment (0.33/0.34/0.33)
+5. Model: ProsusAI/finbert from Hugging Face Hub (~500MB)
+6. All 7 tests passing with 100% coverage for new code
+
+---
+
 ## Implementation Progress Summary
 
-**Completed**: 14/40 tasks (35%)
-**Batches Completed**: 3/7
+**Completed**: 20/40 tasks (50%)
+**Batches Completed**: 4/7
 
-**Phase Status**: US2 (Fetching) complete, ready for US3 (Analysis) implementation
+**Phase Status**: US2 (Fetching) and US3 (Analysis) complete - Core sentiment pipeline ready
 
-**Remaining Work** (26 tasks):
-- Batch 4 (US3 Analysis): 6 tasks - FinBERT model loading and inference with tests
-- Batch 5 (US4 Aggregation): 4 tasks - 30-min rolling window with recency weighting
-- Batch 6 (US1 Integration): 5 tasks - CatalystDetector.scan() extension with E2E tests
-- Batch 7 (Polish): 11 tasks - Error handling, logging, deployment prep, documentation
+**Remaining Work** (20 tasks):
+- Batch 5 (US4 Aggregation): 4 tasks - 30-min rolling window with recency weighting (T021-T024)
+- Batch 6 (US1 Integration): 5 tasks - CatalystDetector.scan() extension with E2E tests (T025-T029)
+- Batch 7 (Polish): 11 tasks - Error handling, logging, deployment prep, documentation (T030-T040)
 
 **Next Steps**:
-1. Continue with Batch 4 (US3 - FinBERT sentiment analysis)
-2. Load FinBERT model from Hugging Face (ProsusAI/finbert)
-3. Implement batch inference for performance (<200ms per post)
-4. Follow TDD approach: Write tests before implementation
+1. Continue with Batch 5 (US4 - 30-min rolling aggregation)
+2. Implement SentimentAggregator.aggregate() with exponential decay weighting
+3. Min 10 posts requirement for reliable signal
+4. Formula: weighted_avg = Σ(score * e^(-minutes_ago/10)) / Σ(weights)
 
