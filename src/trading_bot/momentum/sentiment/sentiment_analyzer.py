@@ -14,10 +14,9 @@ Tasks: T018-T020 [GREEN] - SentimentAnalyzer implementation
 """
 
 import logging
-from typing import List, Dict
 
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 # Module logger
 logger = logging.getLogger(__name__)
@@ -45,7 +44,7 @@ class SentimentAnalyzer:
     _tokenizer = None
     _model_loaded = False
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize FinBERT model and tokenizer.
 
         Loads model on first instantiation, reuses cached instance thereafter.
@@ -94,7 +93,7 @@ class SentimentAnalyzer:
         self.model = SentimentAnalyzer._model
         self.tokenizer = SentimentAnalyzer._tokenizer
 
-    def analyze_post(self, text: str) -> Dict[str, float] | None:
+    def analyze_post(self, text: str) -> dict[str, float] | None:
         """Analyze sentiment of a single post.
 
         Args:
@@ -148,7 +147,7 @@ class SentimentAnalyzer:
             logger.error(f"Sentiment analysis failed for text: {e}")
             return None
 
-    def analyze_batch(self, texts: List[str]) -> List[Dict[str, float]]:
+    def analyze_batch(self, texts: list[str]) -> list[dict[str, float]]:
         """Analyze sentiment of multiple posts in batch.
 
         Args:

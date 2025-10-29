@@ -15,13 +15,12 @@ Tasks: T012-T014 [GREEN] - SentimentFetcher implementation
 
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import List
 
-import tweepy
 import praw
+import tweepy
 
-from ..config import MomentumConfig
 from ...error_handling.retry import with_retry
+from ..config import MomentumConfig
 from .models import SentimentPost
 
 # Module logger
@@ -79,7 +78,7 @@ class SentimentFetcher:
             self.reddit_client = None
 
     @with_retry()
-    def fetch_twitter_posts(self, symbol: str, minutes: int = 30) -> List[SentimentPost]:
+    def fetch_twitter_posts(self, symbol: str, minutes: int = 30) -> list[SentimentPost]:
         """Fetch recent tweets mentioning the stock symbol.
 
         Args:
@@ -139,7 +138,7 @@ class SentimentFetcher:
             return []  # Graceful degradation
 
     @with_retry()
-    def fetch_reddit_posts(self, symbol: str, minutes: int = 30) -> List[SentimentPost]:
+    def fetch_reddit_posts(self, symbol: str, minutes: int = 30) -> list[SentimentPost]:
         """Fetch recent Reddit posts mentioning the stock symbol.
 
         Args:
@@ -203,7 +202,7 @@ class SentimentFetcher:
             logger.error(f"Reddit API error for {symbol}: {e}")
             return []  # Graceful degradation
 
-    def fetch_all(self, symbol: str, minutes: int = 30) -> List[SentimentPost]:
+    def fetch_all(self, symbol: str, minutes: int = 30) -> list[SentimentPost]:
         """Fetch posts from both Twitter and Reddit.
 
         Args:

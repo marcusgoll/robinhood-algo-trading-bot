@@ -14,8 +14,7 @@ Tasks: T023-T024 [GREEN] - SentimentAggregator implementation
 
 import logging
 import math
-from datetime import datetime, UTC
-from typing import List
+from datetime import UTC, datetime
 
 from .models import SentimentScore
 
@@ -46,7 +45,7 @@ class SentimentAggregator:
 
     MIN_POSTS_REQUIRED = 10
 
-    def aggregate(self, scores: List[SentimentScore]) -> float | None:
+    def aggregate(self, scores: list[SentimentScore]) -> float | None:
         """Aggregate sentiment scores with exponential recency weighting.
 
         Args:
@@ -82,7 +81,7 @@ class SentimentAggregator:
         weights = self._weight_by_recency(scores, now)
 
         # Calculate weighted average
-        weighted_sum = sum(score.score * weight for score, weight in zip(scores, weights))
+        weighted_sum = sum(score.score * weight for score, weight in zip(scores, weights, strict=False))
         total_weight = sum(weights)
 
         if total_weight == 0:
@@ -98,7 +97,7 @@ class SentimentAggregator:
 
         return weighted_avg
 
-    def _weight_by_recency(self, scores: List[SentimentScore], reference_time: datetime) -> List[float]:
+    def _weight_by_recency(self, scores: list[SentimentScore], reference_time: datetime) -> list[float]:
         """Calculate exponential decay weights based on post recency.
 
         Args:
