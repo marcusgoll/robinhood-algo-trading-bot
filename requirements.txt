@@ -60,3 +60,9 @@ python-telegram-bot==20.7  # Async Telegram Bot API wrapper
 
 # Telegram Command Handlers (031-telegram-command-handlers)
 httpx~=0.25.2  # Async HTTP client for internal API calls (compatible with python-telegram-bot)
+
+# Sentiment Analysis Integration (034-sentiment-analysis-integration)
+transformers==4.35.0  # Hugging Face library for FinBERT model loading/inference
+torch==2.1.0  # PyTorch for FinBERT model execution
+tweepy==4.14.0  # Twitter API v2 SDK for fetching tweets
+praw==7.7.1  # Reddit API wrapper (Python Reddit API Wrapper)
