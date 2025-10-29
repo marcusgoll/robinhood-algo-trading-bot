@@ -8,7 +8,7 @@ Composition pattern extending BullFlagDetector with daily/4H trend confirmation.
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
@@ -121,7 +121,7 @@ class MultiTimeframeValidator:
         indicators_service = TechnicalIndicatorsService()
 
         # Convert DataFrame to list of dicts for indicators service
-        bars_list = bars.to_dict('records')
+        bars_list: List[Dict[str, Any]] = bars.to_dict('records')
 
         # Calculate MACD
         macd_result = indicators_service.get_macd(bars_list)
@@ -230,7 +230,7 @@ class MultiTimeframeValidator:
         indicators_service = TechnicalIndicatorsService()
 
         # Convert DataFrame to list of dicts for indicators service
-        bars_list = bars.to_dict('records')
+        bars_list: List[Dict[str, Any]] = bars.to_dict('records')
 
         # Calculate MACD
         macd_result = indicators_service.get_macd(bars_list)

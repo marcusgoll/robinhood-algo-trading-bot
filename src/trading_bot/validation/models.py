@@ -104,7 +104,7 @@ class TimeframeValidationResult:
     reasons: List[str] = field(default_factory=list)
     validation_duration_ms: Optional[int] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate aggregate_score is in range [0.0, 1.0]."""
         if not (Decimal("0.0") <= self.aggregate_score <= Decimal("1.0")):
             raise ValueError(
