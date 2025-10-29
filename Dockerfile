@@ -29,7 +29,7 @@ RUN mkdir -p logs/llm_cache logs/health logs/emotional-control logs/profit-prote
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/src
 
 # Health check (bot should be running)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
