@@ -89,3 +89,63 @@ Multi-timeframe analysis adds higher-timeframe confirmation to momentum trades b
 
 ## Last Updated
 2025-10-28T23:05:00Z
+
+## Phase 1: Planning (2025-10-28)
+
+**Summary**:
+- Architecture: Composition pattern with weighted scoring (Daily 60% + 4H 40%)
+- Components: 6 reusable (MarketDataService, TechnicalIndicatorsService, BullFlagDetector, @with_retry, test patterns, JSONL logging)
+- New infrastructure: 4 components (MultiTimeframeValidator, models, logger, config)
+- Performance target: <2s P95 validation latency
+- Key decision: Separate TechnicalIndicatorsService instances per timeframe (prevents state collision)
+- Test strategy: TDD with 90% coverage (13 unit + 4 integration tests)
+
+**Checkpoint**:
+- ✅ Plan document created: specs/033-multi-timeframe-confirmation/plan.md
+- ✅ Research completed: 6 findings documented
+- ✅ Architecture designed: Composition pattern, weighted scoring
+- ✅ Reuse analysis: 6 existing components identified
+- ✅ Performance budget defined: <2s P95 (daily 300ms + 4H 500ms + indicators 200ms)
+- 📋 Ready for: /tasks
+
+## Phase 2: Tasks (2025-10-28)
+
+**Summary**:
+- Total tasks: 50
+- User story tasks: 30 (US1: 13, US2: 4, US3: 6, US4: 4, US5: 3)
+- Parallel opportunities: 27 tasks marked [P]
+- Setup tasks: 2
+- Task file: specs/033-multi-timeframe-confirmation/tasks.md
+
+**Checkpoint**:
+- ✅ Tasks generated: 50 tasks
+- ✅ User story organization: Complete (5 stories prioritized P1-P3)
+- ✅ Dependency graph: Created (7 phases with clear blocking relationships)
+- ✅ MVP strategy: Defined (US1 + US2 - daily validation + JSONL logging)
+- ✅ Test guardrails: Speed requirements, coverage requirements (90%+), quality gates
+- ✅ Parallel execution: 27 tasks marked [P] for concurrent execution
+- 📋 Ready for: /analyze
+
+**Task Breakdown**:
+- Phase 1 (Setup): 2 tasks (directory structure, dependency verification)
+- Phase 2 (Foundational): 4 tasks (models, config - blocks all stories)
+- Phase 3 (US1 - Daily validation): 13 tasks (tests + implementation)
+- Phase 4 (US2 - JSONL logging): 4 tasks (logger + integration)
+- Phase 5 (US3 - 4H validation): 6 tasks (weighted scoring extension)
+- Phase 6 (US4 - Graceful degradation): 4 tasks (retry + fallback logic)
+- Phase 7 (US5 - Backtest comparison): 3 tasks (win rate validation)
+- Phase 8 (BullFlag Integration): 5 tasks (composition pattern integration)
+- Phase 9 (Polish): 9 tasks (performance, docs, deployment prep)
+
+**Key Decisions**:
+- TDD approach: Write failing tests first (100% coverage on new code)
+- Separate TechnicalIndicatorsService instances per timeframe (avoid state collision)
+- Weighted scoring: Daily 60% + 4H 40% (prioritizes institutional over intraday)
+- Graceful degradation: 3 retries with exponential backoff, then DEGRADED status
+- MVP scope: US1 + US2 (daily validation + logging), defer 4H to Phase 5
+
+**Next Steps**:
+1. /analyze - Cross-artifact consistency validation, risk identification
+2. /implement - Execute tasks with TDD, 90%+ test coverage
+3. /optimize - Performance tuning (<2s P95), code quality review
+4. /preview - Manual testing with paper trading, JSONL log analysis
