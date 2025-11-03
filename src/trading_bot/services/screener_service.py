@@ -17,6 +17,7 @@ Tasks: T010-T020 [IN PROGRESS] - Core ScreenerService implementation
 Spec: specs/001-stock-screener/spec.md (FR-001 to FR-012)
 """
 
+import logging
 import time
 from dataclasses import asdict
 from datetime import datetime
@@ -113,6 +114,9 @@ class ScreenerService:
 
         # Fetch quotes for all symbols
         quotes_data = []
+        logger = logging.getLogger(__name__)
+        logger.info(f"DEBUG: Starting to fetch quotes for {len(symbols)} symbols")
+
         for symbol in symbols:
             try:
                 # Fetch quote data from robin_stocks (detailed quote)
@@ -131,6 +135,8 @@ class ScreenerService:
                             "previous_close": Decimal(str(float(quote_data.get("previous_close", 0)))),
                         })
                         api_calls += 1
+                    else:
+                        logger.debug(f"DEBUG: Skipping {symbol} - bid_price is 0")
             except Exception as e:
                 # Log data gap but continue
                 self.logger.log_data_gap(
@@ -138,63 +144,96 @@ class ScreenerService:
                     field="quote",
                     reason=f"Failed to fetch quote: {str(e)}"
                 )
+                logger.debug(f"DEBUG: Failed to fetch quote for {symbol}: {e}")
+
+        logger.info(f"DEBUG: Fetched quotes for {len(quotes_data)} symbols (from {len(symbols)} total)")
 
         # Get historical data for volume and float information (batch call)
         # For MVP, we'll fetch fundamentals separately
+        # NOTE: Fundamentals are optional - stocks can pass through with quote data only
         stocks = []
+        fundamentals_fetched = 0
+        fundamentals_empty = 0
+        fundamentals_failed = 0
+
         for quote_data in quotes_data:
             symbol = quote_data["symbol"]
 
+            # Calculate daily change from quote data
+            current_price = quote_data["last_trade_price"]
+            previous_close = quote_data["previous_close"]
+
+            if previous_close > 0:
+                daily_change_pct = float(abs((current_price - previous_close) / previous_close * 100))
+                daily_change_pct = min(daily_change_pct, 1000)  # Cap at 1000%
+                daily_change_direction = "up" if current_price >= previous_close else "down"
+            else:
+                daily_change_pct = 0.0
+                daily_change_direction = "up"
+
+            # Try to fetch fundamentals (optional - graceful degradation)
+            volume = 0
+            volume_avg = None
+            float_shares = None
+
             try:
-                # Fetch fundamentals for volume and float data
                 fundamentals = r.get_fundamentals(symbol)
                 if fundamentals and len(fundamentals) > 0:
+                    fundamentals_fetched += 1
                     fund = fundamentals[0]
 
-                    # Extract volume data
+                    # Extract volume data (optional)
                     volume = int(fund.get("volume", 0))
                     volume_avg = fund.get("average_volume")  # Can be None
 
-                    # Extract float data
+                    # Extract float data (optional)
                     float_shares_str = fund.get("float")
                     float_shares = int(float(float_shares_str)) if float_shares_str else None
-
-                    # Calculate daily change
-                    current_price = quote_data["last_trade_price"]
-                    previous_close = quote_data["previous_close"]
-
-                    if previous_close > 0:
-                        daily_change_pct = float(abs((current_price - previous_close) / previous_close * 100))
-                        daily_change_pct = min(daily_change_pct, 1000)  # Cap at 1000%
-
-                        daily_change_direction = "up" if current_price >= previous_close else "down"
-                    else:
-                        daily_change_pct = 0.0
-                        daily_change_direction = "up"
-
-                    # Build stock data structure
-                    stock_data = {
-                        "symbol": symbol,
-                        "bid_price": quote_data["bid_price"],
-                        "volume": volume,
-                        "volume_avg_100d": int(float(volume_avg)) if volume_avg else None,
-                        "float_shares": float_shares,
-                        "daily_open": previous_close,  # Approximation for MVP
-                        "daily_close": current_price,
-                        "daily_change_pct": daily_change_pct,
-                        "daily_change_direction": daily_change_direction,
-                    }
-
-                    stocks.append(stock_data)
-                    api_calls += 1
+                else:
+                    fundamentals_empty += 1
+                    if fundamentals_empty <= 3:  # Log first 3 examples
+                        logger.info(f"DEBUG: Empty fundamentals for {symbol}: {fundamentals}")
 
             except Exception as e:
+                fundamentals_failed += 1
                 # Log data gap but continue
                 self.logger.log_data_gap(
                     symbol=symbol,
                     field="fundamentals",
                     reason=f"Failed to fetch fundamentals: {str(e)}"
                 )
+                if fundamentals_failed <= 3:  # Log first 3 examples
+                    logger.info(f"DEBUG: Exception fetching fundamentals for {symbol}: {e}")
+
+            # Build stock data structure (with or without fundamentals)
+            stock_data = {
+                "symbol": symbol,
+                "bid_price": quote_data["bid_price"],
+                "volume": volume,
+                "volume_avg_100d": int(float(volume_avg)) if volume_avg else None,
+                "float_shares": float_shares,
+                "daily_open": previous_close,  # Approximation for MVP
+                "daily_close": current_price,
+                "daily_change_pct": daily_change_pct,
+                "daily_change_direction": daily_change_direction,
+            }
+
+            stocks.append(stock_data)
+            api_calls += 1
+
+        # Log fundamentals fetching summary
+        logger.info(f"DEBUG: Fundamentals summary - Fetched: {fundamentals_fetched}, Empty: {fundamentals_empty}, Failed: {fundamentals_failed}")
+        logger.info(f"DEBUG: Built stock data for {len(stocks)} symbols")
+
+        # Log sample data from first 3 stocks
+        if len(stocks) > 0:
+            for i, stock in enumerate(stocks[:3]):
+                logger.info(f"DEBUG: Sample stock #{i+1}: {stock['symbol']} - "
+                           f"bid_price=${stock['bid_price']}, "
+                           f"volume={stock['volume']}, "
+                           f"volume_avg={stock['volume_avg_100d']}, "
+                           f"float={stock['float_shares']}, "
+                           f"daily_change={stock['daily_change_pct']}%")
 
         # Apply filters sequentially (AND logic)
         matched_filters_map: dict[str, list[str]] = {}  # Track which filters each stock passed
@@ -204,30 +243,47 @@ class ScreenerService:
             matched_filters_map[stock["symbol"]] = []
 
         # Apply price filter
+        initial_count = len(stocks)
         if query.min_price is not None or query.max_price is not None:
             stocks = self._apply_price_filter(stocks, query.min_price, query.max_price)
+            logger.info(f"DEBUG: Price filter: {initial_count} -> {len(stocks)} stocks (min=${query.min_price}, max=${query.max_price})")
             for stock in stocks:
                 matched_filters_map[stock["symbol"]].append("price_range")
+        else:
+            logger.info(f"DEBUG: Price filter: SKIPPED (no criteria set)")
 
         # Apply volume filter
+        volume_count = len(stocks)
         if query.relative_volume is not None:
             stocks = self._apply_volume_filter(stocks, query.relative_volume)
+            logger.info(f"DEBUG: Volume filter: {volume_count} -> {len(stocks)} stocks (relative_volume={query.relative_volume}x)")
             for stock in stocks:
                 matched_filters_map[stock["symbol"]].append("relative_volume")
+        else:
+            logger.info(f"DEBUG: Volume filter: SKIPPED (no criteria set)")
 
         # Apply float filter
+        float_count = len(stocks)
         if query.float_max is not None:
             stocks = self._apply_float_filter(stocks, query.float_max)
+            logger.info(f"DEBUG: Float filter: {float_count} -> {len(stocks)} stocks (float_max={query.float_max}M)")
             for stock in stocks:
                 matched_filters_map[stock["symbol"]].append("float_size")
+        else:
+            logger.info(f"DEBUG: Float filter: SKIPPED (no criteria set)")
 
         # Apply daily change filter
+        daily_count = len(stocks)
         if query.min_daily_change is not None:
             stocks = self._apply_daily_change_filter(stocks, query.min_daily_change)
+            logger.info(f"DEBUG: Daily change filter: {daily_count} -> {len(stocks)} stocks (min_daily_change={query.min_daily_change}%)")
             for stock in stocks:
                 matched_filters_map[stock["symbol"]].append("daily_movers")
+        else:
+            logger.info(f"DEBUG: Daily change filter: SKIPPED (no criteria set)")
 
         # Sort by volume descending
+        logger.info(f"DEBUG: Final result after all filters: {len(stocks)} stocks (from initial {len(quotes_data)} with valid quotes)")
         stocks.sort(key=lambda s: s["volume"], reverse=True)
 
         # Total count before pagination

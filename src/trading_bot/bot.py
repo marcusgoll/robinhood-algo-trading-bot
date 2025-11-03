@@ -932,13 +932,8 @@ class TradingBot:
             logger.warning("Momentum scan skipped: MomentumRanker not initialized")
             return
 
-        # Define scan universe (top 100 liquid stocks for now)
-        # TODO: Make this configurable or dynamic based on volume
-        scan_symbols = [
-            "AAPL", "MSFT", "GOOGL", "AMZN", "META",
-            "TSLA", "NVDA", "AMD", "INTC", "NFLX",
-            "DIS", "BA", "JPM", "V", "MA",
-        ]
+        # Load scan universe from config (dynamic) or fallback to static list
+        scan_symbols = self._load_scan_watchlist()
 
         logger.info(f"Starting momentum scan for {len(scan_symbols)} symbols")
 
@@ -981,6 +976,68 @@ class TradingBot:
                 "error": str(e),
                 "timestamp": time.time(),
             }
+
+    def _load_scan_watchlist(self) -> list[str]:
+        """
+        Load stock watchlist for momentum scanning.
+
+        Loads from config.json if momentum_scanning section exists,
+        otherwise falls back to hardcoded default list.
+
+        Returns:
+            List of stock symbols to scan
+        """
+        import json
+        from pathlib import Path
+
+        # Default fallback list
+        default_symbols = [
+            "AAPL", "MSFT", "GOOGL", "AMZN", "META",
+            "TSLA", "NVDA", "AMD", "INTC", "NFLX",
+            "DIS", "BA", "JPM", "V", "MA",
+        ]
+
+        try:
+            config_path = Path("config.json")
+
+            if not config_path.exists():
+                logger.info("config.json not found, using default watchlist (15 symbols)")
+                return default_symbols
+
+            with open(config_path, "r") as f:
+                config_data = json.load(f)
+
+            # Check for momentum_scanning section
+            momentum_config = config_data.get("momentum_scanning")
+
+            if not momentum_config:
+                logger.info("No momentum_scanning in config.json, using default watchlist (15 symbols)")
+                return default_symbols
+
+            # Check mode
+            mode = momentum_config.get("mode", "static")
+
+            if mode == "dynamic" and "symbols" in momentum_config:
+                symbols = momentum_config["symbols"]
+                logger.info(f"Loaded dynamic watchlist from config.json ({len(symbols)} symbols)")
+
+                # Warn if watchlist is very large
+                if len(symbols) > 60:
+                    logger.warning(
+                        f"Watchlist has {len(symbols)} symbols (recommended max: 60). "
+                        "This may impact scan performance and API rate limits."
+                    )
+
+                return symbols
+            else:
+                # Static mode or missing symbols
+                fallback = momentum_config.get("fallback_symbols", default_symbols)
+                logger.info(f"Using fallback watchlist ({len(fallback)} symbols)")
+                return fallback
+
+        except Exception as e:
+            logger.error(f"Failed to load watchlist from config: {e}, using default", exc_info=True)
+            return default_symbols
 
     def _log_scan_activity(self, signals: list[Any]) -> None:
         """

@@ -99,9 +99,13 @@ class StockScreenerMatch:
 
     def __post_init__(self) -> None:
         """Validate stock match data after initialization."""
-        # Validate symbol length (stock tickers are 1-5 characters)
-        if not (1 <= len(self.symbol) <= 5):
-            raise ValueError(f"Symbol must be 1-5 chars, got {self.symbol}")
+        # Validate symbol length (stock tickers are 1-7 characters, including class designations like .A)
+        if not (1 <= len(self.symbol) <= 7):
+            raise ValueError(f"Symbol must be 1-7 chars, got {self.symbol}")
+
+        # Validate symbol format (alphanumeric + optional dot/hyphen for class designation)
+        if not all(c.isalnum() or c in '.-' for c in self.symbol):
+            raise ValueError(f"Symbol contains invalid characters: {self.symbol}")
 
         # Validate bid price is positive
         if self.bid_price <= 0:

@@ -17,6 +17,12 @@ Usage:
 import argparse
 import sys
 
+# Configure UTF-8 output for Windows
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 
 def parse_arguments() -> argparse.Namespace:
     """Parse command-line arguments.
@@ -45,8 +51,8 @@ Examples:
         "mode",
         nargs="?",
         default="trade",
-        choices=["trade", "dashboard"],
-        help="Operation mode: trade (default) or dashboard"
+        choices=["trade", "dashboard", "generate-watchlist"],
+        help="Operation mode: trade (default), dashboard, or generate-watchlist"
     )
     parser.add_argument(
         "--dry-run",
@@ -57,6 +63,21 @@ Examples:
         "--json",
         action="store_true",
         help="Output status as JSON for machine parsing"
+    )
+    parser.add_argument(
+        "--preview",
+        action="store_true",
+        help="Preview watchlist without saving (generate-watchlist mode only)"
+    )
+    parser.add_argument(
+        "--save",
+        action="store_true",
+        help="Save generated watchlist to config.json (generate-watchlist mode only)"
+    )
+    parser.add_argument(
+        "--sectors",
+        type=str,
+        help="Comma-separated sectors to include (e.g., 'technology,biopharmaceutical')"
     )
     return parser.parse_args()
 
@@ -87,6 +108,11 @@ def main() -> int:
         if args.mode == "dashboard":
             from .dashboard.__main__ import main as dashboard_main
             return dashboard_main()
+
+        # Handle generate-watchlist mode
+        if args.mode == "generate-watchlist":
+            from .cli.generate_watchlist import generate_watchlist_command
+            return generate_watchlist_command(args)
 
         # Load configuration
         from .config import Config
