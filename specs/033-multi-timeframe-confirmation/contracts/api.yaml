@@ -1,0 +1,210 @@
+# Internal Service Contract: MultiTimeframeValidator
+# Feature: 033-multi-timeframe-confirmation
+# Version: 1.0.0
+
+service: MultiTimeframeValidator
+language: Python 3.12
+module_path: src/trading_bot/validation/multi_timeframe_validator.py
+
+# Public API Contract
+methods:
+  - name: validate
+    description: |
+      Validates 5-minute bull flag entry against higher timeframes (daily + 4H).
+      Returns validation result with weighted aggregate score and decision.
+
+    signature: |
+      def validate(
+          self,
+          symbol: str,
+          current_price: Decimal,
+          bars_5min: List[Dict[str, Any]]
+      ) -> TimeframeValidationResult
+
+    parameters:
+      - name: symbol
+        type: str
+        description: Stock ticker symbol (e.g., "AAPL")
+        constraints:
+          - Non-empty string
+          - Valid ticker format
+
+      - name: current_price
+        type: Decimal
+        description: Current price on 5-minute timeframe
+        constraints:
+          - Greater than 0
+          - Precision up to 4 decimal places
+
+      - name: bars_5min
+        type: List[Dict[str, Any]]
+        description: 5-minute OHLCV bars for context (optional, used for correlation checks)
+        constraints:
+          - Minimum 30 bars recommended
+          - Each bar must have keys: open, high, low, close, volume, timestamp
+
+    returns:
+      type: TimeframeValidationResult
+      description: Validation decision with scores and indicator values
+      fields:
+        - status: ValidationStatus (PASS | BLOCK | DEGRADED)
+        - aggregate_score: Decimal (0.0-1.0)
+        - daily_score: Decimal (0.0-1.0)
+        - 4h_score: Decimal (0.0-1.0)
+        - daily_indicators: TimeframeIndicators
+        - 4h_indicators: Optional[TimeframeIndicators]
+        - reasons: List[str]
+        - timestamp: datetime
+        - symbol: str
+
+    raises:
+      - exception: ValueError
+        condition: Invalid symbol format or current_price <= 0
+
+      - exception: InsufficientDataError
+        condition: Daily bars < 30 or 4H bars < 72 after fetch
+
+      - exception: DataFetchError
+        condition: Market data API failure after 3 retries (degraded mode triggered)
+
+    performance:
+      - p50_latency_ms: 800
+      - p95_latency_ms: 2000
+      - p99_latency_ms: 5000
+      - timeout_ms: 10000
+
+    behavior:
+      - name: Daily Validation
+        steps:
+          - Fetch daily OHLCV data (span=3month, interval=day)
+          - Validate minimum 30 bars available
+          - Calculate daily MACD (12-26-9) and 20 EMA
+          - Compute daily_score (0.5 if MACD>0, +0.5 if price>EMA)
+
+      - name: 4H Validation
+        steps:
+          - Fetch 4H OHLCV data (span=week, interval=10minute, aggregate to 4H)
+          - Validate minimum 72 10-minute bars (3 days * 24h / 10min)
+          - Calculate 4H MACD and 20 EMA
+          - Compute 4h_score (0.5 if MACD>0, +0.5 if price>EMA)
+
+      - name: Aggregate Scoring
+        steps:
+          - Calculate weighted score: daily_score * 0.6 + 4h_score * 0.4
+          - Status = PASS if aggregate_score > 0.5
+          - Status = BLOCK if aggregate_score <= 0.5
+          - Populate reasons[] with blocking factors if BLOCK
+
+      - name: Graceful Degradation
+        steps:
+          - On data fetch failure, retry with exponential backoff (1s, 2s, 4s)
+          - After 3 retries, set status = DEGRADED
+          - Log warning with severity=HIGH
+          - Return result with degraded flag
+
+    examples:
+      - scenario: Daily bearish, 4H bullish → BLOCK
+        input:
+          symbol: "AAPL"
+          current_price: Decimal("150.25")
+          bars_5min: [...]  # 30 bars
+        output:
+          status: BLOCK
+          aggregate_score: 0.36  # (0.3*0.6 + 0.5*0.4)
+          daily_score: 0.3  # MACD negative, price below EMA
+          4h_score: 0.5  # MACD positive, price below EMA
+          reasons: ["Daily MACD negative (-0.52)", "Price 2.3% below daily 20 EMA"]
+
+      - scenario: Both timeframes bullish → PASS
+        input:
+          symbol: "TSLA"
+          current_price: Decimal("245.80")
+          bars_5min: [...]
+        output:
+          status: PASS
+          aggregate_score: 1.0  # (1.0*0.6 + 1.0*0.4)
+          daily_score: 1.0
+          4h_score: 1.0
+          reasons: []
+
+      - scenario: Daily data unavailable → DEGRADED
+        input:
+          symbol: "NVDA"
+          current_price: Decimal("485.20")
+          bars_5min: [...]
+        output:
+          status: DEGRADED
+          aggregate_score: 0.0
+          daily_score: 0.0
+          4h_score: 0.0
+          reasons: ["Daily data fetch failed after 3 retries: HTTP 503"]
+
+# Dependencies
+dependencies:
+  - service: MarketDataService
+    module: src/trading_bot/market_data/market_data_service.py
+    methods_used:
+      - get_historical_data(symbol, interval="day", span="3month")
+      - get_historical_data(symbol, interval="10minute", span="week")
+
+  - service: TechnicalIndicatorsService
+    module: src/trading_bot/indicators/service.py
+    note: Create separate instances per timeframe to avoid state collision
+    methods_used:
+      - get_macd(bars)
+      - get_emas(bars)
+
+  - service: TimeframeValidationLogger
+    module: src/trading_bot/validation/logger.py
+    methods_used:
+      - log_validation_event(result)
+
+# Configuration
+configuration:
+  - name: MULTI_TIMEFRAME_VALIDATION_ENABLED
+    type: bool
+    default: true
+    description: Feature flag to enable/disable multi-timeframe validation
+
+  - name: DAILY_WEIGHT
+    type: float
+    default: 0.6
+    description: Weight for daily timeframe score (0.0-1.0)
+
+  - name: 4H_WEIGHT
+    type: float
+    default: 0.4
+    description: Weight for 4H timeframe score (0.0-1.0)
+
+  - name: AGGREGATE_THRESHOLD
+    type: float
+    default: 0.5
+    description: Minimum aggregate score to PASS validation
+
+  - name: MAX_RETRIES
+    type: int
+    default: 3
+    description: Maximum retry attempts for data fetch failures
+
+  - name: RETRY_BACKOFF_BASE_MS
+    type: int
+    default: 1000
+    description: Base delay for exponential backoff (1s, 2s, 4s)
+
+# Testing Contract
+testing:
+  unit_tests:
+    - test_validate_daily_bearish_blocks_entry
+    - test_validate_both_bullish_passes
+    - test_validate_conflicting_signals_uses_weighted_score
+    - test_validate_data_fetch_failure_degrades_gracefully
+    - test_validate_insufficient_bars_raises_error
+
+  integration_tests:
+    - test_validate_with_real_market_data_service
+    - test_validate_logs_event_to_jsonl
+    - test_validate_latency_under_2s_p95
+
+  performance_tests:
+    - test_validate_concurrent_requests_no_state_collision
+    - test_validate_memory_usage_stable
