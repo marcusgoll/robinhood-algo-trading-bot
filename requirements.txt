@@ -15,7 +15,7 @@ pyarrow==22.0.0  # Parquet file format for efficient data caching (updated for P
 pytest==8.4.2
 pytest-cov==4.1.0
 pytest-mock==3.15.1
-pytest-asyncio==0.23.3
+pytest-asyncio==1.2.0
 
 # Type checking (§Code_Quality)
 mypy==1.18.2
