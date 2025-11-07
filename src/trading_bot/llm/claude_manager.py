@@ -96,6 +96,11 @@ class ClaudeCodeManager:
             config: Configuration object (uses defaults if None)
         """
         self.config = config or LLMConfig()
+
+        # Normalize model to enum if string
+        if isinstance(self.config.model, str):
+            self.config.model = LLMModel(self.config.model)
+
         self.log_dir = Path(self.config.log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
