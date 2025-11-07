@@ -56,6 +56,9 @@ RUN mkdir -p /app/logs/orchestrator \
 # Set Python path
 ENV PYTHONPATH=/app/src
 
+# Disable Python stdout/stderr buffering for Docker logs
+ENV PYTHONUNBUFFERED=1
+
 # Health check - verify bot can start in dry-run mode
 HEALTHCHECK --interval=5m --timeout=30s --start-period=30s --retries=3 \
     CMD python -m trading_bot --dry-run --json || exit 1
