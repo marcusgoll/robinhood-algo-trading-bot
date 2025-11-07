@@ -19,12 +19,17 @@ LABEL description="LLM-Enhanced Trading Bot with Claude Code Integration"
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including Node.js for Claude CLI
 RUN apt-get update && apt-get install -y \
     git \
     build-essential \
     curl \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Claude CLI
+RUN npm install -g @anthropic-ai/claude-cli
 
 # Copy requirements first for better layer caching
 COPY requirements.txt .
