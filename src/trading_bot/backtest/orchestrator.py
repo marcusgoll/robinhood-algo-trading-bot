@@ -12,7 +12,7 @@ import logging
 from datetime import datetime
 from decimal import Decimal
 
-from src.trading_bot.backtest.models import (
+from trading_bot.backtest.models import (
     HistoricalDataBar,
     OrchestratorConfig,
     OrchestratorResult,
@@ -20,7 +20,7 @@ from src.trading_bot.backtest.models import (
     StrategyAllocation,
     Trade,
 )
-from src.trading_bot.backtest.strategy_protocol import IStrategy
+from trading_bot.backtest.strategy_protocol import IStrategy
 
 logger = logging.getLogger(__name__)
 

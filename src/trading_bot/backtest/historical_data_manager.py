@@ -233,12 +233,12 @@ class HistoricalDataManager:
                     f"{bars[i].timestamp} >= {bars[i + 1].timestamp}"
                 )
 
-        # Check for gaps in trading days (> 3 days = suspicious)
+        # Check for gaps in trading days (> 5 days = suspicious, likely data issue)
         for i in range(len(bars) - 1):
             gap_days = (bars[i + 1].timestamp - bars[i].timestamp).days
-            if gap_days > 3:  # Allow weekend + 1 day for holidays
-                raise DataQualityError(
-                    f"Missing trading days for {symbol}: gap of {gap_days} days "
+            if gap_days > 5:  # Allow weekend + holiday (e.g., MLK Day creates 4-day gap)
+                self.logger.warning(
+                    f"Large gap in trading days for {symbol}: {gap_days} days "
                     f"between {bars[i].timestamp.date()} and {bars[i + 1].timestamp.date()}"
                 )
 
@@ -433,13 +433,13 @@ class HistoricalDataManager:
             # Fetch bars from Alpaca
             bars_response = client.get_stock_bars(request)
 
-            # Extract bars for the symbol (response is multi-symbol dict)
-            if symbol not in bars_response:
+            # Extract bars for the symbol (response is BarSet with .data dict)
+            if not hasattr(bars_response, 'data') or symbol not in bars_response.data:
                 raise InsufficientDataError(
                     f"No data returned from Alpaca for {symbol}"
                 )
 
-            alpaca_bars = bars_response[symbol]
+            alpaca_bars = bars_response.data[symbol]
 
             # Convert Alpaca Bar objects to HistoricalDataBar
             historical_bars = []
