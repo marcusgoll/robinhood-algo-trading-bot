@@ -167,7 +167,15 @@ class ClaudeCodeManager:
                         )
                     )
                 finally:
-                    loop.close()
+                    # Don't close the loop - let it be garbage collected to avoid
+                    # "Event loop is closed" errors in daemon threads
+                    pass
+            except RuntimeError as e:
+                # Handle event loop closed errors gracefully
+                if "Event loop is closed" in str(e):
+                    logger.debug("Event loop was closed during notification (non-blocking)")
+                else:
+                    logger.debug(f"Telegram notification runtime error (non-blocking): {e}")
             except Exception as e:
                 # Never let Telegram failures block LLM operations
                 logger.debug(f"Telegram notification failed (non-blocking): {e}")

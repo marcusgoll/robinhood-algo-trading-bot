@@ -82,6 +82,34 @@ class TradingOrchestrator:
 
         logger.info(f"TradingOrchestrator initialized in {mode} mode")
 
+    def _notify(self, message: str, level: str = "info"):
+        """
+        Send both log and Telegram notification.
+
+        Args:
+            message: The message to log and send
+            level: Log level (info, warning, error)
+        """
+        # Log the message
+        if level == "error":
+            logger.error(message)
+        elif level == "warning":
+            logger.warning(message)
+        else:
+            logger.info(message)
+
+        # Send Telegram notification for important events
+        if self.claude_manager.telegram_enabled:
+            # Format message for Telegram (add emoji based on level)
+            if level == "error":
+                telegram_msg = f"🚨 *Error*\n\n{message}"
+            elif level == "warning":
+                telegram_msg = f"⚠️ *Warning*\n\n{message}"
+            else:
+                telegram_msg = f"ℹ️ {message}"
+
+            self.claude_manager._send_telegram_notification(telegram_msg)
+
     def _setup_schedule(self):
         """Setup scheduled trading workflows."""
         # Pre-market screening (6:30am EST)
@@ -127,11 +155,11 @@ class TradingOrchestrator:
 
     def run_pre_market_workflow(self):
         """Execute pre-market screening workflow."""
-        logger.info("Starting pre-market workflow")
+        self._notify("📊 *Pre-Market Workflow Started*\nBeginning market screening...")
 
         # Transition to PRE_MARKET_SCREENING
         if not self.workflow.transition(WorkflowTransition.START_PRE_MARKET):
-            logger.error("Failed to transition to PRE_MARKET_SCREENING")
+            self._notify("Failed to transition to PRE_MARKET_SCREENING state", "error")
             return
 
         try:
@@ -145,10 +173,11 @@ class TradingOrchestrator:
             if not screen_response.success:
                 raise Exception(f"Screening failed: {screen_response.error}")
 
-            watchlist = screen_response.parsed_output.get("watchlist", [])
+            watchlist = screen_response.data.get("watchlist", []) if screen_response.data else []
             self.workflow.context.watchlist = watchlist
 
-            logger.info(f"Screening complete: {len(watchlist)} candidates")
+            symbols = ", ".join([s.get("symbol", "?") for s in watchlist[:5]])
+            self._notify(f"✅ *Screening Complete*\nFound {len(watchlist)} candidates\nTop 5: {symbols}")
             self.workflow.transition(WorkflowTransition.SCREENING_COMPLETE)
 
             # Step 2: Analyze top candidates
@@ -165,12 +194,13 @@ class TradingOrchestrator:
                     logger.warning(f"Analysis failed for {symbol}")
                     continue
 
-                analysis = analysis_response.parsed_output
-                signal = analysis.get("analysis", {}).get("signal", "AVOID")
+                analysis = analysis_response.data
+                signal = analysis.get("analysis", {}).get("signal", "AVOID") if analysis else "AVOID"
 
                 if signal in ["STRONG_BUY", "BUY"]:
                     self.workflow.context.analyzed_symbols[symbol] = analysis
                     logger.info(f"{symbol}: {signal}")
+                    self._notify(f"📈 *Buy Signal: {symbol}*\nSignal: {signal}")
 
             self.workflow.transition(WorkflowTransition.ANALYSIS_COMPLETE)
 
@@ -183,24 +213,30 @@ class TradingOrchestrator:
                     output_format="json"
                 )
 
-                if opt_response.success:
+                if opt_response.success and opt_response.data:
                     self.workflow.context.optimized_trades.append(
-                        opt_response.parsed_output
+                        opt_response.data
                     )
 
-            logger.info(f"Pre-market workflow complete: {len(self.workflow.context.optimized_trades)} trades ready")
+            num_trades = len(self.workflow.context.optimized_trades)
+            symbols_list = list(self.workflow.context.analyzed_symbols.keys())
+            self._notify(
+                f"✅ *Pre-Market Complete*\n"
+                f"{num_trades} trades ready for market open\n"
+                f"Symbols: {', '.join(symbols_list)}"
+            )
             self.workflow.transition(WorkflowTransition.OPTIMIZATION_COMPLETE)
 
         except Exception as e:
-            logger.error(f"Pre-market workflow error: {e}")
+            self._notify(f"Pre-market workflow error: {str(e)}", "error")
             self.workflow.add_error(str(e))
 
     def run_market_open_workflow(self):
         """Execute trades at market open."""
-        logger.info("Starting market open workflow")
+        self._notify("🔔 *Market Open*\nExecuting trades...")
 
         if not self.workflow.transition(WorkflowTransition.MARKET_OPEN):
-            logger.error("Failed to transition to MARKET_EXECUTION")
+            self._notify("Failed to transition to MARKET_EXECUTION state", "error")
             return
 
         try:
@@ -251,10 +287,10 @@ class TradingOrchestrator:
                     })
 
             self.workflow.transition(WorkflowTransition.EXECUTION_COMPLETE)
-            logger.info("Market open workflow complete")
+            self._notify(f"✅ *Market Open Complete*\nExecuted {len(optimized_trades)} trades")
 
         except Exception as e:
-            logger.error(f"Market open workflow error: {e}")
+            self._notify(f"Market open workflow error: {str(e)}", "error")
             self.workflow.add_error(str(e))
 
     def run_monitoring_workflow(self):
@@ -279,6 +315,11 @@ class TradingOrchestrator:
         """End-of-day performance review."""
         logger.info("Starting end-of-day review")
 
+        # Only transition if currently in monitoring state
+        if self.workflow.get_current_state() != WorkflowState.INTRADAY_MONITORING:
+            logger.info("Skipping EOD review - bot not in monitoring state")
+            return
+
         if not self.workflow.transition(WorkflowTransition.MARKET_CLOSE):
             logger.error("Failed to transition to END_OF_DAY_REVIEW")
             return
@@ -292,13 +333,25 @@ class TradingOrchestrator:
             )
 
             if review_response.success:
-                review = review_response.parsed_output
-                summary = review.get("summary", {})
+                review = review_response.data
+                summary = review.get("summary", {}) if review else {}
+
+                trades = summary.get('total_trades', 0)
+                win_rate = summary.get('win_rate', 0)
+                pnl = summary.get('total_pnl', 0)
 
                 logger.info("Daily Performance:")
-                logger.info(f"  Trades: {summary.get('total_trades', 0)}")
-                logger.info(f"  Win Rate: {summary.get('win_rate', 0):.1f}%")
-                logger.info(f"  P&L: ${summary.get('total_pnl', 0):.2f}")
+                logger.info(f"  Trades: {trades}")
+                logger.info(f"  Win Rate: {win_rate:.1f}%")
+                logger.info(f"  P&L: ${pnl:.2f}")
+
+                # Send daily summary via Telegram
+                self._notify(
+                    f"📊 *Daily Summary*\n"
+                    f"Trades: {trades}\n"
+                    f"Win Rate: {win_rate:.1f}%\n"
+                    f"P&L: ${pnl:.2f}"
+                )
 
                 # Save review to log
                 self._save_daily_report(review)
@@ -311,7 +364,7 @@ class TradingOrchestrator:
             logger.info("End-of-day review complete")
 
         except Exception as e:
-            logger.error(f"EOD workflow error: {e}")
+            self._notify(f"EOD workflow error: {str(e)}", "error")
             self.workflow.add_error(str(e))
 
     def run_weekly_workflow(self):
@@ -336,10 +389,10 @@ class TradingOrchestrator:
             )
 
             if review_response.success:
-                review = review_response.parsed_output
+                review = review_response.data
 
                 # Identify poor performers for backtesting
-                patterns = review.get("patterns", {})
+                patterns = review.get("patterns", {}) if review else {}
                 losing = patterns.get("losing", [])
 
                 logger.info(f"Weekly review complete. Issues identified: {len(losing)}")
