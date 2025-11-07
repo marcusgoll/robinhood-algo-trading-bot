@@ -54,6 +54,7 @@ websockets==11.0.3  # Downgraded for compatibility with polygon-api-client
 jsonschema==4.20.0  # JSON schema validation for config
 sqlalchemy==2.0.23  # Database ORM for API order tracking
 alembic==1.12.1  # Database migrations for API
+openai==1.12.0  # OpenAI API client for LLM orchestrator
 
 # Telegram Notifications (030-telegram-notifications)
 python-telegram-bot==20.7  # Async Telegram Bot API wrapper
