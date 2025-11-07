@@ -33,6 +33,7 @@ pyotp==2.9.0  # MFA TOTP generation (authentication-module)
 
 # Backtesting
 backtrader==1.9.78.123
+alpaca-py==0.34.2  # Alpaca Trading and Data API (paper trading for orchestrator)
 
 # Utilities
 python-dateutil==2.8.2
