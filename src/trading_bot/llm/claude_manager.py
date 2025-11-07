@@ -300,8 +300,12 @@ class ClaudeCodeManager:
             )
 
         # Build command
+        # Use full path to claude CLI for Docker compatibility
+        import shutil
+        claude_path = shutil.which("claude") or "/root/.local/bin/claude"
+
         cmd = [
-            "claude",
+            claude_path,
             "-p", prompt,
             "--model", self.config.model.value,
             "--output-format", output_format
