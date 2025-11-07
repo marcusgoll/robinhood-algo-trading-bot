@@ -32,6 +32,7 @@ import subprocess
 import logging
 import os
 import asyncio
+import threading
 from dataclasses import dataclass, asdict
 from datetime import datetime, date
 from pathlib import Path
@@ -151,18 +152,29 @@ class ClaudeCodeManager:
         if not self.telegram_enabled or not self.telegram_client:
             return
 
-        try:
-            # Run async notification in a new event loop (non-blocking)
-            asyncio.run(
-                self.telegram_client.send_message(
-                    chat_id=self.telegram_chat_id,
-                    text=message,
-                    parse_mode="Markdown"
-                )
-            )
-        except Exception as e:
-            # Never let Telegram failures block LLM operations
-            logger.debug(f"Telegram notification failed (non-blocking): {e}")
+        def _send_async():
+            """Helper to run async code in separate thread with new event loop"""
+            try:
+                # Create new event loop for this thread
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(
+                        self.telegram_client.send_message(
+                            chat_id=self.telegram_chat_id,
+                            text=message,
+                            parse_mode="Markdown"
+                        )
+                    )
+                finally:
+                    loop.close()
+            except Exception as e:
+                # Never let Telegram failures block LLM operations
+                logger.debug(f"Telegram notification failed (non-blocking): {e}")
+
+        # Run in background thread to avoid blocking
+        thread = threading.Thread(target=_send_async, daemon=True)
+        thread.start()
 
     def _load_daily_cost(self) -> float:
         """Load today's accumulated cost from logs"""
