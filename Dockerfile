@@ -26,9 +26,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Claude Code CLI
-RUN curl -fsSL https://api.claude.ai/api/v1/download/cli/linux-x64 -o /usr/local/bin/claude && \
-    chmod +x /usr/local/bin/claude
+# Install Claude Code CLI using official install script
+RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # Copy requirements first for better layer caching
 COPY requirements.txt .
