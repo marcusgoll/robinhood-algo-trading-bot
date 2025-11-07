@@ -85,6 +85,87 @@ Write-Host "✅ GitHub authenticated ($authMethod)" -ForegroundColor Green
 Write-Host "✅ Repository: $repo" -ForegroundColor Green
 ```
 
+## PROJECT CONTEXT (Optional)
+
+**Check for project documentation** (if `/init-project` was run):
+
+```bash
+PROJECT_OVERVIEW="docs/project/overview.md"
+PROJECT_TECH_STACK="docs/project/tech-stack.md"
+PROJECT_CAPACITY="docs/project/capacity-planning.md"
+HAS_PROJECT_DOCS=false
+HAS_TECH_STACK=false
+HAS_CAPACITY=false
+
+if [ -f "$PROJECT_OVERVIEW" ]; then
+  HAS_PROJECT_DOCS=true
+  echo "✅ Project documentation found"
+  echo ""
+
+  # Read project overview for validation
+  # Claude Code: Read docs/project/overview.md
+  # Extract:
+  # - Vision (what problem we're solving)
+  # - Out of scope (explicit exclusions)
+  # - Target users (who we're building for)
+
+  # Will use for:
+  # 1. Vision alignment check when adding features
+  # 2. Out-of-scope validation
+  # 3. ICE scoring context
+fi
+
+if [ -f "$PROJECT_TECH_STACK" ]; then
+  HAS_TECH_STACK=true
+  echo "✅ Tech stack documentation found"
+  echo ""
+
+  # Read tech stack for brainstorming constraints
+  # Claude Code: Read docs/project/tech-stack.md
+  # Extract:
+  # - Frontend tech (Next.js, React, etc.)
+  # - Backend tech (FastAPI, Node.js, etc.)
+  # - Database (PostgreSQL, MongoDB, etc.)
+  # - Deployment platform (Vercel, Railway, AWS, etc.)
+  # - Auth provider (Clerk, Auth0, custom, etc.)
+  # - API style (REST, GraphQL, tRPC, gRPC)
+
+  # Will use for:
+  # 1. Brainstorm only features compatible with existing tech stack
+  # 2. Flag features requiring new technology additions
+  # 3. Leverage existing infrastructure (piggyback opportunities)
+fi
+
+if [ -f "$PROJECT_CAPACITY" ]; then
+  HAS_CAPACITY=true
+  echo "✅ Capacity planning documentation found"
+  echo ""
+
+  # Read capacity planning for effort estimation
+  # Claude Code: Read docs/project/capacity-planning.md
+  # Extract:
+  # - Scale tier (micro/small/medium/large)
+  # - Target users count (100/1k/10k/100k+)
+  # - Cost constraints
+  # - Performance targets
+
+  # Will use for:
+  # 1. Adjust effort estimates based on scale tier
+  #    - micro: 1-2 (simple CRUD, minimal infra)
+  #    - small: 2-3 (basic features, some optimization)
+  #    - medium: 3-5 (complex features, scaling considerations)
+  #    - large: 5-8 (distributed systems, high performance)
+  # 2. Flag features exceeding cost/performance budgets
+fi
+
+if [ "$HAS_PROJECT_DOCS" = false ]; then
+  echo "ℹ️  No project documentation found"
+  echo "   Run /init-project to create project design docs"
+  echo "   (Optional - roadmap works without it)"
+  echo ""
+fi
+```
+
 ## CONTEXT
 
 **Backend**: GitHub Issues with label-based state management
@@ -176,6 +257,67 @@ Add a progress widget...
 - Check if slug exists in GitHub Issues via `get_issue_by_slug()`
 - Check if `specs/[slug]/` directory exists
 - If duplicate: Ask "Merge with existing issue #N?"
+
+**Vision alignment validation** (if project docs exist):
+
+```bash
+if [ "$HAS_PROJECT_DOCS" = true ]; then
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "📋 VISION ALIGNMENT CHECK"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+
+  # Read project overview for validation
+  # Claude Code: Read docs/project/overview.md
+  # Extract:
+  # - Vision statement (1 paragraph)
+  # - Out of scope (explicit exclusions)
+  # - Target users (primary personas)
+
+  # Validate feature against project context:
+  # 1. Does it align with vision?
+  # 2. Is it explicitly out of scope?
+  # 3. Does it serve target users?
+
+  # If misaligned:
+  echo "⚠️  Potential misalignment detected"
+  echo ""
+  echo "Project vision: [Vision from overview.md]"
+  echo "This feature: $TITLE"
+  echo ""
+  echo "Concerns:"
+  echo "  - [List specific misalignment issues]"
+  echo ""
+  echo "Options:"
+  echo "  A) Add anyway (ignore alignment)"
+  echo "  B) Revise feature to align"
+  echo "  C) Skip (out of scope)"
+  read -p "Choice (A/B/C): " alignment_choice
+
+  case $alignment_choice in
+    B|b)
+      echo "Describe how to revise:"
+      read -p "> " revision
+      # Update TITLE and BODY with revised approach
+      ;;
+    C|c)
+      echo "Feature rejected (out of scope per overview.md)"
+      exit 0
+      ;;
+    A|a)
+      echo "Proceeding anyway (alignment override)"
+      # Add note to issue body
+      BODY="$BODY
+
+---
+
+⚠️  **Alignment Note**: Flagged as potentially out of scope, but added per user request."
+      ;;
+  esac
+
+  echo ""
+fi
+```
 
 **Size validation with auto-split:**
 
@@ -325,6 +467,8 @@ Default: B
 
 **Step 1 - Current Context:**
 - Read `.spec-flow/memory/constitution.md` (mission)
+- **If `HAS_TECH_STACK=true`:** Read `docs/project/tech-stack.md` for technical constraints
+- **If `HAS_CAPACITY=true`:** Read `docs/project/capacity-planning.md` for scale tier
 - **Fetch existing features from GitHub:**
 
 **Bash:**
@@ -372,6 +516,16 @@ $existingSlugs = $existingFeatures |
 - **Gap-fill** (address missing): Solve unmet user needs
 - **Quick Wins** (Impact 3-4, Effort 1-2): Ship in 1-2 weeks
 
+**Technical Constraints** (if tech stack docs available):
+- **ONLY suggest features compatible with documented tech stack**
+- Flag any feature requiring new technology: `[NEW TECH: GraphQL]`
+- Adjust effort estimates based on scale tier from capacity-planning.md:
+  - micro tier: Effort 1-2 (simple CRUD, minimal infrastructure)
+  - small tier: Effort 2-3 (basic features, some optimization)
+  - medium tier: Effort 3-5 (complex features, scaling needed)
+  - large tier: Effort 5-8 (distributed systems, high performance)
+- Prefer features leveraging existing infrastructure (lower effort)
+
 **Present** (simplified selection):
 ```
 💡 Brainstormed Ideas (sorted by score):
@@ -397,6 +551,8 @@ Which to add? (1,2,3, all, skip)
 
 **Step 1 - Current Context:**
 - Read `.spec-flow/memory/constitution.md` (mission)
+- **If `HAS_TECH_STACK=true`:** Read `docs/project/tech-stack.md` for technical constraints
+- **If `HAS_CAPACITY=true`:** Read `docs/project/capacity-planning.md` for scale tier
 - Fetch existing features from GitHub Issues (same as quick brainstorm)
 - Glob `specs/*/spec.md` (patterns, user flows, reusable infra)
 
@@ -417,6 +573,17 @@ Which to add? (1,2,3, all, skip)
 - **Extension** (piggyback existing): Build on current features
 - **Gap-fill** (address missing): Solve unmet user needs
 - **Innovation** (differentiation): New value propositions
+
+**Technical Constraints** (if tech stack docs available):
+- **ONLY suggest features compatible with documented tech stack**
+- Flag any feature requiring new technology: `[NEW TECH: GraphQL]`
+- Adjust effort estimates based on scale tier from capacity-planning.md:
+  - micro tier: Effort 1-2 (simple CRUD, minimal infrastructure)
+  - small tier: Effort 2-3 (basic features, some optimization)
+  - medium tier: Effort 3-5 (complex features, scaling needed)
+  - large tier: Effort 5-8 (distributed systems, high performance)
+- Prefer features leveraging existing infrastructure (lower effort)
+- Consider cost constraints from capacity planning when estimating feasibility
 
 **Step 2 - Group by Strategy:**
 - **Quick Wins** (Impact 3-4, Effort 1-2): Ship in 1-2 weeks

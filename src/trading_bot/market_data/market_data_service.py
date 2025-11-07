@@ -13,6 +13,7 @@ Constitution v1.0.0:
 import logging
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Dict, List
 
 import pandas as pd
 import robin_stocks.robinhood as r
@@ -36,6 +37,33 @@ class MarketDataService:
     Handles real-time quotes, historical data, and market status with
     built-in validation and error handling.
     """
+
+    # Mapping from standard timeframe notation to Robinhood API intervals
+    # Robinhood supports: 5minute, 10minute, day, week
+    TIMEFRAME_TO_INTERVAL = {
+        "1min": "5minute",    # Robinhood doesn't support 1min, use 5min as closest
+        "5min": "5minute",
+        "15min": "5minute",   # Will need resampling from 5min to 15min
+        "1hr": "5minute",     # Will need resampling from 5min to 1hr
+        "4hr": "5minute",     # Will need resampling from 5min to 4hr
+        "1day": "day",
+        "daily": "day",
+        "1week": "week",
+        "weekly": "week"
+    }
+
+    # Resampling rules for timeframes that need aggregation
+    RESAMPLE_FREQ = {
+        "1min": None,         # Not supported
+        "5min": None,         # Native
+        "15min": "15T",       # Resample from 5min
+        "1hr": "1H",          # Resample from 5min
+        "4hr": "4H",          # Resample from 5min
+        "1day": None,         # Native
+        "daily": None,        # Native
+        "1week": None,        # Native
+        "weekly": None        # Native
+    }
 
     def __init__(
         self,
@@ -162,6 +190,147 @@ class MarketDataService:
         validate_historical_data(df)
 
         return df
+
+    @with_retry(policy=DEFAULT_POLICY)
+    def get_multi_timeframe_data(
+        self,
+        symbol: str,
+        timeframes: List[str],
+        span: str = "year"
+    ) -> Dict[str, pd.DataFrame]:
+        """
+        Fetch historical data across multiple timeframes.
+
+        Handles timeframe mapping, data resampling where needed, and validation
+        for all requested timeframes. Used for multi-timeframe ML models.
+
+        Args:
+            symbol: Stock ticker symbol (e.g., "AAPL", "TSLA")
+            timeframes: List of timeframes (e.g., ["5min", "1hr", "1day"])
+                       Supported: 1min, 5min, 15min, 1hr, 4hr, 1day, daily, 1week, weekly
+            span: Time span for all timeframes ("day", "week", "month", "year", "5year")
+
+        Returns:
+            Dict mapping timeframe -> OHLCV DataFrame
+            Example: {"5min": df_5min, "1hr": df_1hr, "1day": df_daily}
+
+        Raises:
+            ValueError: If unsupported timeframe requested
+            DataValidationError: If data validation fails for any timeframe
+            RateLimitError: After 3 retries on HTTP 429
+
+        Example:
+            >>> data = service.get_multi_timeframe_data(
+            ...     "SPY",
+            ...     ["5min", "1hr", "1day"],
+            ...     span="year"
+            ... )
+            >>> print(data["1day"].head())
+        """
+        # Log the request
+        self._log_request(
+            "get_multi_timeframe_data",
+            {"symbol": symbol, "timeframes": timeframes, "span": span}
+        )
+
+        # Validate requested timeframes
+        unsupported = [tf for tf in timeframes if tf not in self.TIMEFRAME_TO_INTERVAL]
+        if unsupported:
+            raise ValueError(
+                f"Unsupported timeframes: {unsupported}. "
+                f"Supported: {list(self.TIMEFRAME_TO_INTERVAL.keys())}"
+            )
+
+        data_by_timeframe = {}
+
+        # Group timeframes by required API interval to minimize API calls
+        interval_to_timeframes = {}
+        for tf in timeframes:
+            interval = self.TIMEFRAME_TO_INTERVAL[tf]
+            if interval not in interval_to_timeframes:
+                interval_to_timeframes[interval] = []
+            interval_to_timeframes[interval].append(tf)
+
+        # Fetch data for each unique interval
+        for interval, tfs in interval_to_timeframes.items():
+            try:
+                # Fetch raw data from Robinhood
+                self.logger.info(f"Fetching {interval} data for {symbol} (span={span})")
+                raw_data = r.get_stock_historicals(symbol, interval=interval, span=span)
+
+                # Convert to DataFrame
+                df = pd.DataFrame(raw_data)
+
+                # Normalize column names
+                df = df.rename(columns={
+                    'begins_at': 'date',
+                    'open_price': 'open',
+                    'high_price': 'high',
+                    'low_price': 'low',
+                    'close_price': 'close',
+                    'volume': 'volume'
+                })
+
+                # Convert date to datetime and set as index
+                df['date'] = pd.to_datetime(df['date'])
+                df = df.set_index('date')
+
+                # Convert price/volume columns to numeric
+                for col in ['open', 'high', 'low', 'close', 'volume']:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+
+                # Process each timeframe that needs this interval
+                for tf in tfs:
+                    resample_freq = self.RESAMPLE_FREQ.get(tf)
+
+                    if resample_freq is None:
+                        # No resampling needed (native timeframe)
+                        tf_df = df.copy()
+                    else:
+                        # Resample to target timeframe
+                        self.logger.info(f"Resampling {interval} → {tf} using {resample_freq}")
+                        tf_df = df.resample(resample_freq).agg({
+                            'open': 'first',
+                            'high': 'max',
+                            'low': 'min',
+                            'close': 'last',
+                            'volume': 'sum'
+                        })
+
+                        # Drop rows with NaN (incomplete bars)
+                        tf_df = tf_df.dropna()
+
+                    # Reset index to have 'date' as column (for compatibility)
+                    tf_df = tf_df.reset_index()
+
+                    # Validate the data
+                    validate_historical_data(tf_df)
+
+                    # Store in result dict
+                    data_by_timeframe[tf] = tf_df
+
+                    self.logger.info(
+                        f"Loaded {len(tf_df)} bars for {symbol} {tf} "
+                        f"({tf_df['date'].iloc[0]} to {tf_df['date'].iloc[-1]})"
+                    )
+
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to fetch {interval} data for timeframes {tfs}: {e}"
+                )
+                # Mark all dependent timeframes as failed
+                for tf in tfs:
+                    data_by_timeframe[tf] = pd.DataFrame()  # Empty DataFrame as error indicator
+
+        # Verify all timeframes were successfully fetched
+        failed_tfs = [tf for tf, df in data_by_timeframe.items() if df.empty]
+        if failed_tfs:
+            raise ValueError(
+                f"Failed to fetch data for timeframes: {failed_tfs}. "
+                f"Check API connectivity and rate limits."
+            )
+
+        return data_by_timeframe
 
     @with_retry(policy=DEFAULT_POLICY)
     def is_market_open(self) -> MarketStatus:

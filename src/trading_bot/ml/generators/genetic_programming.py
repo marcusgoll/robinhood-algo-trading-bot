@@ -193,7 +193,7 @@ class GeneticProgrammingGenerator:
             "exp": 1,
             "not": 1,
         }
-        self.population: list[tuple[GPNode, float]] = []  # (tree, fitness)
+        self.population: list[tuple[GPNode, float, dict]] = []  # (tree, fitness, metrics)
 
     def create_random_tree(
         self, max_depth: int, method: str = "grow"
@@ -238,7 +238,7 @@ class GeneticProgrammingGenerator:
             method = "grow" if i < self.config.population_size // 2 else "full"
 
             tree = self.create_random_tree(depth, method)
-            self.population.append((tree, 0.0))  # Fitness starts at 0
+            self.population.append((tree, 0.0, {}))  # Fitness starts at 0, metrics empty
 
         logger.info(f"Initialized population of {len(self.population)} trees")
 
@@ -246,19 +246,192 @@ class GeneticProgrammingGenerator:
         self,
         tree: GPNode,
         historical_data: Any,
-    ) -> float:
+    ) -> tuple[float, dict]:
         """Evaluate strategy fitness on historical data.
+
+        Simple backtesting fitness function:
+        1. Extract features from historical data
+        2. Evaluate tree on each bar to generate signals
+        3. Simulate buy-and-hold on signals
+        4. Calculate comprehensive metrics
 
         Args:
             tree: Strategy tree to evaluate
-            historical_data: Historical market data
+            historical_data: Historical market data (DataFrame with OHLCV)
 
         Returns:
-            Fitness score (higher is better)
+            Tuple of (fitness_score, metrics_dict)
         """
-        # TODO: Implement full backtest
-        # For now, return random fitness
-        return random.random()
+        try:
+            import pandas as pd
+            from trading_bot.ml.features import FeatureExtractor
+
+            # Skip if insufficient data
+            if len(historical_data) < 50:
+                return 0.0, {}
+
+            # Extract features for each bar
+            extractor = FeatureExtractor()
+            feature_sets = extractor.extract(historical_data, symbol="BACKTEST")
+
+            # Generate signals by evaluating tree on each bar
+            signals = []
+            for fs in feature_sets:
+                # Convert FeatureSet to dict for tree evaluation
+                features = {
+                    "close": historical_data["close"].iloc[len(signals)],
+                    "volume": historical_data["volume"].iloc[len(signals)],
+                    "rsi": fs.rsi_14,
+                    "macd": fs.macd,
+                    "ema_12": fs.returns_5d,  # Proxy (actual EMA not in features)
+                    "ema_26": fs.returns_20d,  # Proxy
+                    "sma_20": fs.price_to_sma20,  # Normalized version
+                    "sma_50": fs.price_to_sma50,  # Normalized version
+                    "atr": fs.atr_14,
+                    "const": 1.0,
+                }
+
+                # Evaluate tree (> 0.5 = buy signal)
+                signal_value = tree.evaluate(features)
+                signals.append(1.0 if signal_value > 0.5 else 0.0)
+
+            # Simulate trading: buy when signal=1, hold until signal=0
+            returns = []
+            trades = []  # Track individual trades
+            position = 0.0  # 0 = no position, 1 = long position
+            entry_price = 0.0
+            equity = 1.0  # Start with $1
+            peak_equity = 1.0
+            max_drawdown = 0.0
+
+            for i in range(1, len(signals)):
+                signal = signals[i]
+                prev_signal = signals[i - 1]
+                current_price = float(historical_data["close"].iloc[i])
+                prev_price = float(historical_data["close"].iloc[i - 1])
+
+                # Entry: signal changes from 0 to 1
+                if signal > 0.5 and prev_signal <= 0.5:
+                    position = 1.0
+                    entry_price = current_price
+                    returns.append(0.0)  # No return on entry
+
+                # Exit: signal changes from 1 to 0
+                elif signal <= 0.5 and prev_signal > 0.5 and position > 0:
+                    trade_return = (current_price - entry_price) / entry_price
+                    returns.append(trade_return)
+                    trades.append(trade_return)
+                    equity *= (1 + trade_return)
+                    position = 0.0
+
+                    # Update max drawdown
+                    if equity > peak_equity:
+                        peak_equity = equity
+                    drawdown = (peak_equity - equity) / peak_equity
+                    if drawdown > max_drawdown:
+                        max_drawdown = drawdown
+
+                # Holding position
+                elif position > 0:
+                    bar_return = (current_price - prev_price) / prev_price
+                    returns.append(bar_return)
+                    equity *= (1 + bar_return)
+
+                    # Update max drawdown
+                    if equity > peak_equity:
+                        peak_equity = equity
+                    drawdown = (peak_equity - equity) / peak_equity
+                    if drawdown > max_drawdown:
+                        max_drawdown = drawdown
+
+                else:
+                    returns.append(0.0)  # No position, no return
+
+            # Penalize strategies with too few trades
+            num_trades = len(trades)
+            if num_trades < 20:  # Need at least 20 trades for statistical significance
+                metrics = {
+                    "sharpe_ratio": 0.0,
+                    "max_drawdown": 0.0,
+                    "win_rate": 0.0,
+                    "profit_factor": 0.0,
+                    "num_trades": num_trades,
+                    "total_return": equity - 1.0,
+                }
+                return 0.01 * num_trades, metrics  # Small fitness based on trade count
+
+            # Calculate trade statistics
+            if len(returns) == 0 or all(r == 0.0 for r in returns):
+                metrics = {
+                    "sharpe_ratio": 0.0,
+                    "max_drawdown": 0.0,
+                    "win_rate": 0.0,
+                    "profit_factor": 0.0,
+                    "num_trades": 0,
+                    "total_return": 0.0,
+                }
+                return 0.0, metrics
+
+            returns_array = np.array(returns)
+            mean_return = returns_array.mean()
+            std_return = returns_array.std()
+
+            if std_return == 0.0:
+                metrics = {
+                    "sharpe_ratio": 0.0,
+                    "max_drawdown": max_drawdown,
+                    "win_rate": 0.0,
+                    "profit_factor": 0.0,
+                    "num_trades": num_trades,
+                    "total_return": equity - 1.0,
+                }
+                return 0.0, metrics
+
+            # Annualized Sharpe ratio
+            sharpe = (mean_return / std_return) * np.sqrt(252)
+
+            # Win rate
+            trades_array = np.array(trades)
+            winners = (trades_array > 0).sum()
+            win_rate = winners / num_trades if num_trades > 0 else 0.0
+
+            # Profit factor
+            gross_wins = trades_array[trades_array > 0].sum()
+            gross_losses = abs(trades_array[trades_array < 0].sum())
+            profit_factor = gross_wins / gross_losses if gross_losses > 0 else 0.0
+
+            # Composite fitness score (similar to StrategyMetrics.get_fitness_score)
+            sharpe_score = np.clip(sharpe / 3.0, 0.0, 1.0) * 30  # 30% weight
+            drawdown_score = (1.0 - min(max_drawdown, 1.0)) * 20  # 20% weight
+            win_rate_score = win_rate * 20  # 20% weight
+            profit_factor_score = np.clip(profit_factor / 3.0, 0.0, 1.0) * 30  # 30% weight
+
+            fitness = (sharpe_score + drawdown_score + win_rate_score + profit_factor_score) / 100.0
+
+            # Return metrics dict with all calculated values
+            metrics = {
+                "sharpe_ratio": sharpe,
+                "max_drawdown": max_drawdown,
+                "win_rate": win_rate,
+                "profit_factor": profit_factor,
+                "num_trades": num_trades,
+                "total_return": equity - 1.0,
+            }
+
+            return fitness, metrics
+
+        except Exception as e:
+            # If evaluation fails, return low fitness
+            logger.warning(f"Fitness evaluation failed: {e}")
+            metrics = {
+                "sharpe_ratio": 0.0,
+                "max_drawdown": 0.0,
+                "win_rate": 0.0,
+                "profit_factor": 0.0,
+                "num_trades": 0,
+                "total_return": 0.0,
+            }
+            return 0.0, metrics
 
     def tournament_selection(self) -> GPNode:
         """Select parent using tournament selection.
@@ -270,7 +443,7 @@ class GeneticProgrammingGenerator:
         winner = max(tournament, key=lambda x: x[1])  # Max fitness
         return winner[0]
 
-    def crossover(self, parent1: GPNode, parent2: GPNode) -> GPNode:
+    def _crossover_trees(self, parent1: GPNode, parent2: GPNode) -> GPNode:
         """Perform subtree crossover.
 
         Args:
@@ -302,7 +475,7 @@ class GeneticProgrammingGenerator:
 
         return offspring
 
-    def mutate(self, tree: GPNode) -> GPNode:
+    def _mutate_tree(self, tree: GPNode) -> GPNode:
         """Mutate tree by replacing random subtree.
 
         Args:
@@ -370,7 +543,7 @@ class GeneticProgrammingGenerator:
         target.children = replacement.children
 
     def evolve(self, historical_data: Any) -> list[MLStrategy]:
-        """Run evolution loop.
+        """Run evolution loop with train/validation split to prevent overfitting.
 
         Args:
             historical_data: Historical market data for fitness evaluation
@@ -382,23 +555,55 @@ class GeneticProgrammingGenerator:
             f"Starting GP evolution: {self.config.num_generations} generations"
         )
 
+        # Split data into train (80%) and validation (20%)
+        split_idx = int(len(historical_data) * 0.8)
+        train_data = historical_data.iloc[:split_idx].copy()
+        validation_data = historical_data.iloc[split_idx:].copy()
+
+        logger.info(
+            f"Data split: Train={len(train_data)} bars, Validation={len(validation_data)} bars"
+        )
+
         self.initialize_population()
 
+        # Track best validation fitness across generations
+        best_validation_fitness = 0.0
+        best_validation_tree = None
+
         for generation in range(self.config.num_generations):
-            # Evaluate fitness
-            for i, (tree, _) in enumerate(self.population):
-                fitness = self.evaluate_fitness(tree, historical_data)
-                self.population[i] = (tree, fitness)
+            # Evaluate fitness on TRAIN data only
+            for i, (tree, _, _) in enumerate(self.population):
+                fitness, metrics = self.evaluate_fitness(tree, train_data)
+
+                # Add complexity penalty to prevent overly complex trees
+                complexity_penalty = tree.count_nodes() * 0.001
+                penalized_fitness = max(fitness - complexity_penalty, 0.0)
+
+                self.population[i] = (tree, penalized_fitness, metrics)
 
             # Sort by fitness
             self.population.sort(key=lambda x: x[1], reverse=True)
 
             # Log progress
             best_fitness = self.population[0][1]
-            avg_fitness = sum(f for _, f in self.population) / len(self.population)
+            avg_fitness = sum(f for _, f, _ in self.population) / len(self.population)
+
+            # Every 5 generations, check validation performance
+            validation_check = ""
+            if generation % 5 == 0 and generation > 0:
+                val_fitness, val_metrics = self.evaluate_fitness(
+                    self.population[0][0], validation_data
+                )
+                validation_check = f", Val={val_fitness:.4f}"
+
+                # Track best validation performer
+                if val_fitness > best_validation_fitness:
+                    best_validation_fitness = val_fitness
+                    best_validation_tree = self._copy_tree(self.population[0][0])
+
             logger.info(
                 f"Generation {generation + 1}: "
-                f"Best={best_fitness:.4f}, Avg={avg_fitness:.4f}"
+                f"Best={best_fitness:.4f}, Avg={avg_fitness:.4f}{validation_check}"
             )
 
             # Create next generation
@@ -414,32 +619,57 @@ class GeneticProgrammingGenerator:
                     # Crossover
                     parent1 = self.tournament_selection()
                     parent2 = self.tournament_selection()
-                    offspring = self.crossover(parent1, parent2)
+                    offspring = self._crossover_trees(parent1, parent2)
                 else:
                     # Reproduction
                     offspring = self._copy_tree(self.tournament_selection())
 
                 # Mutation
                 if random.random() < self.config.mutation_rate:
-                    offspring = self.mutate(offspring)
+                    offspring = self._mutate_tree(offspring)
 
-                next_population.append((offspring, 0.0))
+                next_population.append((offspring, 0.0, {}))
 
             self.population = next_population
 
-        # Convert top strategies to MLStrategy objects
+        # Final evaluation on validation data for all top strategies
+        logger.info("Performing final validation evaluation...")
+        validation_scores = []
+
         top_n = min(20, len(self.population))
+        for i in range(top_n):
+            tree, train_fitness, train_metrics = self.population[i]
+            val_fitness, val_metrics = self.evaluate_fitness(tree, validation_data)
+
+            # Calculate generalization score (train vs validation)
+            if train_fitness > 0:
+                generalization_ratio = val_fitness / train_fitness
+            else:
+                generalization_ratio = 0.0
+
+            validation_scores.append((
+                tree,
+                train_fitness,
+                train_metrics,
+                val_fitness,
+                val_metrics,
+                generalization_ratio
+            ))
+
+        # Sort by validation fitness (prefer strategies that generalize)
+        validation_scores.sort(key=lambda x: x[3], reverse=True)
+
+        # Convert to MLStrategy objects
         strategies = []
 
-        for i in range(top_n):
-            tree, fitness = self.population[i]
-
+        for i, (tree, train_fitness, train_metrics, val_fitness, val_metrics, gen_ratio) in enumerate(validation_scores):
             gene = StrategyGene(
                 tree=tree.to_string(),
                 depth=tree.get_depth(),
                 num_nodes=tree.count_nodes(),
             )
 
+            # Use validation metrics for backtest_metrics since they're more realistic
             strategy = MLStrategy(
                 name=f"GP_Strategy_{i + 1}",
                 type=StrategyType.GENETIC_PROGRAMMING,
@@ -447,13 +677,23 @@ class GeneticProgrammingGenerator:
                 entry_logic=tree.to_string(),
                 gene=gene,
                 backtest_metrics=StrategyMetrics(
-                    sharpe_ratio=fitness,  # Placeholder
+                    sharpe_ratio=val_metrics.get("sharpe_ratio", val_fitness),
+                    max_drawdown=val_metrics.get("max_drawdown", 0.0),
+                    win_rate=val_metrics.get("win_rate", 0.0),
+                    profit_factor=val_metrics.get("profit_factor", 0.0),
+                    num_trades=val_metrics.get("num_trades", 0),
+                    total_return=val_metrics.get("total_return", 0.0),
                 ),
                 generation_config=self.config.__dict__,
                 complexity_score=gene.complexity_score(),
             )
 
             strategies.append(strategy)
+
+            logger.info(
+                f"Strategy {i+1}: Train={train_fitness:.4f}, "
+                f"Val={val_fitness:.4f}, Gen={gen_ratio:.2f}"
+            )
 
         logger.info(f"Evolution complete. Generated {len(strategies)} strategies")
         return strategies

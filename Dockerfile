@@ -45,8 +45,7 @@ RUN mkdir -p /app/logs/orchestrator \
              /app/logs/llm \
              /app/logs/backtest \
              /app/logs/trades \
-             /app/.backtest_cache \
-             /app/.robinhood.pickle
+             /app/.backtest_cache
 
 # Set Python path
 ENV PYTHONPATH=/app/src

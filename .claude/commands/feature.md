@@ -130,16 +130,17 @@ Let me analyze this workflow decision:
 <instructions>
 ## PARSE ARGUMENTS
 
-**Get feature description, continue mode, or next mode:**
+**Get feature description, continue mode, next mode, or lookup mode:**
 
 If `$ARGUMENTS` is empty, show usage:
 ```
-Usage: /feature [feature description]
+Usage: /feature [feature description or slug]
    or: /feature continue
    or: /feature next
 
 Examples:
-  /feature "Student progress tracking dashboard"
+  /feature landing-page-waitlist
+  /feature "Student progress tracking"
   /feature continue
   /feature next
 ```
@@ -155,11 +156,12 @@ Else if `$ARGUMENTS` is "next":
 - Extract slug and feature description
 - Initialize new workflow with auto-fetched feature
 
-Else:
-- Set `CONTINUE_MODE = false`
-- Set `NEXT_MODE = false`
-- Set `FEATURE_DESCRIPTION = $ARGUMENTS`
-- Initialize new workflow
+Else (all other arguments):
+- Set `LOOKUP_MODE = true`
+- Set `SEARCH_TERM = $ARGUMENTS`
+- Search GitHub Issues for roadmap item matching slug or title
+- If found: Display details, confirm, claim issue, continue workflow
+- If not found: Ask user to create new feature with detailed description
 
 ## FETCH NEXT FEATURE
 
@@ -315,14 +317,208 @@ SLUG="$EXTRACTED_SLUG"
 
 **Important**: After fetching, continue to GENERATE FEATURE SLUG section (which will use the extracted SLUG), then proceed normally through the workflow.
 
+## LOOKUP FEATURE IN ROADMAP
+
+**Execute for all non-continue/non-next modes (LOOKUP_MODE = true):**
+
+```bash
+# Check GitHub authentication
+if ! command -v gh &> /dev/null; then
+  echo "❌ GitHub CLI (gh) not installed"
+  echo "Install: https://cli.github.com"
+  exit 1
+fi
+
+# Verify authentication
+if ! gh auth status &> /dev/null; then
+  echo "❌ GitHub authentication required"
+  echo "Run: gh auth login"
+  exit 1
+fi
+
+# Get repository info
+REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+if [ -z "$REPO" ]; then
+  echo "❌ Not in a GitHub repository"
+  exit 1
+fi
+
+echo "🔍 Searching roadmap for: \"$SEARCH_TERM\"..."
+echo ""
+
+# Query GitHub Issues for item with matching slug or title
+# First try exact slug match in YAML frontmatter: slug: "exact-slug"
+# Then try fuzzy title match as fallback
+LOOKUP_ISSUE=$(gh issue list \
+  --repo "$REPO" \
+  --label "type:feature" \
+  --json number,title,body,labels \
+  --limit 100 | jq -r --arg term "$SEARCH_TERM" '
+    map(select(
+      (.body | test("slug:\\s*\"" + $term + "\"")) or
+      (.title | ascii_downcase | contains($term | ascii_downcase))
+    )) |
+    first // empty')
+
+# If not found, ask user what to do
+if [ -z "$LOOKUP_ISSUE" ]; then
+  echo "❌ No roadmap item found for: \"$SEARCH_TERM\""
+  echo ""
+  echo "Options:"
+  echo "  A) Create new feature (not on roadmap)"
+  echo "  B) Cancel and add to roadmap first"
+  echo ""
+  read -p "Choice (A/B): " choice
+
+  case $choice in
+    A|a)
+      echo ""
+      echo "Creating new feature (not on roadmap)..."
+      echo ""
+      echo "📝 Describe the feature in detail (2-3 sentences):"
+      echo "   (Press Enter twice when done)"
+      echo ""
+
+      # Read multi-line input
+      FEATURE_DESCRIPTION=""
+      while IFS= read -r line; do
+        if [ -z "$line" ]; then
+          break
+        fi
+        if [ -z "$FEATURE_DESCRIPTION" ]; then
+          FEATURE_DESCRIPTION="$line"
+        else
+          FEATURE_DESCRIPTION="$FEATURE_DESCRIPTION $line"
+        fi
+      done
+
+      # Validate description was provided
+      if [ -z "$FEATURE_DESCRIPTION" ]; then
+        echo "❌ No description provided. Cancelled."
+        exit 1
+      fi
+
+      echo ""
+      echo "Description: $FEATURE_DESCRIPTION"
+      echo ""
+      read -p "Proceed with this feature? (yes/no): " confirm
+
+      if [[ ! "$confirm" =~ ^[Yy] ]]; then
+        echo "Cancelled"
+        exit 0
+      fi
+
+      echo ""
+      echo "✅ Creating new feature..."
+      echo ""
+      # SLUG will be generated in GENERATE FEATURE SLUG section
+      ;;
+    B|b)
+      echo ""
+      echo "Add this feature to your roadmap first:"
+      echo "  /roadmap"
+      echo ""
+      echo "Then run: /feature <slug>"
+      exit 0
+      ;;
+    *)
+      echo "Cancelled"
+      exit 0
+      ;;
+  esac
+else
+  # Found - extract details and confirm with user
+  ISSUE_NUMBER=$(echo "$LOOKUP_ISSUE" | jq -r '.number')
+  ISSUE_TITLE=$(echo "$LOOKUP_ISSUE" | jq -r '.title')
+  ISSUE_BODY=$(echo "$LOOKUP_ISSUE" | jq -r '.body // ""')
+
+  # Parse ICE scores from frontmatter
+  ICE_IMPACT=$(echo "$ISSUE_BODY" | grep -oP '^impact:\s*\K\d+' | head -1)
+  ICE_CONFIDENCE=$(echo "$ISSUE_BODY" | grep -oP '^confidence:\s*\K[\d.]+' | head -1)
+  ICE_EFFORT=$(echo "$ISSUE_BODY" | grep -oP '^effort:\s*\K[\d.]+' | head -1)
+  ICE_SCORE=""
+
+  if [ -n "$ICE_IMPACT" ] && [ -n "$ICE_CONFIDENCE" ] && [ -n "$ICE_EFFORT" ]; then
+    ICE_SCORE=$(echo "scale=2; ($ICE_IMPACT * $ICE_CONFIDENCE) / $ICE_EFFORT" | bc)
+  fi
+
+  # Get current status and priority
+  CURRENT_STATUS=$(echo "$LOOKUP_ISSUE" | jq -r '.labels[] | select(.name | startswith("status:")) | .name' | sed 's/status://' | head -1)
+  PRIORITY=$(echo "$LOOKUP_ISSUE" | jq -r '.labels[] | select(.name | startswith("priority:")) | .name' | sed 's/priority://' | head -1)
+
+  # Extract first 3-5 requirements from body (lines starting with - after frontmatter)
+  REQUIREMENTS=$(echo "$ISSUE_BODY" | awk '/^---$/,/^---$/ {next} /^- / {print}' | head -5)
+
+  # Display issue details
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "📋 Found Roadmap Item"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  echo "Issue: #$ISSUE_NUMBER"
+  echo "Title: $ISSUE_TITLE"
+  echo "Status: $CURRENT_STATUS"
+  echo ""
+
+  if [ -n "$ICE_SCORE" ]; then
+    echo "Priority: $PRIORITY (ICE Score: $ICE_SCORE)"
+    echo "  Impact: $ICE_IMPACT | Confidence: $ICE_CONFIDENCE | Effort: $ICE_EFFORT"
+  else
+    echo "Priority: $PRIORITY"
+  fi
+  echo ""
+
+  if [ -n "$REQUIREMENTS" ]; then
+    echo "Requirements:"
+    echo "$REQUIREMENTS"
+    echo ""
+  fi
+
+  read -p "Start this feature? (yes/no): " confirm
+
+  if [[ ! "$confirm" =~ ^[Yy] ]]; then
+    echo "Cancelled"
+    exit 0
+  fi
+
+  # Claim issue immediately (prevent race conditions)
+  echo ""
+  echo "📌 Claiming issue #$ISSUE_NUMBER (updating status to in-progress)..."
+  gh issue edit "$ISSUE_NUMBER" \
+    --remove-label "status:next" \
+    --remove-label "status:backlog" \
+    --add-label "status:in-progress" \
+    --repo "$REPO" 2>/dev/null || {
+      echo "⚠️  Warning: Could not update issue status (may already be claimed)"
+    }
+  echo ""
+
+  # Extract slug from issue body YAML frontmatter
+  SLUG=$(echo "$ISSUE_BODY" | grep -oP '^slug:\s*"\K[^"]+' | head -1)
+
+  # Fallback: if no slug in frontmatter, generate from title
+  if [ -z "$SLUG" ]; then
+    SLUG=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//' | cut -c1-30)
+  fi
+
+  FEATURE_DESCRIPTION="$ISSUE_TITLE"
+
+  echo "✅ Claimed issue #$ISSUE_NUMBER"
+  echo ""
+  echo "Starting feature workflow..."
+  echo ""
+fi
+```
+
+**Important**: After lookup, continue to GENERATE FEATURE SLUG section (which will use the extracted SLUG), then proceed normally through the workflow. The `ISSUE_NUMBER` will be stored in `workflow-state.yaml` for tracking.
+
 ## GENERATE FEATURE SLUG
 
 **Generate slug from feature description before any file/branch operations:**
 
-**Skip if already set by NEXT_MODE:**
+**Skip if already set by NEXT_MODE or LOOKUP_MODE:**
 
 ```bash
-# If SLUG already set (from /feature next), skip generation
+# If SLUG already set (from /feature next or GitHub Issues lookup), skip generation
 if [ -z "$SLUG" ]; then
   # Generate concise short-name from feature description (2-4 words, action-noun format)
   # This must happen BEFORE branch creation since branch name includes slug
@@ -506,8 +702,10 @@ mkdir -p "$FEATURE_DIR"
 # - Deployment state (staging, production)
 # - Artifacts paths
 initialize_workflow_state "$FEATURE_DIR" "$SLUG" "$FEATURE_DESCRIPTION" "$BRANCH_NAME"
+n# Start timing for spec-flow phase
+start_phase_timing "$FEATURE_DIR" "spec-flow"
 
-# If using /feature next, store GitHub issue number for tracking
+# If using /feature next or /feature <slug>, store GitHub issue number for tracking
 if [ -n "$ISSUE_NUMBER" ]; then
   yq eval -i ".feature.github_issue = $ISSUE_NUMBER" "$FEATURE_DIR/workflow-state.yaml"
   echo "🔗 Linked to GitHub Issue #$ISSUE_NUMBER"
@@ -648,6 +846,8 @@ if [ "$STATUS" != "completed" ]; then
 fi
 
 # Update workflow state: mark spec-flow phase complete
+n# Complete timing for spec-flow phase
+complete_phase_timing "$FEATURE_DIR" "spec-flow"
 update_workflow_phase "$FEATURE_DIR" "spec-flow" "completed"
 
 # Store phase summary in artifacts
@@ -1104,6 +1304,8 @@ update_workflow_phase "$FEATURE_DIR" "implement" "completed"
    echo "Feature: $SLUG"
    echo "Summary: $FEATURE_DIR/ship-summary.md"
    echo ""
+n   # Display comprehensive timing summary
+   display_workflow_summary "$FEATURE_DIR"
    ```
 
 ### Completion

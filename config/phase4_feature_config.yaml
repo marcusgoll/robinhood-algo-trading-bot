@@ -1,0 +1,135 @@
+# Phase 4A: Multi-Timeframe Feature Engineering Configuration
+#
+# Phase 3 Winner:
+#   Model: attention_lstm (hidden_dim=64, num_layers=2, dropout=0.3)
+#   Horizon: 78 bars (6.5 hours)
+#   Accuracy: 59.65%
+#
+# Phase 4 Objective:
+#   Improve to 60-61% accuracy by adding multi-timeframe features
+#
+# Strategy:
+#   - Keep model and horizon FIXED at Phase 3 winner settings
+#   - Test different timeframe combinations
+#   - Expected improvement: +0.5-1.0% from multi-timeframe context
+
+# FIXED: Model configuration (winner from Phase 3)
+model:
+  name: "attention_lstm"
+  type: "attention_lstm"
+  params:
+    hidden_dim: 64
+    num_layers: 2
+    dropout: 0.3
+
+# FIXED: Prediction horizon (winner from Phase 3)
+horizon:
+  name: "78bar"
+  bars: 78
+  description: "6.5 hours ahead"
+
+# FIXED: Training parameters (optimized from Phase 3)
+training:
+  learning_rate: 0.0001
+  batch_size: 32
+  max_epochs: 50
+
+# VARIABLE: Feature set configurations to test
+feature_sets:
+  # Baseline: Single timeframe (5Min only) - should match Phase 3
+  - name: "baseline_5min"
+    primary_timeframe: "5Min"
+    additional_timeframes: []
+    description: "Baseline - 5Min only (Phase 3 benchmark)"
+    enabled: true
+    priority: 1
+
+  # Two-timeframe combinations
+  - name: "5min_15min"
+    primary_timeframe: "5Min"
+    additional_timeframes: ["15Min"]
+    description: "5Min + 15Min context"
+    enabled: true
+    priority: 2
+
+  - name: "5min_1hr"
+    primary_timeframe: "5Min"
+    additional_timeframes: ["1Hour"]
+    description: "5Min + 1Hour trend"
+    enabled: true
+    priority: 2
+
+  - name: "5min_4hr"
+    primary_timeframe: "5Min"
+    additional_timeframes: ["4Hour"]
+    description: "5Min + 4Hour macro trend"
+    enabled: true
+    priority: 2
+
+  # Three-timeframe combinations
+  - name: "5min_15min_1hr"
+    primary_timeframe: "5Min"
+    additional_timeframes: ["15Min", "1Hour"]
+    description: "5Min + 15Min + 1Hour multi-scale"
+    enabled: true
+    priority: 3
+
+  - name: "5min_15min_4hr"
+    primary_timeframe: "5Min"
+    additional_timeframes: ["15Min", "4Hour"]
+    description: "5Min + 15Min + 4Hour"
+    enabled: true
+    priority: 3
+
+  - name: "5min_1hr_4hr"
+    primary_timeframe: "5Min"
+    additional_timeframes: ["1Hour", "4Hour"]
+    description: "5Min + hourly trends"
+    enabled: true
+    priority: 3
+
+  # Four-timeframe combination (full multi-scale)
+  - name: "5min_15min_1hr_4hr"
+    primary_timeframe: "5Min"
+    additional_timeframes: ["15Min", "1Hour", "4Hour"]
+    description: "Full multi-timeframe stack"
+    enabled: true
+    priority: 4
+
+  # Alternative primary timeframes
+  - name: "1min_5min_15min"
+    primary_timeframe: "1Min"
+    additional_timeframes: ["5Min", "15Min"]
+    description: "Ultra-short 1Min primary"
+    enabled: true
+    priority: 5
+
+  - name: "15min_1hr_4hr"
+    primary_timeframe: "15Min"
+    additional_timeframes: ["1Hour", "4Hour"]
+    description: "Longer 15Min primary"
+    enabled: true
+    priority: 5
+
+# Symbol and data settings
+symbols:
+  - symbol: "SPY"
+    timeframe: "5Min"  # Default primary timeframe
+    data_days: 60
+    enabled: true
+
+# Execution settings
+execution:
+  max_parallel: 4
+  device: "cpu"
+  db_path: "experiments_phase4.db"
+
+# Expected outcomes
+expected_results:
+  baseline_accuracy: 59.65  # Phase 3 winner
+  target_accuracy: 60.50    # Mid-range target
+  stretch_accuracy: 61.00   # Stretch goal
+  best_combinations:
+    - "5min_15min_1hr"      # Most likely winner
+    - "5min_15min_1hr_4hr"  # Full stack
+    - "5min_1hr"            # Simple but effective

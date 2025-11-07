@@ -19,6 +19,7 @@ class StrategyType(str, Enum):
     GENETIC_PROGRAMMING = "genetic_programming"
     REINFORCEMENT_LEARNING = "reinforcement_learning"
     LLM_GENERATED = "llm_generated"
+    RULE_BASED = "rule_based"
     ENSEMBLE = "ensemble"
     HYBRID = "hybrid"
 
@@ -219,9 +220,18 @@ class FeatureSet:
         days_to_earnings: Days until earnings / 90 (capped)
         days_from_earnings: Days since earnings / 90 (capped)
 
-        # Pattern features (8)
-        support_distance: Distance to nearest support (%)
-        resistance_distance: Distance to nearest resistance (%)
+        # Support/Resistance features (9)
+        distance_to_nearest_support: % distance to nearest support below (-0.05 to 0)
+        distance_to_nearest_resistance: % distance to nearest resistance above (0 to +0.05)
+        support_strength: Strength of nearest support (0-1)
+        resistance_strength: Strength of nearest resistance (0-1)
+        between_levels: 1 if price between strong S/R, else 0
+        num_supports_below: Count of support levels below price
+        num_resistances_above: Count of resistance levels above price
+        avg_support_distance: Average % distance to all supports below
+        avg_resistance_distance: Average % distance to all resistances above
+
+        # Pattern features (6)
         in_uptrend: 1 if above rising SMA(50), else 0
         in_downtrend: 1 if below falling SMA(50), else 0
         bull_flag_score: Bull flag pattern strength (0-1)
@@ -280,9 +290,18 @@ class FeatureSet:
     days_to_earnings: float = 1.0
     days_from_earnings: float = 1.0
 
-    # Pattern features (8)
-    support_distance: float = 0.0
-    resistance_distance: float = 0.0
+    # Support/Resistance features (9)
+    distance_to_nearest_support: float = -0.05
+    distance_to_nearest_resistance: float = 0.05
+    support_strength: float = 0.0
+    resistance_strength: float = 0.0
+    between_levels: float = 0.0
+    num_supports_below: float = 0.0
+    num_resistances_above: float = 0.0
+    avg_support_distance: float = -0.05
+    avg_resistance_distance: float = 0.05
+
+    # Pattern features (6)
     in_uptrend: float = 0.0
     in_downtrend: float = 0.0
     bull_flag_score: float = 0.0
@@ -294,7 +313,8 @@ class FeatureSet:
         """Convert to NumPy array for ML model input.
 
         Returns:
-            Array of shape (55,) with all features
+            Array of shape (52,) with all features
+            (10 price + 15 technical + 5 microstructure + 3 sentiment + 4 time + 9 S/R + 6 pattern)
         """
         return np.array(
             [
@@ -340,9 +360,17 @@ class FeatureSet:
                 self.day_of_week,
                 self.days_to_earnings,
                 self.days_from_earnings,
+                # Support/Resistance features
+                self.distance_to_nearest_support,
+                self.distance_to_nearest_resistance,
+                self.support_strength,
+                self.resistance_strength,
+                self.between_levels,
+                self.num_supports_below,
+                self.num_resistances_above,
+                self.avg_support_distance,
+                self.avg_resistance_distance,
                 # Pattern features
-                self.support_distance,
-                self.resistance_distance,
                 self.in_uptrend,
                 self.in_downtrend,
                 self.bull_flag_score,
@@ -399,9 +427,17 @@ class FeatureSet:
             "day_of_week",
             "days_to_earnings",
             "days_from_earnings",
+            # Support/Resistance features
+            "distance_to_nearest_support",
+            "distance_to_nearest_resistance",
+            "support_strength",
+            "resistance_strength",
+            "between_levels",
+            "num_supports_below",
+            "num_resistances_above",
+            "avg_support_distance",
+            "avg_resistance_distance",
             # Pattern features
-            "support_distance",
-            "resistance_distance",
             "in_uptrend",
             "in_downtrend",
             "bull_flag_score",

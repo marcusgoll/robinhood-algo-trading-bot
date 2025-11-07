@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from trading_bot.ml.features.support_resistance import SupportResistanceDetector
 from trading_bot.ml.features.technical import TechnicalFeatureCalculator
 from trading_bot.ml.models import FeatureSet
 
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 
 
 class FeatureExtractor:
-    """Extracts 55-dimensional feature vectors from market data.
+    """Extracts 52-dimensional feature vectors from market data.
 
     Orchestrates feature calculation from multiple sources:
     - Price features (10)
@@ -25,7 +26,8 @@ class FeatureExtractor:
     - Market microstructure (5)
     - Sentiment (3)
     - Time features (4)
-    - Pattern features (8)
+    - Support/Resistance features (9)
+    - Pattern features (6)
 
     All features normalized to [-1, 1] or [0, 1] ranges.
 
@@ -39,6 +41,7 @@ class FeatureExtractor:
     def __init__(self) -> None:
         """Initialize feature extractor."""
         self.technical_calc = TechnicalFeatureCalculator()
+        self.sr_detector = SupportResistanceDetector()
 
     def calculate_price_features(
         self, df: DataFrame
@@ -51,6 +54,11 @@ class FeatureExtractor:
         Returns:
             Dictionary of price feature arrays
         """
+        # Convert string columns to float (Robinhood API returns strings)
+        for col in ["open", "high", "low", "close", "volume"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+
         close = df["close"]
         high = df["high"]
         low = df["low"]
@@ -205,22 +213,43 @@ class FeatureExtractor:
     def calculate_pattern_features(
         self, df: DataFrame
     ) -> dict[str, NDArray[np.float64]]:
-        """Calculate pattern-based features (8 features).
+        """Calculate pattern-based features (6 features) and S/R features (9 features).
 
         Args:
             df: OHLCV DataFrame
 
         Returns:
-            Dictionary of pattern feature arrays
+            Dictionary of S/R and pattern feature arrays
         """
         close = df["close"]
         high = df["high"]
         low = df["low"]
         n = len(df)
 
-        # Support/resistance distance (placeholder - requires zone detection)
-        support_distance = np.zeros(n)
-        resistance_distance = np.zeros(n)
+        # Support/Resistance features using enhanced detector
+        sr_features_arrays = {
+            "distance_to_nearest_support": np.full(n, -0.05),
+            "distance_to_nearest_resistance": np.full(n, 0.05),
+            "support_strength": np.zeros(n),
+            "resistance_strength": np.zeros(n),
+            "between_levels": np.zeros(n),
+            "num_supports_below": np.zeros(n),
+            "num_resistances_above": np.zeros(n),
+            "avg_support_distance": np.full(n, -0.05),
+            "avg_resistance_distance": np.full(n, 0.05),
+        }
+
+        # Calculate S/R for each bar (rolling window approach)
+        for i in range(min(100, n), n):  # Start after minimum window
+            lookback_df = df.iloc[:i+1]
+            current_price = float(close.iloc[i])
+
+            # Get S/R features for current price
+            sr_features = self.sr_detector.get_features(lookback_df, current_price, lookback=100)
+
+            # Store in arrays
+            for key, value in sr_features.items():
+                sr_features_arrays[key][i] = value
 
         # Trend detection (using SMA slopes)
         sma50 = close.rolling(window=50).mean()
@@ -250,8 +279,17 @@ class FeatureExtractor:
         ).values  # Contrarian
 
         return {
-            "support_distance": support_distance,
-            "resistance_distance": resistance_distance,
+            # S/R features (9)
+            "distance_to_nearest_support": sr_features_arrays["distance_to_nearest_support"],
+            "distance_to_nearest_resistance": sr_features_arrays["distance_to_nearest_resistance"],
+            "support_strength": sr_features_arrays["support_strength"],
+            "resistance_strength": sr_features_arrays["resistance_strength"],
+            "between_levels": sr_features_arrays["between_levels"],
+            "num_supports_below": sr_features_arrays["num_supports_below"],
+            "num_resistances_above": sr_features_arrays["num_resistances_above"],
+            "avg_support_distance": sr_features_arrays["avg_support_distance"],
+            "avg_resistance_distance": sr_features_arrays["avg_resistance_distance"],
+            # Pattern features (6)
             "in_uptrend": in_uptrend.values,
             "in_downtrend": in_downtrend.values,
             "bull_flag_score": bull_flag_score,
@@ -348,9 +386,17 @@ class FeatureExtractor:
                 day_of_week=time_features["day_of_week"],
                 days_to_earnings=time_features["days_to_earnings"],
                 days_from_earnings=time_features["days_from_earnings"],
+                # Support/Resistance features
+                distance_to_nearest_support=float(pattern_features["distance_to_nearest_support"][i]),
+                distance_to_nearest_resistance=float(pattern_features["distance_to_nearest_resistance"][i]),
+                support_strength=float(pattern_features["support_strength"][i]),
+                resistance_strength=float(pattern_features["resistance_strength"][i]),
+                between_levels=float(pattern_features["between_levels"][i]),
+                num_supports_below=float(pattern_features["num_supports_below"][i]),
+                num_resistances_above=float(pattern_features["num_resistances_above"][i]),
+                avg_support_distance=float(pattern_features["avg_support_distance"][i]),
+                avg_resistance_distance=float(pattern_features["avg_resistance_distance"][i]),
                 # Pattern features
-                support_distance=float(pattern_features["support_distance"][i]),
-                resistance_distance=float(pattern_features["resistance_distance"][i]),
                 in_uptrend=float(pattern_features["in_uptrend"][i]),
                 in_downtrend=float(pattern_features["in_downtrend"][i]),
                 bull_flag_score=float(pattern_features["bull_flag_score"][i]),

@@ -108,9 +108,10 @@ class StrategySelector:
         # Take top N
         selected = sorted_strategies[: self.config.num_strategies_to_select]
 
+        scores = [f"{s.get_overall_score():.1f}" for s in selected[:5]]
         logger.info(
             f"Selected top {len(selected)} strategies "
-            f"(scores: {[s.get_overall_score():.1f for s in selected[:5]]}...)"
+            f"(scores: {scores}...)"
         )
 
         return selected

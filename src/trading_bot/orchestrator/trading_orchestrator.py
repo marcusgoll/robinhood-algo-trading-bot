@@ -19,7 +19,7 @@ from trading_bot.orchestrator.workflow import (
     WorkflowTransition
 )
 from trading_bot.orchestrator.scheduler import TradingScheduler
-from trading_bot.llm.claude_manager import ClaudeCodeManager, LLMConfig
+from trading_bot.llm.claude_manager import ClaudeCodeManager, LLMConfig, LLMModel
 from trading_bot.config import Config
 from trading_bot.auth.robinhood_auth import RobinhoodAuth
 
@@ -54,7 +54,7 @@ class TradingOrchestrator:
         # Initialize LLM manager
         llm_config = LLMConfig(
             daily_budget_usd=5.0,
-            model="haiku",
+            model=LLMModel.HAIKU,
             timeout_seconds=30,
             max_calls_per_hour=50
         )

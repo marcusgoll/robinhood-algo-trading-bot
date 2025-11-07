@@ -1,0 +1,394 @@
+# Phase 3 Ensemble Experimental Framework Configuration
+# Systematic testing of all improvements and combinations
+
+# Data configurations
+data:
+  symbols:
+    - SPY
+    # - QQQ  # Uncomment for multi-asset experiments
+    # - IWM
+    # - DIA
+
+  periods:
+    - name: "3mo"
+      days: 90
+      priority: 3  # Lower priority
+    - name: "6mo"
+      days: 180
+      priority: 2  # Medium priority
+    - name: "1yr"
+      days: 365
+      priority: 1  # Highest priority - most experiments
+    - name: "2yr"
+      days: 730
+      priority: 2  # Medium priority
+
+  timeframes:
+    - name: "1min"
+      alpaca: "1Min"
+      bars_per_day: 390
+      enabled: false  # Too noisy, enable for specific tests
+    - name: "5min"
+      alpaca: "5Min"
+      bars_per_day: 78
+      enabled: true  # Primary timeframe
+    - name: "15min"
+      alpaca: "15Min"
+      bars_per_day: 26
+      enabled: true
+    - name: "1hr"
+      alpaca: "1Hour"
+      bars_per_day: 6.5
+      enabled: true
+    - name: "4hr"
+      alpaca: "4Hour"
+      bars_per_day: 1.625
+      enabled: true
+    - name: "1day"
+      alpaca: "1Day"
+      bars_per_day: 1
+      enabled: true
+
+# Prediction horizons (in bars)
+horizons:
+  - name: "1bar"
+    bars: 1
+    description: "Next bar (baseline - noisy)"
+    enabled: false  # Known to be noisy
+  - name: "3bar"
+    bars: 3
+    description: "15 minutes ahead (5min bars)"
+    enabled: true
+  - name: "6bar"
+    bars: 6
+    description: "30 minutes ahead (5min bars)"
+    enabled: true
+  - name: "12bar"
+    bars: 12
+    description: "60 minutes ahead (5min bars) - CURRENT BEST"
+    enabled: true
+  - name: "24bar"
+    bars: 24
+    description: "2 hours ahead (5min bars)"
+    enabled: true
+  - name: "78bar"
+    bars: 78
+    description: "1 day ahead (5min bars)"
+    enabled: true
+
+# Feature sets
+features:
+  - name: "base"
+    description: "52 core technical indicators"
+    components:
+      - price_features
+      - volume_features
+      - momentum_features
+      - volatility_features
+      - support_resistance
+    enabled: true
+
+  - name: "base_micro"
+    description: "Base + 5 microstructure features (57 total)"
+    components:
+      - base
+      - intrabar_volatility
+      - volume_imbalance
+      - momentum_5_10
+      - vwap_deviation
+    enabled: true
+
+  - name: "multi_timeframe"
+    description: "Base features from 3 timeframes (~150 features)"
+    components:
+      - base_5min
+      - base_15min
+      - base_1hr
+    enabled: true
+
+  - name: "full"
+    description: "All features + multi-TF (200+ features)"
+    components:
+      - base_micro
+      - multi_timeframe
+      - news_sentiment  # If available
+      - options_flow     # If available
+    enabled: false  # Enable when alternative data ready
+
+# Model architectures
+models:
+  # === TIER 1: BASELINE MODELS ===
+  - name: "lstm_small"
+    type: "regression_lstm"
+    params:
+      input_dim: auto  # Set based on feature set
+      hidden_dim: 32
+      num_layers: 1
+      dropout: 0.3
+    priority: 1
+    enabled: true
+
+  - name: "lstm_medium"
+    type: "regression_lstm"
+    params:
+      input_dim: auto
+      hidden_dim: 64
+      num_layers: 2
+      dropout: 0.3
+    priority: 1
+    enabled: true
+
+  - name: "lstm_large"
+    type: "regression_lstm"
+    params:
+      input_dim: auto
+      hidden_dim: 128
+      num_layers: 2
+      dropout: 0.4
+    priority: 2
+    enabled: true
+
+  - name: "gru_medium"
+    type: "regression_gru"
+    params:
+      input_dim: auto
+      hidden_dim: 64
+      num_layers: 2
+      dropout: 0.3
+    priority: 1
+    enabled: true
+
+  - name: "transformer_small"
+    type: "regression_transformer"
+    params:
+      input_dim: auto
+      d_model: 32
+      nhead: 4
+      num_layers: 1
+      dropout: 0.3
+    priority: 1
+    enabled: true
+
+  # === TIER 2: ADVANCED ARCHITECTURES ===
+  - name: "cnn_lstm"
+    type: "cnn_lstm"
+    params:
+      input_dim: auto
+      cnn_channels: [64, 32]
+      lstm_hidden: 64
+      lstm_layers: 2
+      dropout: 0.3
+      sequence_length: 20
+    priority: 2
+    enabled: true
+
+  - name: "multi_task"
+    type: "multi_task_lstm"
+    params:
+      input_dim: auto
+      hidden_dim: 64
+      num_layers: 2
+      dropout: 0.3
+      horizons: [3, 6, 12, 24]  # Multi-horizon prediction
+      loss_weights: [0.4, 0.3, 0.2, 0.1]
+    priority: 2
+    enabled: true
+
+  - name: "attention_lstm"
+    type: "attention_lstm"
+    params:
+      input_dim: auto
+      hidden_dim: 64
+      num_layers: 2
+      attention_dim: 32
+      dropout: 0.3
+    priority: 2
+    enabled: true
+
+  # === TIER 3: CUTTING-EDGE ===
+  - name: "mixture_of_experts"
+    type: "moe"
+    params:
+      experts:
+        - type: "regression_lstm"
+          hidden_dim: 64
+          num_layers: 2
+        - type: "regression_gru"
+          hidden_dim: 64
+          num_layers: 2
+        - type: "regression_transformer"
+          d_model: 64
+          nhead: 4
+      gating_hidden: 32
+      dropout: 0.3
+    priority: 3
+    enabled: true
+
+  - name: "temporal_fusion_transformer"
+    type: "tft"
+    params:
+      input_dim: auto
+      hidden_dim: 64
+      num_heads: 4
+      num_layers: 2
+      dropout: 0.3
+      max_encoder_length: 60
+      max_prediction_length: 12
+    priority: 3
+    enabled: false  # Enable after implementing TFT
+
+# Ensemble methods
+ensembles:
+  - name: "simple_average"
+    method: "average"
+    params: {}
+    enabled: true
+
+  - name: "weighted_performance"
+    method: "weighted"
+    params:
+      weight_metric: "directional_accuracy"
+      min_threshold: 0.52
+    enabled: true
+
+  - name: "selective_threshold"
+    method: "selective"
+    params:
+      threshold: 0.52
+      fallback: "best_model"
+    enabled: true
+
+  - name: "stacking_xgboost"
+    method: "stacking"
+    params:
+      meta_learner: "xgboost"
+      n_estimators: 100
+      max_depth: 5
+      learning_rate: 0.1
+    enabled: true
+
+  - name: "voting_hard"
+    method: "voting"
+    params:
+      voting_type: "hard"  # Predict sign, then vote
+    enabled: true
+
+  - name: "voting_soft"
+    method: "voting"
+    params:
+      voting_type: "soft"  # Average predictions
+    enabled: true
+
+# Training configurations
+training:
+  batch_size: [32, 64]  # Test both
+  learning_rate: [0.0001, 0.0005, 0.001]  # Test multiple LRs
+  max_epochs: 30
+  patience: 5
+  weight_decay: [0.01, 0.001]
+
+  # Data splits
+  train_ratio: 0.6
+  val_ratio: 0.2
+  test_ratio: 0.2
+
+  # Walk-forward cross-validation
+  walk_forward:
+    enabled: true
+    n_splits: 5
+    min_train_size: 0.4  # Minimum 40% for training
+
+  # Optimizer
+  optimizer: "adam"
+
+  # Loss function
+  loss: "mse"  # Mean Squared Error for regression
+
+# Validation methods
+validation:
+  - name: "holdout"
+    description: "Single train/val/test split"
+    enabled: true
+
+  - name: "walk_forward"
+    description: "Rolling window cross-validation"
+    enabled: true
+    folds: 5
+
+  - name: "time_series_cv"
+    description: "Expanding window cross-validation"
+    enabled: true
+    folds: 5
+
+# Metrics to track
+metrics:
+  primary: "directional_accuracy"  # Main optimization target
+
+  secondary:
+    - mse
+    - rmse
+    - mae
+    - r2
+    - sharpe_ratio
+    - max_drawdown
+    - win_rate
+    - profit_factor
+
+# Experiment execution
+execution:
+  max_parallel: 4  # Number of parallel experiments
+  device: "cpu"    # "cpu" or "cuda"
+  random_seed: 42
+
+  # Experiment prioritization
+  phases:
+    - name: "phase1_baselines"
+      description: "Test all model architectures with base features"
+      priority: 1
+      estimated_experiments: 30  # 6 models × 5 horizons
+
+    - name: "phase2_features"
+      description: "Test top 3 models with different feature sets"
+      priority: 2
+      estimated_experiments: 15  # 3 models × 5 feature sets
+
+    - name: "phase3_ensembles"
+      description: "Test ensemble methods on top models"
+      priority: 3
+      estimated_experiments: 18  # 3 base combos × 6 ensemble methods
+
+    - name: "phase4_optimization"
+      description: "Hyperparameter tuning for top 10 configs"
+      priority: 4
+      estimated_experiments: 100  # Grid search on top configs
+
+    - name: "phase5_validation"
+      description: "Full walk-forward validation on best config"
+      priority: 5
+      estimated_experiments: 5  # Final validation runs
+
+# Reporting
+reporting:
+  save_frequency: "every_experiment"  # Save after each experiment
+  checkpoint_frequency: 10  # Checkpoint every 10 experiments
+
+  outputs:
+    - experiment_database  # SQLite DB with all results
+    - csv_summary         # CSV for easy analysis
+    - plots               # Performance visualizations
+    - leaderboard         # Top 20 configurations
+
+  visualizations:
+    - performance_heatmap
+    - learning_curves
+    - prediction_scatter
+    - error_distribution
+    - feature_importance
+    - ensemble_comparison
+
+# Resource limits
+limits:
+  max_experiment_time: 3600  # 1 hour per experiment
+  max_total_time: 86400      # 24 hours total
+  min_samples: 1000          # Minimum samples for training
+  max_memory_gb: 16
