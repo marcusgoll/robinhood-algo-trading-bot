@@ -1,132 +1,74 @@
-# Docker Compose Configuration for Trading Bot
-#
-# Services:
-#   - trading-bot: Main trading bot (24/7 operation)
-#   - api: FastAPI service for monitoring/control
-#   - redis: Optional caching for LLM responses
-#
-# Usage:
-#   docker-compose up -d          # Start all services
-#   docker-compose logs -f        # View logs
-#   docker-compose down           # Stop all services
-#   docker-compose restart        # Restart services
-
 version: '3.8'
 
 services:
-  # Main Trading Bot
   trading-bot:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trading-bot:latest
     container_name: trading-bot
     restart: unless-stopped
+
+    # Environment variables from .env file
     env_file:
       - .env
+
+    # Volume mounts for persistent data
     volumes:
-      # Persist logs
+      # Logs directory
       - ./logs:/app/logs
-      # Mount .env for startup validation
+
+      # Configuration files
       - ./.env:/app/.env:ro
-      # Persist configuration
       - ./config.json:/app/config.json:ro
-      # Persist Robinhood session (avoid re-auth)
+
+      # Authentication session (created after first login)
       - ./.robinhood.pickle:/app/.robinhood.pickle
-    depends_on:
-      - redis
-    networks:
-      - trading-net
+
+      # Backtest cache (optional, for performance)
+      - ./.backtest_cache:/app/.backtest_cache
+
+    # Health check
     healthcheck:
-      test: ["CMD", "python", "-c", "import os; os.path.exists('/app/logs/trading_bot.log')"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "python", "-m", "trading_bot", "--dry-run", "--json"]
+      interval: 5m
+      timeout: 30s
       retries: 3
-      start_period: 40s
+      start_period: 30s
+
+    # Resource limits (adjust based on VPS capacity)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+    # Logging configuration
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-  # FastAPI Service (optional - for monitoring)
-  api:
-    build: .
-    container_name: trading-bot-api
-    restart: unless-stopped
-    command: uvicorn api.app.main:app --host 0.0.0.0 --port 8000
-    env_file:
-      - .env
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./logs:/app/logs  # Writable for state files (pause/resume commands)
-      - ./.env:/app/.env:ro
-      - ./config.json:/app/config.json:ro
-      - ./backtest_results:/app/backtest_results:ro  # Mount backtest results for API
-    depends_on:
-      - redis
-    networks:
-      - trading-net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    # Network mode
+    network_mode: bridge
 
-  # Frontend Dashboard (React + Vite)
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: trading-bot-frontend
-    restart: unless-stopped
-    ports:
-      - "3002:80"
-    depends_on:
-      - api
-    networks:
-      - trading-net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "2"
+    # Command override for different modes
+    # Uncomment one of the following:
 
-  # Redis (for LLM caching)
-  redis:
-    image: redis:7-alpine
-    container_name: trading-bot-redis
-    restart: unless-stopped
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
-    volumes:
-      - redis-data:/data
-    networks:
-      - trading-net
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "2"
+    # Paper trading (default - safe for testing)
+    command: ["python", "-m", "trading_bot", "orchestrator", "--orchestrator-mode", "paper"]
 
-networks:
-  trading-net:
-    driver: bridge
+    # Live trading (REAL MONEY - use with caution)
+    # command: ["python", "-m", "trading_bot", "orchestrator", "--orchestrator-mode", "live"]
 
+    # Backtest mode
+    # command: ["python", "-m", "trading_bot", "orchestrator", "--orchestrator-mode", "backtest"]
+
+# Optional: Add a volume for backtest cache persistence
 volumes:
-  redis-data:
+  backtest_cache:
     driver: local

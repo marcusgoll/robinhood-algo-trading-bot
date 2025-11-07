@@ -46,15 +46,17 @@ docs/
 # Examples and tests
 examples/
 tests/
-backtests/
+test_*.py
+*_test.py
+validate_*.py
+experiment_*.py
 
 # Build artifacts
 *.egg-info/
 dist/
 build/
 
-# Spec-Flow artifacts (project management)
-.spec-flow/
+# Spec-Flow working directories (exclude specs, but keep templates and scripts)
 specs/
 
 # Data files (mount as volume if needed)
@@ -62,6 +64,12 @@ data/
 *.csv
 *.db
 *.sqlite
+.backtest_cache/
+ml_models/
+ml_strategies/
+*.h5
+*.pkl
+*.parquet
 
 # Backups
 backups/
