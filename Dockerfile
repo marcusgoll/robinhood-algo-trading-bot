@@ -29,6 +29,9 @@ RUN apt-get update && apt-get install -y \
 # Install Claude Code CLI using official install script
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
+# Add Claude CLI to PATH
+ENV PATH="/root/.local/bin:$PATH"
+
 # Copy requirements first for better layer caching
 COPY requirements.txt .
 
