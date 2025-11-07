@@ -30,6 +30,8 @@ Constitution v1.0.0 - §Security: API keys from environment only, subprocess san
 import json
 import subprocess
 import logging
+import os
+import asyncio
 from dataclasses import dataclass, asdict
 from datetime import datetime, date
 from pathlib import Path
@@ -106,6 +108,9 @@ class ClaudeCodeManager:
         # Logging setup
         self._setup_logging()
 
+        # Telegram notification setup
+        self._setup_telegram()
+
         logger.info(f"Claude Code Manager initialized: model={self.config.model.value}, "
                    f"budget=${self.config.daily_budget_usd}/day")
 
@@ -114,6 +119,45 @@ class ClaudeCodeManager:
         self.calls_log = self.log_dir / "llm-calls.jsonl"
         self.costs_log = self.log_dir / "llm-costs.jsonl"
         self.errors_log = self.log_dir / "llm-errors.jsonl"
+
+    def _setup_telegram(self):
+        """Setup Telegram notifications for LLM triggers"""
+        self.telegram_enabled = os.getenv("TELEGRAM_ENABLED", "false").lower() == "true"
+        self.telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        self.telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID")
+        self.telegram_client = None
+
+        if self.telegram_enabled and self.telegram_bot_token and self.telegram_chat_id:
+            try:
+                from trading_bot.notifications.telegram_client import TelegramClient
+                self.telegram_client = TelegramClient(
+                    bot_token=self.telegram_bot_token,
+                    timeout=5.0
+                )
+                logger.info("Telegram notifications enabled for LLM triggers")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Telegram client: {e}")
+                self.telegram_enabled = False
+        else:
+            logger.debug("Telegram notifications disabled for LLM triggers")
+
+    def _send_telegram_notification(self, message: str):
+        """Send async Telegram notification (non-blocking)"""
+        if not self.telegram_enabled or not self.telegram_client:
+            return
+
+        try:
+            # Run async notification in a new event loop (non-blocking)
+            asyncio.run(
+                self.telegram_client.send_message(
+                    chat_id=self.telegram_chat_id,
+                    text=message,
+                    parse_mode="Markdown"
+                )
+            )
+        except Exception as e:
+            # Never let Telegram failures block LLM operations
+            logger.debug(f"Telegram notification failed (non-blocking): {e}")
 
     def _load_daily_cost(self) -> float:
         """Load today's accumulated cost from logs"""
@@ -240,6 +284,16 @@ class ClaudeCodeManager:
 
         logger.debug(f"Invoking Claude Code: {' '.join(cmd[:4])}...")  # Don't log full prompt
 
+        # Send Telegram notification: LLM triggered
+        emoji = "🤖" if os.getenv("TELEGRAM_INCLUDE_EMOJIS", "true").lower() == "true" else ""
+        truncated_prompt = prompt[:100] + "..." if len(prompt) > 100 else prompt
+        self._send_telegram_notification(
+            f"{emoji} *LLM Triggered*\n"
+            f"Model: `{self.config.model.value}`\n"
+            f"Prompt: `{truncated_prompt}`\n"
+            f"Budget: ${self.daily_cost:.2f}/${self.config.daily_budget_usd}"
+        )
+
         try:
             # Run subprocess
             result = subprocess.run(
@@ -302,12 +356,29 @@ class ClaudeCodeManager:
 
             logger.info(f"Claude Code success: latency={latency:.2f}s, cost=${cost:.4f}")
 
+            # Send Telegram notification: LLM completed
+            success_emoji = "✅" if os.getenv("TELEGRAM_INCLUDE_EMOJIS", "true").lower() == "true" else ""
+            self._send_telegram_notification(
+                f"{success_emoji} *LLM Completed*\n"
+                f"Latency: `{latency:.2f}s`\n"
+                f"Cost: `${cost:.4f}`\n"
+                f"Total Today: `${self.daily_cost:.2f}/${self.config.daily_budget_usd}`"
+            )
+
             return response
 
         except subprocess.TimeoutExpired:
             error_msg = f"Claude Code timeout after {self.config.timeout_seconds}s"
             logger.error(error_msg)
             self._log_error(prompt, error_msg)
+
+            # Send Telegram notification: LLM error
+            error_emoji = "❌" if os.getenv("TELEGRAM_INCLUDE_EMOJIS", "true").lower() == "true" else ""
+            self._send_telegram_notification(
+                f"{error_emoji} *LLM Timeout*\n"
+                f"Error: `{error_msg}`\n"
+                f"Prompt: `{truncated_prompt}`"
+            )
 
             return LLMResponse(
                 success=False,
@@ -320,6 +391,14 @@ class ClaudeCodeManager:
             error_msg = f"Unexpected error: {e}"
             logger.exception(error_msg)
             self._log_error(prompt, error_msg)
+
+            # Send Telegram notification: LLM error
+            error_emoji = "❌" if os.getenv("TELEGRAM_INCLUDE_EMOJIS", "true").lower() == "true" else ""
+            self._send_telegram_notification(
+                f"{error_emoji} *LLM Error*\n"
+                f"Error: `{str(e)[:200]}`\n"
+                f"Prompt: `{truncated_prompt}`"
+            )
 
             return LLMResponse(
                 success=False,
