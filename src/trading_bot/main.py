@@ -41,18 +41,20 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s --dry-run        Validate startup without trading
-  %(prog)s --json           Machine-readable JSON output
-  %(prog)s dashboard        Launch CLI dashboard
-  %(prog)s                  Normal startup and trading
+  %(prog)s --dry-run                         Validate startup without trading
+  %(prog)s --json                            Machine-readable JSON output
+  %(prog)s dashboard                         Launch CLI dashboard
+  %(prog)s orchestrator --orchestrator-mode paper   LLM-enhanced trading (paper mode)
+  %(prog)s orchestrator --orchestrator-mode live    LLM-enhanced trading (live mode)
+  %(prog)s                                   Normal startup and trading
         """
     )
     parser.add_argument(
         "mode",
         nargs="?",
         default="trade",
-        choices=["trade", "dashboard", "generate-watchlist"],
-        help="Operation mode: trade (default), dashboard, or generate-watchlist"
+        choices=["trade", "dashboard", "generate-watchlist", "orchestrator"],
+        help="Operation mode: trade (default), dashboard, generate-watchlist, or orchestrator"
     )
     parser.add_argument(
         "--dry-run",
@@ -78,6 +80,13 @@ Examples:
         "--sectors",
         type=str,
         help="Comma-separated sectors to include (e.g., 'technology,biopharmaceutical')"
+    )
+    parser.add_argument(
+        "--orchestrator-mode",
+        type=str,
+        choices=["live", "paper", "backtest"],
+        default="paper",
+        help="Orchestrator operation mode: live, paper (default), or backtest"
     )
     return parser.parse_args()
 
@@ -113,6 +122,52 @@ def main() -> int:
         if args.mode == "generate-watchlist":
             from .cli.generate_watchlist import generate_watchlist_command
             return generate_watchlist_command(args)
+
+        # Handle orchestrator mode
+        if args.mode == "orchestrator":
+            from .config import Config
+            from .auth.robinhood_auth import RobinhoodAuth
+            from .orchestrator import TradingOrchestrator
+
+            print(f"\nStarting LLM-enhanced trading orchestrator in {args.orchestrator_mode} mode...")
+
+            # Load configuration
+            config = Config.from_env_and_json()
+
+            # Initialize authentication
+            auth = RobinhoodAuth(config)
+            auth.login()
+
+            # Initialize and run orchestrator
+            orchestrator = TradingOrchestrator(
+                config=config,
+                auth=auth,
+                mode=args.orchestrator_mode
+            )
+
+            print(f"\nOrchestrator initialized. Mode: {args.orchestrator_mode}")
+            print("Daily budget: $5.00")
+            print("Scheduled workflows:")
+            print("  - 6:30am EST: Pre-market screening")
+            print("  - 9:30am EST: Market open execution")
+            print("  - 10:00am, 11:00am, 2:00pm EST: Intraday monitoring")
+            print("  - 4:00pm EST: End-of-day review")
+            print("  - Friday 4:05pm EST: Weekly review")
+            print("\nPress Ctrl+C to stop\n")
+
+            try:
+                orchestrator.run_loop()
+                return 0
+            except KeyboardInterrupt:
+                print("\n\nOrchestrator stopped by user")
+                orchestrator.stop()
+                return 130
+            except Exception as e:
+                print(f"\n\nOrchestrator error: {e}")
+                import traceback
+                traceback.print_exc()
+                orchestrator.stop()
+                return 3
 
         # Load configuration
         from .config import Config
