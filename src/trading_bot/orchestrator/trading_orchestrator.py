@@ -21,7 +21,6 @@ from trading_bot.orchestrator.workflow import (
 from trading_bot.orchestrator.scheduler import TradingScheduler
 from trading_bot.llm.claude_manager import ClaudeCodeManager, LLMConfig, LLMModel
 from trading_bot.config import Config
-from trading_bot.auth.robinhood_auth import RobinhoodAuth
 
 logger = logging.getLogger(__name__)
 
@@ -38,18 +37,28 @@ class TradingOrchestrator:
     - Weekly review (Friday 4pm EST)
     """
 
-    def __init__(self, config: Config, auth: RobinhoodAuth, mode: str = "live"):
+    def __init__(self, config: Config, auth: Optional[Any] = None, mode: str = "live"):
         """
         Initialize orchestrator.
 
         Args:
             config: Trading bot configuration
-            auth: Robinhood authentication
+            auth: Optional authentication object (Robinhood/Alpaca). None for paper trading.
             mode: Operation mode (live, paper, backtest)
+
+        Note:
+            For paper trading mode, auth can be None. For live trading, you must provide
+            an authentication object (future: Alpaca TradingClient for paper/live trading).
         """
         self.config = config
         self.auth = auth
         self.mode = mode
+
+        if mode == "live" and auth is None:
+            logger.warning("Live mode requested but no authentication provided. Trades will not execute.")
+
+        if mode == "paper":
+            logger.info("Paper trading mode - no authentication required")
 
         # Initialize LLM manager
         llm_config = LLMConfig(
@@ -217,10 +226,23 @@ class TradingOrchestrator:
                 logger.info(f"  Target: ${optimization.get('target_1')}")
 
                 if self.mode == "live":
-                    # Execute via existing trading_bot infrastructure
-                    pass  # TODO: Implement
+                    # TODO: Implement live trading via Alpaca TradingClient
+                    # Example:
+                    #   from alpaca.trading.client import TradingClient
+                    #   from alpaca.trading.requests import MarketOrderRequest
+                    #   from alpaca.trading.enums import OrderSide, TimeInForce
+                    #
+                    #   if self.auth:  # auth should be TradingClient instance
+                    #       order_data = MarketOrderRequest(
+                    #           symbol=symbol,
+                    #           qty=optimization.get('position_size'),
+                    #           side=OrderSide.BUY,
+                    #           time_in_force=TimeInForce.DAY
+                    #       )
+                    #       order = self.auth.submit_order(order_data)
+                    pass
                 elif self.mode == "paper":
-                    # Log paper trade
+                    # Log paper trade (for testing without real orders)
                     self.daily_trades.append({
                         "symbol": symbol,
                         "entry": optimization.get("recommended_entry"),

@@ -126,7 +126,6 @@ def main() -> int:
         # Handle orchestrator mode
         if args.mode == "orchestrator":
             from .config import Config
-            from .auth.robinhood_auth import RobinhoodAuth
             from .orchestrator import TradingOrchestrator
 
             print(f"\nStarting LLM-enhanced trading orchestrator in {args.orchestrator_mode} mode...")
@@ -134,14 +133,13 @@ def main() -> int:
             # Load configuration
             config = Config.from_env_and_json()
 
-            # Initialize authentication
-            auth = RobinhoodAuth(config)
-            auth.login()
-
-            # Initialize and run orchestrator
+            # Initialize orchestrator without authentication (paper trading uses Alpaca data API only)
+            # TODO: For live trading, integrate Alpaca TradingClient here:
+            #   from alpaca.trading.client import TradingClient
+            #   trading_client = TradingClient(api_key=..., secret_key=..., paper=True/False)
             orchestrator = TradingOrchestrator(
                 config=config,
-                auth=auth,
+                auth=None,  # No auth needed for paper mode
                 mode=args.orchestrator_mode
             )
 
