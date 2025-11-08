@@ -25,6 +25,7 @@ Example usage:
 from trading_bot.market_data.data_models import MarketDataConfig, MarketStatus, Quote
 from trading_bot.market_data.exceptions import DataValidationError, TradingHoursError
 from trading_bot.market_data.market_data_service import MarketDataService
+from trading_bot.market_data.fmp_client import FMPClient, FMPRateLimitExceeded
 from trading_bot.market_data.validators import (
     validate_historical_data,
     validate_price,
@@ -36,6 +37,7 @@ from trading_bot.market_data.validators import (
 __all__ = [
     # Service
     'MarketDataService',
+    'FMPClient',
     # Data models
     'Quote',
     'MarketStatus',
@@ -49,4 +51,5 @@ __all__ = [
     # Exceptions
     'DataValidationError',
     'TradingHoursError',
+    'FMPRateLimitExceeded',
 ]

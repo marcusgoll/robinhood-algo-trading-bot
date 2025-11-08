@@ -53,8 +53,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-    # Network mode
-    network_mode: bridge
+    # Networks
+    networks:
+      - trading-network
 
     # Command override for different modes
     # Uncomment one of the following:
@@ -68,7 +69,12 @@ services:
     # Backtest mode
     # command: ["python", "-m", "trading_bot", "orchestrator", "--orchestrator-mode", "backtest"]
 
-# Optional: Add a volume for backtest cache persistence
+# Networks
+networks:
+  trading-network:
+    driver: bridge
+
+# Volumes for persistent data
 volumes:
   backtest_cache:
     driver: local

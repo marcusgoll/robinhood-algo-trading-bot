@@ -20,6 +20,7 @@ from trading_bot.orchestrator.workflow import (
 )
 from trading_bot.orchestrator.scheduler import TradingScheduler
 from trading_bot.llm.claude_manager import ClaudeCodeManager, LLMConfig, LLMModel
+from trading_bot.llm.examples.multi_agent_consensus_workflow import MultiAgentTradingWorkflow
 from trading_bot.config import Config
 
 logger = logging.getLogger(__name__)
@@ -73,12 +74,20 @@ class TradingOrchestrator:
         self.workflow = WorkflowStateMachine()
         self.scheduler = TradingScheduler()
 
+        # Initialize multi-agent trading workflow
+        self.multi_agent_workflow = MultiAgentTradingWorkflow()
+        logger.info("Multi-agent trading system initialized with 8 specialized agents")
+
         # Setup scheduled tasks
         self._setup_schedule()
 
         # Runtime state
         self.running = False
         self.daily_trades = []
+
+        # Portfolio tracking (for multi-agent position sizing)
+        self.portfolio_value = 100000.0  # Default $100k portfolio
+        self.cash_available = 100000.0   # Default $100k cash
 
         logger.info(f"TradingOrchestrator initialized in {mode} mode")
 
@@ -460,6 +469,83 @@ class TradingOrchestrator:
         except Exception as e:
             logger.error(f"Failed to save daily report: {e}")
 
+    def evaluate_trade_with_agents(
+        self,
+        symbol: str,
+        current_price: float,
+        technical_indicators: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Evaluate a trade opportunity using multi-agent consensus.
+
+        Uses 3 specialized agents (RegimeDetector, Research, NewsAnalyst) to vote
+        on trade decisions. If 2/3 consensus reached for BUY, RiskManager calculates
+        position size with Kelly Criterion.
+
+        Args:
+            symbol: Stock symbol (e.g., 'AAPL')
+            current_price: Current stock price
+            technical_indicators: Technical data (RSI, SMA, ATR, ADX, etc.)
+
+        Returns:
+            {
+                'symbol': str,
+                'decision': str,                    # BUY/HOLD/SKIP
+                'consensus_reached': bool,
+                'votes': List[dict],                # Agent votes with reasoning
+                'position_size_shares': int,        # If BUY
+                'position_size_pct': float,         # If BUY (% of portfolio)
+                'stop_loss_pct': float,            # If BUY
+                'take_profit_pct': float,          # If BUY
+                'summary': str,
+                'total_cost_usd': float,           # LLM API cost
+                'total_tokens': int,               # Tokens used
+                'regime': str,                      # Market regime
+                'regime_confidence': float         # Regime confidence %
+            }
+        """
+        try:
+            logger.info(f"Evaluating {symbol} @ ${current_price} using multi-agent consensus")
+
+            # Call multi-agent trading workflow
+            result = self.multi_agent_workflow.evaluate_trade_opportunity(
+                symbol=symbol,
+                current_price=current_price,
+                portfolio_value=self.portfolio_value,
+                cash_available=self.cash_available,
+                technical_indicators=technical_indicators
+            )
+
+            # Log cost tracking
+            logger.info(f"Multi-agent evaluation cost: ${result['total_cost_usd']:.4f} ({result['total_tokens']:,} tokens)")
+            logger.info(f"Decision: {result['decision']} (consensus: {result['consensus_reached']})")
+
+            # Update cash if BUY decision
+            if result['decision'] == 'BUY' and result['position_size_shares'] > 0:
+                trade_cost = current_price * result['position_size_shares']
+                self.cash_available -= trade_cost
+                logger.info(f"Cash after trade: ${self.cash_available:.2f}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Multi-agent evaluation failed for {symbol}: {e}")
+            return {
+                'symbol': symbol,
+                'decision': 'SKIP',
+                'consensus_reached': False,
+                'votes': [],
+                'position_size_shares': 0,
+                'position_size_pct': 0.0,
+                'stop_loss_pct': 0.0,
+                'take_profit_pct': 0.0,
+                'summary': f"Error: {str(e)}",
+                'total_cost_usd': 0.0,
+                'total_tokens': 0,
+                'regime': 'UNKNOWN',
+                'regime_confidence': 0.0
+            }
+
     def get_status(self) -> Dict[str, Any]:
         """Get current orchestrator status."""
         return {
@@ -469,5 +555,7 @@ class TradingOrchestrator:
             "daily_cost": self.claude_manager.daily_cost,
             "budget_remaining": self.claude_manager.config.daily_budget_usd - self.claude_manager.daily_cost,
             "trades_today": len(self.daily_trades),
-            "next_task": self.scheduler.get_next_trigger()
+            "next_task": self.scheduler.get_next_trigger(),
+            "portfolio_value": self.portfolio_value,
+            "cash_available": self.cash_available
         }
