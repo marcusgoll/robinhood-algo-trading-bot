@@ -12,7 +12,16 @@ from datetime import datetime
 from typing import Optional, Any, List, Dict
 
 from trading_bot.orchestrator.interval_scheduler import IntervalScheduler
-from trading_bot.llm.claude_manager import ClaudeCodeManager
+
+# LLM imports are optional - only needed if MULTI_AGENT_ENABLED=true
+try:
+    from trading_bot.llm.claude_manager import ClaudeCodeManager
+    HAS_LLM = True
+except ImportError:
+    # Multi-agent system not available (excluded from Docker or incomplete setup)
+    ClaudeCodeManager = None
+    HAS_LLM = False
+
 from trading_bot.config.crypto_config import CryptoConfig
 from trading_bot.market_data.crypto_service import CryptoDataService
 
