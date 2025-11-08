@@ -19,8 +19,20 @@ from trading_bot.orchestrator.workflow import (
     WorkflowTransition
 )
 from trading_bot.orchestrator.scheduler import TradingScheduler
-from trading_bot.llm.claude_manager import ClaudeCodeManager, LLMConfig, LLMModel
-from trading_bot.llm.examples.multi_agent_consensus_workflow import MultiAgentTradingWorkflow
+
+# LLM imports are optional - only needed if MULTI_AGENT_ENABLED=true
+try:
+    from trading_bot.llm.claude_manager import ClaudeCodeManager, LLMConfig, LLMModel
+    from trading_bot.llm.examples.multi_agent_consensus_workflow import MultiAgentTradingWorkflow
+    HAS_LLM = True
+except ImportError:
+    # Multi-agent system not available (excluded from Docker or incomplete setup)
+    ClaudeCodeManager = None
+    LLMConfig = None
+    LLMModel = None
+    MultiAgentTradingWorkflow = None
+    HAS_LLM = False
+
 from trading_bot.config import Config
 
 logger = logging.getLogger(__name__)
