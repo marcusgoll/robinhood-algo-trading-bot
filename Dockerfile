@@ -43,8 +43,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY src/ ./src/
 COPY mcp_servers/ ./mcp_servers/
-COPY .claude/ ./.claude/
-COPY .spec-flow/ ./.spec-flow/
 
 # Create necessary directories
 RUN mkdir -p /app/logs/orchestrator \
