@@ -1,11 +1,17 @@
-# /optimize-entry - Position Optimization
+# /optimize-entry - Position Optimization (Stocks & Crypto)
 
 Optimize entry price, position size, and stop/target levels for an existing or proposed trade.
 
 ## Usage
 ```bash
-/optimize-entry SYMBOL --entry PRICE [--current-position SHARES]
+/optimize-entry SYMBOL --entry PRICE [--asset-type {stock|crypto}] [--current-position SHARES|USD]
 ```
+
+**Parameters:**
+- `SYMBOL`: Symbol to optimize (e.g., AAPL for stocks, BTC/USD for crypto)
+- `--entry`: Proposed entry price
+- `--asset-type`: Asset type (default: auto-detect from symbol)
+- `--current-position`: Existing position (shares for stocks, USD for crypto)
 
 ## Process
 
