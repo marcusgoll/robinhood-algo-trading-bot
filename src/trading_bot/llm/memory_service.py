@@ -18,16 +18,22 @@ from sqlalchemy import create_engine, func, and_, or_
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.dialects.postgresql import insert
 
-# Import models (adjust path based on your structure)
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'api'))
+# TODO: Implement proper SQLAlchemy models for PostgreSQL integration
+# These imports reference models that need to be created based on the
+# database schema in scripts/init_agent_tables.py
+#
+# Required models: AgentPrompt, LLMInteraction, StrategyAdjustment,
+# TradeOutcome, ScreenerResult, AgentMetric
+#
+# For now, stub out to allow import without crashing
 
-from app.models.agent_memory import (
-    AgentPrompt, LLMInteraction, StrategyAdjustment,
-    TradeOutcome, ScreenerResult, AgentMetric
-)
-from app.core.database import SessionLocal
+# Placeholder - replace with actual database session factory
+def SessionLocal():
+    """Placeholder for database session. Implement with proper PostgreSQL connection."""
+    raise NotImplementedError(
+        "AgentMemory requires DATABASE_URL environment variable and proper "
+        "SQLAlchemy model setup. See scripts/init_agent_tables.py for schema."
+    )
 
 
 class AgentMemory:
