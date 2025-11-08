@@ -125,25 +125,27 @@ def main() -> int:
 
         # Handle orchestrator mode
         if args.mode == "orchestrator":
+            import threading
             from .config import Config
             from .orchestrator import TradingOrchestrator
+            from .orchestrator.crypto_orchestrator import CryptoOrchestrator
 
             print(f"\nStarting LLM-enhanced trading orchestrator in {args.orchestrator_mode} mode...")
 
             # Load configuration
             config = Config.from_env_and_json()
 
-            # Initialize orchestrator without authentication (paper trading uses Alpaca data API only)
+            # Initialize stock orchestrator without authentication (paper trading uses Alpaca data API only)
             # TODO: For live trading, integrate Alpaca TradingClient here:
             #   from alpaca.trading.client import TradingClient
             #   trading_client = TradingClient(api_key=..., secret_key=..., paper=True/False)
-            orchestrator = TradingOrchestrator(
+            stock_orchestrator = TradingOrchestrator(
                 config=config,
                 auth=None,  # No auth needed for paper mode
                 mode=args.orchestrator_mode
             )
 
-            print(f"\nOrchestrator initialized. Mode: {args.orchestrator_mode}")
+            print(f"\nStock Orchestrator initialized. Mode: {args.orchestrator_mode}")
             print("Daily budget: $5.00")
             print("Scheduled workflows:")
             print("  - 6:30am EST: Pre-market screening")
@@ -151,20 +153,49 @@ def main() -> int:
             print("  - 10:00am, 11:00am, 2:00pm EST: Intraday monitoring")
             print("  - 4:00pm EST: End-of-day review")
             print("  - Friday 4:05pm EST: Weekly review")
+
+            # Initialize crypto orchestrator if enabled
+            crypto_orchestrator = None
+            crypto_thread = None
+
+            if config.crypto.enabled:
+                print(f"\nCrypto trading enabled. Initializing 24/7 crypto orchestrator...")
+                crypto_orchestrator = CryptoOrchestrator(
+                    crypto_config=config.crypto,
+                    claude_manager=stock_orchestrator.claude_manager,  # Share LLM manager
+                    mode=config.crypto.mode
+                )
+
+                # Start crypto orchestrator in background thread
+                crypto_thread = threading.Thread(
+                    target=crypto_orchestrator.run_loop,
+                    daemon=True,
+                    name="CryptoOrchestrator"
+                )
+                crypto_thread.start()
+                print(f"Crypto Orchestrator running in background (24/7)")
+            else:
+                print(f"\nCrypto trading disabled")
+
             print("\nPress Ctrl+C to stop\n")
 
             try:
-                orchestrator.run_loop()
+                # Run stock orchestrator in main thread
+                stock_orchestrator.run_loop()
                 return 0
             except KeyboardInterrupt:
-                print("\n\nOrchestrator stopped by user")
-                orchestrator.stop()
+                print("\n\nOrchestrators stopped by user")
+                stock_orchestrator.stop()
+                if crypto_orchestrator:
+                    crypto_orchestrator.stop()
                 return 130
             except Exception as e:
                 print(f"\n\nOrchestrator error: {e}")
                 import traceback
                 traceback.print_exc()
-                orchestrator.stop()
+                stock_orchestrator.stop()
+                if crypto_orchestrator:
+                    crypto_orchestrator.stop()
                 return 3
 
         # Load configuration

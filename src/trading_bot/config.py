@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional
 from dotenv import load_dotenv
 
 from trading_bot.risk_management.config import RiskManagementConfig
+from trading_bot.config.crypto_config import CryptoConfig
 
 # Load .env file if exists (§Security: environment variables)
 load_dotenv()
@@ -177,6 +178,9 @@ class Config:
     risk_management: RiskManagementConfig = field(
         default_factory=RiskManagementConfig.default
     )
+    crypto: CryptoConfig = field(
+        default_factory=CryptoConfig.default
+    )
 
     @classmethod
     def from_env_and_json(cls, config_file: str = "config.json") -> "Config":
@@ -245,6 +249,9 @@ class Config:
         risk_management_config = RiskManagementConfig.from_dict(
             config_data.get("risk_management")
         )
+        crypto_config = CryptoConfig.from_dict(
+            config_data.get("crypto")
+        )
 
         # Handle max_trades_per_day: None means unlimited (999 sentinel)
         max_trades = phase_config.get("max_trades_per_day", 999)
@@ -276,6 +283,7 @@ class Config:
             config_file=config_path,
             order_management=order_management_config,
             risk_management=risk_management_config,
+            crypto=crypto_config,
         )
 
     @classmethod
