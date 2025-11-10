@@ -154,10 +154,19 @@ class TradingOrchestrator:
             run_once_per_day=True
         )
 
-        # Intraday monitoring
-        for hour in [10, 11, 14]:
+        # Intraday monitoring - Every hour during market hours
+        for hour in [10, 11, 12, 13, 14, 15]:
             self.scheduler.schedule(
                 f"monitor_{hour}",
+                datetime_time(hour, 0),
+                self.run_monitoring_workflow,
+                run_once_per_day=False
+            )
+
+        # After-hours screening - Every 2 hours
+        for hour in [18, 20, 22]:
+            self.scheduler.schedule(
+                f"afterhours_scan_{hour}",
                 datetime_time(hour, 0),
                 self.run_monitoring_workflow,
                 run_once_per_day=False
