@@ -105,11 +105,11 @@ class CryptoConfig:
             if "/" not in symbol:
                 raise ValueError(f"Invalid crypto symbol format: {symbol}. Expected format: BTC/USD")
 
-        # Scheduling intervals
+        # Scheduling intervals (support both flat and nested structure)
         scheduling = data.get("scheduling", {})
-        screening_interval = int(scheduling.get("screening_interval_hours", 2))
-        monitoring_interval = int(scheduling.get("monitoring_interval_minutes", 5))
-        rebalance_interval = int(scheduling.get("rebalance_interval_hours", 24))
+        screening_interval = int(data.get("screening_interval_hours", scheduling.get("screening_interval_hours", 2)))
+        monitoring_interval = int(data.get("monitoring_interval_minutes", scheduling.get("monitoring_interval_minutes", 5)))
+        rebalance_interval = int(data.get("rebalance_interval_hours", scheduling.get("rebalance_interval_hours", 24)))
 
         if screening_interval <= 0:
             raise ValueError("screening_interval_hours must be > 0")
@@ -118,13 +118,13 @@ class CryptoConfig:
         if rebalance_interval <= 0:
             raise ValueError("rebalance_interval_hours must be > 0")
 
-        # Risk management
+        # Risk management (support both flat and nested structure)
         risk = data.get("risk_management", {})
-        max_position_pct = float(risk.get("max_position_pct", 3.0))
-        max_daily_loss_pct = float(risk.get("max_daily_loss_pct", 5.0))
-        stop_loss_pct = float(risk.get("stop_loss_pct", 5.0))
-        risk_reward_ratio = float(risk.get("risk_reward_ratio", 2.0))
-        position_size_usd = float(risk.get("position_size_usd", 100.0))
+        max_position_pct = float(data.get("max_position_pct", risk.get("max_position_pct", 3.0)))
+        max_daily_loss_pct = float(data.get("max_daily_loss_pct", risk.get("max_daily_loss_pct", 5.0)))
+        stop_loss_pct = float(data.get("stop_loss_pct", risk.get("stop_loss_pct", 5.0)))
+        risk_reward_ratio = float(data.get("risk_reward_ratio", risk.get("risk_reward_ratio", 2.0)))
+        position_size_usd = float(data.get("position_size_usd", risk.get("position_size_usd", 100.0)))
 
         # Validate risk parameters
         if max_position_pct <= 0 or max_position_pct > 100:

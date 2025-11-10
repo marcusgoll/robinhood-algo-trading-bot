@@ -24,7 +24,7 @@ except ImportError:
 
 # Crypto config imports are optional - only needed for crypto trading mode
 try:
-    from trading_bot.config.crypto_config import CryptoConfig
+    from trading_bot.crypto_config import CryptoConfig
     from trading_bot.market_data.crypto_service import CryptoDataService
     HAS_CRYPTO = True
 except ImportError:
