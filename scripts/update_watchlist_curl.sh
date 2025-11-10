@@ -2,8 +2,13 @@
 # Update Alpaca watchlist via REST API
 
 WATCHLIST_ID="9029ee65-d3ca-420e-8ba6-3ab2ea0eb5ce"
-API_KEY="PK77VHGCCYRVYKI2QWTS7KWN5D"
-SECRET_KEY="9zj7VKZWgMH81BvG2moFnc1KxRLpcM6JjxRnWvwQKYxG"
+API_KEY="${ALPACA_API_KEY}"
+SECRET_KEY="${ALPACA_SECRET_KEY}"
+
+if [ -z "$API_KEY" ] || [ -z "$SECRET_KEY" ]; then
+  echo "❌ ALPACA_API_KEY and ALPACA_SECRET_KEY environment variables required"
+  exit 1
+fi
 
 # Updated symbols (44 total - removed PWCDF)
 SYMBOLS='["BNTX","FHLC","HCA","NVZMY","JAZZ","GIB","NHC","INCY","TRMB","BAESY","ADBE","HOLX","MOH","ZTS","ITRI","WST","MKTX","VEEV","DGX","ICUI","HCSG","IDYA","EXTR","NABZY","BWA","GLPG","SRPT","BKD","TAK","GDS","FLGT","LOB","PHG","FONR","AVNS","CC","EJPRY","DNLI","EGAN","SEDG","MGIC","CHT","EQNR","CSWC"]'
