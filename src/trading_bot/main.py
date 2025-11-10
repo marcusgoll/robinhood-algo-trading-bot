@@ -128,7 +128,13 @@ def main() -> int:
             import threading
             from .config import Config
             from .orchestrator import TradingOrchestrator
-            from .orchestrator.crypto_orchestrator import CryptoOrchestrator
+
+            # Try to import crypto orchestrator (may not be available if crypto classes missing)
+            try:
+                from .orchestrator.crypto_orchestrator import CryptoOrchestrator, HAS_CRYPTO
+            except ImportError:
+                CryptoOrchestrator = None
+                HAS_CRYPTO = False
 
             print(f"\nStarting LLM-enhanced trading orchestrator in {args.orchestrator_mode} mode...")
 
@@ -154,11 +160,11 @@ def main() -> int:
             print("  - 4:00pm EST: End-of-day review")
             print("  - Friday 4:05pm EST: Weekly review")
 
-            # Initialize crypto orchestrator if enabled
+            # Initialize crypto orchestrator if enabled and available
             crypto_orchestrator = None
             crypto_thread = None
 
-            if config.crypto.enabled:
+            if config.crypto.enabled and HAS_CRYPTO and CryptoOrchestrator is not None:
                 print(f"\nCrypto trading enabled. Initializing 24/7 crypto orchestrator...")
                 crypto_orchestrator = CryptoOrchestrator(
                     crypto_config=config.crypto,
@@ -174,6 +180,8 @@ def main() -> int:
                 )
                 crypto_thread.start()
                 print(f"Crypto Orchestrator running in background (24/7)")
+            elif config.crypto.enabled and not HAS_CRYPTO:
+                print(f"\nCrypto trading enabled in config but crypto classes not available (crypto module incomplete)")
             else:
                 print(f"\nCrypto trading disabled")
 
