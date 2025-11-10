@@ -7,12 +7,12 @@ import sys
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import CreateWatchlistRequest
 
-# Screened symbols from latest run
+# Screened symbols from latest run (removed PWCDF - inactive/not tradable)
 SYMBOLS = [
     "BNTX", "FHLC", "HCA", "NVZMY", "JAZZ", "GIB", "NHC", "INCY", "TRMB", "BAESY",
     "ADBE", "HOLX", "MOH", "ZTS", "ITRI", "WST", "MKTX", "VEEV", "DGX", "ICUI",
     "HCSG", "IDYA", "EXTR", "NABZY", "BWA", "GLPG", "SRPT", "BKD", "TAK", "GDS",
-    "FLGT", "LOB", "PHG", "FONR", "AVNS", "CC", "PWCDF", "EJPRY", "DNLI", "EGAN",
+    "FLGT", "LOB", "PHG", "FONR", "AVNS", "CC", "EJPRY", "DNLI", "EGAN",
     "SEDG", "MGIC", "CHT", "EQNR", "CSWC"
 ]
 
