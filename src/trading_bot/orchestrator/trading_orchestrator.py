@@ -73,22 +73,27 @@ class TradingOrchestrator:
         if mode == "paper":
             logger.info("Paper trading mode - no authentication required")
 
-        # Initialize LLM manager
-        llm_config = LLMConfig(
-            daily_budget_usd=5.0,
-            model=LLMModel.HAIKU,
-            timeout_seconds=30,
-            max_calls_per_hour=50
-        )
-        self.claude_manager = ClaudeCodeManager(llm_config)
+        # Initialize LLM manager (if available)
+        if HAS_LLM:
+            llm_config = LLMConfig(
+                daily_budget_usd=5.0,
+                model=LLMModel.HAIKU,
+                timeout_seconds=30,
+                max_calls_per_hour=50
+            )
+            self.claude_manager = ClaudeCodeManager(llm_config)
+
+            # Initialize multi-agent trading workflow
+            self.multi_agent_workflow = MultiAgentTradingWorkflow()
+            logger.info("Multi-agent trading system initialized with 8 specialized agents")
+        else:
+            self.claude_manager = None
+            self.multi_agent_workflow = None
+            logger.info("Multi-agent system not available - running in basic mode")
 
         # Initialize workflow and scheduler
         self.workflow = WorkflowStateMachine()
         self.scheduler = TradingScheduler()
-
-        # Initialize multi-agent trading workflow
-        self.multi_agent_workflow = MultiAgentTradingWorkflow()
-        logger.info("Multi-agent trading system initialized with 8 specialized agents")
 
         # Setup scheduled tasks
         self._setup_schedule()
