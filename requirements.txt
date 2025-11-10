@@ -20,7 +20,7 @@ pytest-asyncio==1.2.0
 # Type checking (§Code_Quality)
 mypy==1.18.2
 types-requests==2.28.11.5  # Downgraded for compatibility with polygon-api-client urllib3<2.0.0
-types-pytz==2025.2.0.20250809  # Type stubs for pytz (safety-checks)
+types-pytz==2025.2.0.20251108  # Type stubs for pytz (safety-checks)
 
 # Code quality (§Code_Quality)
 ruff==0.14.1
