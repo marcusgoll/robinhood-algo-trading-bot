@@ -88,6 +88,7 @@ class WorkflowStateMachine:
     _transitions: Dict[WorkflowState, Dict[WorkflowTransition, WorkflowState]] = {
         WorkflowState.IDLE: {
             WorkflowTransition.START_PRE_MARKET: WorkflowState.PRE_MARKET_SCREENING,
+            WorkflowTransition.START_MONITORING: WorkflowState.INTRADAY_MONITORING,  # Allow monitoring from IDLE for after-hours/existing positions
             WorkflowTransition.START_WEEKLY_REVIEW: WorkflowState.WEEKLY_REVIEW,
             WorkflowTransition.START_BACKTEST: WorkflowState.BACKTESTING,
         },
@@ -114,6 +115,7 @@ class WorkflowStateMachine:
             WorkflowTransition.RESET: WorkflowState.IDLE,
         },
         WorkflowState.INTRADAY_MONITORING: {
+            WorkflowTransition.START_MONITORING: WorkflowState.INTRADAY_MONITORING,  # Allow continuous monitoring (after-hours scans)
             WorkflowTransition.MARKET_CLOSE: WorkflowState.END_OF_DAY_REVIEW,
             WorkflowTransition.ERROR_OCCURRED: WorkflowState.ERROR,
             WorkflowTransition.RESET: WorkflowState.IDLE,

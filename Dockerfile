@@ -57,9 +57,10 @@ ENV PYTHONPATH=/app/src
 # Disable Python stdout/stderr buffering for Docker logs
 ENV PYTHONUNBUFFERED=1
 
-# Health check - verify bot can start in dry-run mode
-HEALTHCHECK --interval=5m --timeout=30s --start-period=30s --retries=3 \
-    CMD python -m trading_bot --dry-run --json || exit 1
+# Health check - verify bot process is running and writing logs
+HEALTHCHECK --interval=2m --timeout=10s --start-period=30s --retries=3 \
+    CMD test -f /app/logs/orchestrator/trading_orchestrator.log && \
+        find /app/logs/orchestrator/trading_orchestrator.log -mmin -10 | grep -q . || exit 1
 
 # Default to paper trading mode for safety
 # Override with: docker run ... trading-bot:latest orchestrator --orchestrator-mode live
