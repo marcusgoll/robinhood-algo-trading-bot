@@ -54,7 +54,7 @@ pydantic==2.12.3  # Data validation (v2)
 websockets==11.0.3  # Downgraded for compatibility with polygon-api-client
 jsonschema==4.20.0  # JSON schema validation for config
 sqlalchemy==2.0.23  # Database ORM for API order tracking
-alembic==1.12.1  # Database migrations for API
+alembic==1.17.1  # Database migrations for API
 openai==1.12.0  # OpenAI API client for LLM orchestrator
 tenacity==8.2.3  # Retry library (dependency of openai)
 tiktoken==0.5.2  # Token encoding for OpenAI models
