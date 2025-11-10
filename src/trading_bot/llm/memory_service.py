@@ -14,26 +14,20 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import create_engine, func, and_, or_
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import func, and_, or_
+from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
 
-# TODO: Implement proper SQLAlchemy models for PostgreSQL integration
-# These imports reference models that need to be created based on the
-# database schema in scripts/init_agent_tables.py
-#
-# Required models: AgentPrompt, LLMInteraction, StrategyAdjustment,
-# TradeOutcome, ScreenerResult, AgentMetric
-#
-# For now, stub out to allow import without crashing
-
-# Placeholder - replace with actual database session factory
-def SessionLocal():
-    """Placeholder for database session. Implement with proper PostgreSQL connection."""
-    raise NotImplementedError(
-        "AgentMemory requires DATABASE_URL environment variable and proper "
-        "SQLAlchemy model setup. See scripts/init_agent_tables.py for schema."
-    )
+# Import SQLAlchemy models and session factory
+from .models import (
+    AgentPrompt,
+    LLMInteraction,
+    StrategyAdjustment,
+    TradeOutcome,
+    ScreenerResult,
+    AgentMetric,
+    SessionLocal
+)
 
 
 class AgentMemory:

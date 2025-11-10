@@ -86,6 +86,3 @@ Thumbs.db
 docker-compose.yml
 Dockerfile
 .dockerignore
-
-# Multi-agent system (incomplete implementation - excluded to prevent import errors)
-src/trading_bot/llm/
