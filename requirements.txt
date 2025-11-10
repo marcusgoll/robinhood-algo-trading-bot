@@ -51,7 +51,7 @@ polygon-api-client==1.12.5  # Polygon.io SDK for Level 2 and Time & Sales data
 fastapi==0.104.1  # REST API framework
 uvicorn[standard]==0.24.0  # ASGI server with WebSocket support
 pydantic==2.12.3  # Data validation (v2)
-websockets==11.0.3  # Downgraded for compatibility with polygon-api-client
+websockets==15.0.1  # Downgraded for compatibility with polygon-api-client
 jsonschema==4.20.0  # JSON schema validation for config
 sqlalchemy==2.0.23  # Database ORM for API order tracking
 alembic==1.12.1  # Database migrations for API
