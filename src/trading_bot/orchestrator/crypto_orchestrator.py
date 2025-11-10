@@ -22,8 +22,16 @@ except ImportError:
     ClaudeCodeManager = None
     HAS_LLM = False
 
-from trading_bot.config.crypto_config import CryptoConfig
-from trading_bot.market_data.crypto_service import CryptoDataService
+# Crypto config imports are optional - only needed for crypto trading mode
+try:
+    from trading_bot.config.crypto_config import CryptoConfig
+    from trading_bot.market_data.crypto_service import CryptoDataService
+    HAS_CRYPTO = True
+except ImportError:
+    # Crypto trading not available (config classes not implemented)
+    CryptoConfig = None
+    CryptoDataService = None
+    HAS_CRYPTO = False
 
 logger = logging.getLogger(__name__)
 
