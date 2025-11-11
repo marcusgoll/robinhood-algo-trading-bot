@@ -8,10 +8,16 @@ Coordinates screening every 2hrs, position monitoring every 5min.
 
 import time
 import logging
+import os
 from datetime import datetime
 from typing import Optional, Any, List, Dict
 
 from trading_bot.orchestrator.interval_scheduler import IntervalScheduler
+
+# Alpaca trading client for order placement
+from alpaca.trading.client import TradingClient
+from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.enums import OrderSide, TimeInForce
 
 # LLM imports are optional - only needed if MULTI_AGENT_ENABLED=true
 try:
@@ -67,6 +73,12 @@ class CryptoOrchestrator:
         # Initialize crypto data service
         self.crypto_data = CryptoDataService()
 
+        # Initialize Alpaca trading client for order placement
+        api_key = os.getenv("ALPACA_API_KEY")
+        secret_key = os.getenv("ALPACA_SECRET_KEY")
+        is_paper = (mode == "paper")
+        self.trading_client = TradingClient(api_key=api_key, secret_key=secret_key, paper=is_paper)
+
         # Initialize interval scheduler
         self.scheduler = IntervalScheduler()
 
@@ -79,6 +91,7 @@ class CryptoOrchestrator:
         self._setup_schedule()
 
         logger.info(f"CryptoOrchestrator initialized in {mode} mode")
+        logger.info(f"Alpaca paper trading: {is_paper}")
         logger.info(f"Symbols: {', '.join(crypto_config.symbols)}")
 
     def _notify(self, message: str, level: str = "info"):
@@ -181,7 +194,7 @@ class CryptoOrchestrator:
             self._notify(f"Screening error: {str(e)}", "error")
 
     def _execute_entry_orders(self):
-        """Execute entry orders for watchlist candidates."""
+        """Execute entry orders for watchlist candidates via Alpaca API."""
         max_positions = int(100 / self.config.max_position_pct)
         slots_available = max_positions - len(self.active_positions)
 
@@ -201,33 +214,46 @@ class CryptoOrchestrator:
                 quantity = position_size_usd / price
 
                 logger.info(
-                    f"PAPER TRADE ENTRY: {symbol} @ ${price:.2f} x {quantity:.4f} "
+                    f"Placing Alpaca order: {symbol} @ ${price:.2f} x {quantity:.4f} "
                     f"(~${position_size_usd:.2f}) - {momentum} momentum"
                 )
 
-                # In paper trading mode, just track the position
-                if self.mode == "paper":
-                    position = {
-                        "symbol": symbol,
-                        "entry_price": price,
-                        "quantity": quantity,
-                        "entry_time": datetime.now().isoformat(),
-                        "momentum": momentum
-                    }
-                    self.active_positions.append(position)
+                # Submit market order to Alpaca (works for both paper and live)
+                order_request = MarketOrderRequest(
+                    symbol=symbol,
+                    qty=quantity,
+                    side=OrderSide.BUY,
+                    time_in_force=TimeInForce.GTC  # GTC for crypto (24/7 markets)
+                )
 
-                    self._notify(
-                        f"🟢 *Paper Trade Entry*\n"
-                        f"{symbol} @ ${price:.2f}\n"
-                        f"Qty: {quantity:.4f} (~${position_size_usd:.2f})\n"
-                        f"Momentum: {momentum}"
-                    )
-                else:
-                    # TODO: Implement live trading via Alpaca
-                    logger.warning(f"Live trading not implemented yet for {symbol}")
+                # Execute order via Alpaca
+                order_response = self.trading_client.submit_order(order_request)
+
+                # Track position with Alpaca order ID
+                position = {
+                    "symbol": symbol,
+                    "entry_price": price,
+                    "quantity": quantity,
+                    "entry_time": datetime.now().isoformat(),
+                    "momentum": momentum,
+                    "alpaca_order_id": str(order_response.id),
+                    "alpaca_status": order_response.status
+                }
+                self.active_positions.append(position)
+
+                logger.info(f"✅ Order placed: {order_response.id} - Status: {order_response.status}")
+
+                self._notify(
+                    f"🟢 *Paper Trade Entry*\n"
+                    f"{symbol} @ ${price:.2f}\n"
+                    f"Qty: {quantity:.4f} (~${position_size_usd:.2f})\n"
+                    f"Momentum: {momentum}\n"
+                    f"Order ID: {order_response.id}"
+                )
 
             except Exception as e:
                 logger.error(f"Failed to execute entry for {candidate.get('symbol')}: {e}")
+                self._notify(f"❌ Order failed for {candidate.get('symbol')}: {str(e)}", "error")
 
     def run_monitoring_workflow(self):
         """Monitor active crypto positions."""
