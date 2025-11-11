@@ -149,7 +149,7 @@ class ClaudeCodeManager:
 
     def _send_telegram_notification(self, message: str):
         """Send async Telegram notification (non-blocking)"""
-        if not self.telegram_enabled or not self.telegram_client:
+        if not self.telegram_enabled or not self.telegram_bot_token or not self.telegram_chat_id:
             return
 
         def _send_async():
@@ -159,19 +159,26 @@ class ClaudeCodeManager:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 try:
+                    # Create fresh TelegramClient in this thread's event loop
+                    # This avoids "bound to a different event loop" errors
+                    from trading_bot.notifications.telegram_client import TelegramClient
+                    client = TelegramClient(
+                        bot_token=self.telegram_bot_token,
+                        timeout=5.0
+                    )
+
                     loop.run_until_complete(
-                        self.telegram_client.send_message(
+                        client.send_message(
                             chat_id=self.telegram_chat_id,
                             text=message,
                             parse_mode="Markdown"
                         )
                     )
                 finally:
-                    # Don't close the loop - let it be garbage collected to avoid
-                    # "Event loop is closed" errors in daemon threads
-                    pass
+                    # Close the loop properly to clean up resources
+                    loop.close()
             except RuntimeError as e:
-                # Handle event loop closed errors gracefully
+                # Handle event loop errors gracefully
                 if "Event loop is closed" in str(e):
                     logger.debug("Event loop was closed during notification (non-blocking)")
                 else:
