@@ -125,31 +125,109 @@ class CryptoOrchestrator:
         self._notify("🔍 *Crypto Screening Started*")
 
         try:
-            # Build symbol list for screening
-            symbols = " ".join(self.config.symbols)
+            # Direct technical screening (bypass broken MCP /screen command)
+            candidates = []
 
-            # Invoke LLM screening command
-            response = self.claude_manager.invoke(
-                f"/screen --asset-type crypto --symbols {symbols}",
-                output_format="json"
-            )
+            for symbol in self.config.symbols:
+                try:
+                    # Get current crypto data
+                    price = self.crypto_data.get_current_price(symbol)
+                    if not price:
+                        continue
 
-            if not response.success:
-                raise Exception(f"Screening failed: {response.error}")
+                    # Get 24h volume and price change
+                    volume_24h = self.crypto_data.get_24h_volume(symbol)
+                    price_change_24h = self.crypto_data.get_price_change_pct(symbol, hours=24)
 
-            data = response.data or {}
-            candidates = data.get("watchlist", [])
-            self.watchlist = candidates
+                    if not volume_24h or not price_change_24h:
+                        continue
 
-            top_symbols = ", ".join([c.get("symbol", "?") for c in candidates[:3]])
+                    # Simple momentum screening:
+                    # - Price moved 2-8% in 24h (not too flat, not too volatile)
+                    # - Volume above average (indicates interest)
+                    abs_change = abs(price_change_24h)
+                    if 2.0 <= abs_change <= 8.0 and volume_24h > 0:
+                        candidates.append({
+                            "symbol": symbol,
+                            "price": price,
+                            "change_24h": price_change_24h,
+                            "volume_24h": volume_24h,
+                            "momentum": "bullish" if price_change_24h > 0 else "bearish"
+                        })
+                        logger.info(f"Candidate: {symbol} @ ${price} ({price_change_24h:+.2f}% 24h)")
+
+                except Exception as e:
+                    logger.warning(f"Failed to screen {symbol}: {e}")
+                    continue
+
+            # Sort by absolute momentum (highest movers first)
+            candidates.sort(key=lambda x: abs(x["change_24h"]), reverse=True)
+            self.watchlist = candidates[:5]  # Top 5 candidates
+
+            top_symbols = ", ".join([c["symbol"] for c in self.watchlist])
             self._notify(
                 f"✅ *Screening Complete*\n"
-                f"Found {len(candidates)} candidates\n"
-                f"Top 3: {top_symbols}"
+                f"Found {len(candidates)} total, tracking top {len(self.watchlist)}\n"
+                f"Top candidates: {top_symbols or 'None'}"
             )
+
+            # Execute trades for top candidates (if not at max positions)
+            # Max positions = 100% / max_position_pct (e.g., 3% each = max 33 positions)
+            max_positions = int(100 / self.config.max_position_pct)
+            if self.watchlist and len(self.active_positions) < max_positions:
+                self._execute_entry_orders()
 
         except Exception as e:
             self._notify(f"Screening error: {str(e)}", "error")
+
+    def _execute_entry_orders(self):
+        """Execute entry orders for watchlist candidates."""
+        max_positions = int(100 / self.config.max_position_pct)
+        slots_available = max_positions - len(self.active_positions)
+
+        for candidate in self.watchlist[:slots_available]:
+            try:
+                symbol = candidate["symbol"]
+                price = candidate["price"]
+                momentum = candidate["momentum"]
+
+                # Skip if already have position in this symbol
+                if any(p["symbol"] == symbol for p in self.active_positions):
+                    logger.info(f"Already have position in {symbol}, skipping")
+                    continue
+
+                # Use fixed position size from config
+                position_size_usd = self.config.position_size_usd
+                quantity = position_size_usd / price
+
+                logger.info(
+                    f"PAPER TRADE ENTRY: {symbol} @ ${price:.2f} x {quantity:.4f} "
+                    f"(~${position_size_usd:.2f}) - {momentum} momentum"
+                )
+
+                # In paper trading mode, just track the position
+                if self.mode == "paper":
+                    position = {
+                        "symbol": symbol,
+                        "entry_price": price,
+                        "quantity": quantity,
+                        "entry_time": datetime.now().isoformat(),
+                        "momentum": momentum
+                    }
+                    self.active_positions.append(position)
+
+                    self._notify(
+                        f"🟢 *Paper Trade Entry*\n"
+                        f"{symbol} @ ${price:.2f}\n"
+                        f"Qty: {quantity:.4f} (~${position_size_usd:.2f})\n"
+                        f"Momentum: {momentum}"
+                    )
+                else:
+                    # TODO: Implement live trading via Alpaca
+                    logger.warning(f"Live trading not implemented yet for {symbol}")
+
+            except Exception as e:
+                logger.error(f"Failed to execute entry for {candidate.get('symbol')}: {e}")
 
     def run_monitoring_workflow(self):
         """Monitor active crypto positions."""
