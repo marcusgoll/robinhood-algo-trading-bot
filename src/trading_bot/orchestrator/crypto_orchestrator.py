@@ -16,7 +16,7 @@ from trading_bot.orchestrator.interval_scheduler import IntervalScheduler
 
 # Alpaca trading client for order placement
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.requests import LimitOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
 
 # LLM imports are optional - only needed if MULTI_AGENT_ENABLED=true
@@ -201,7 +201,8 @@ class CryptoOrchestrator:
         for candidate in self.watchlist[:slots_available]:
             try:
                 symbol = candidate["symbol"]
-                price = candidate["price"]
+                price = candidate["price"]  # Mid-point from quote
+                spread_pct = candidate["spread_pct"]
                 momentum = candidate["momentum"]
 
                 # Skip if already have position in this symbol
@@ -209,21 +210,32 @@ class CryptoOrchestrator:
                     logger.info(f"Already have position in {symbol}, skipping")
                     continue
 
-                # Use fixed position size from config (notional = dollar amount)
+                # Use fixed position size from config
                 position_size_usd = self.config.position_size_usd
 
+                # Get fresh quote for limit price (use ask price for buy orders)
+                quote = self.crypto_data.get_latest_quote(symbol)
+                if not quote:
+                    logger.warning(f"No quote available for {symbol}, skipping")
+                    continue
+
+                # Use ask price as limit (ensures we can buy at market)
+                limit_price = quote.ask
+                quantity = position_size_usd / limit_price
+
                 logger.info(
-                    f"Placing Alpaca order: {symbol} ${position_size_usd:.2f} notional "
-                    f"- {momentum} momentum"
+                    f"Placing Alpaca limit order: {symbol} @ ${limit_price:.4f} x {quantity:.8f} "
+                    f"(${position_size_usd:.2f} notional)"
                 )
 
-                # Submit market order to Alpaca using notional (dollar amount) instead of qty
-                # This is more reliable for crypto fractional orders
-                order_request = MarketOrderRequest(
+                # Submit LIMIT order instead of market (more reliable for crypto)
+                # Using limit at ask price ensures immediate fill at market price
+                order_request = LimitOrderRequest(
                     symbol=symbol,
-                    notional=position_size_usd,  # Dollar amount instead of qty
+                    qty=quantity,
+                    limit_price=limit_price,  # Buy at current ask price
                     side=OrderSide.BUY,
-                    time_in_force=TimeInForce.IOC  # IOC = immediate or cancel (better for market orders)
+                    time_in_force=TimeInForce.GTC  # GTC so order stays until filled
                 )
 
                 # Execute order via Alpaca
@@ -247,13 +259,14 @@ class CryptoOrchestrator:
 
                 logger.info(f"✅ Order placed: {order_response.id} - Status: {order_response.status}")
                 if filled_qty > 0:
-                    logger.info(f"   Filled: {filled_qty:.8f} {symbol}")
+                    logger.info(f"   Filled: {filled_qty:.8f} {symbol} @ ${limit_price:.4f}")
 
                 self._notify(
                     f"🟢 *Paper Trade Entry*\n"
-                    f"{symbol} ${position_size_usd:.2f}\n"
+                    f"{symbol} @ ${limit_price:.4f}\n"
+                    f"Qty: {quantity:.8f} (${position_size_usd:.2f})\n"
+                    f"Type: Limit (GTC)\n"
                     f"Status: {order_response.status}\n"
-                    f"Momentum: {momentum}\n"
                     f"Order ID: {order_response.id}"
                 )
 
