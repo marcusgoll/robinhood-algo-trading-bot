@@ -130,39 +130,39 @@ class CryptoOrchestrator:
 
             for symbol in self.config.symbols:
                 try:
-                    # Get current crypto data
-                    price = self.crypto_data.get_current_price(symbol)
-                    if not price:
+                    # Get current crypto quote
+                    quote = self.crypto_data.get_latest_quote(symbol)
+                    if not quote:
+                        logger.debug(f"No quote data for {symbol}")
                         continue
 
-                    # Get 24h volume and price change
-                    volume_24h = self.crypto_data.get_24h_volume(symbol)
-                    price_change_24h = self.crypto_data.get_price_change_pct(symbol, hours=24)
+                    price = (quote.bid + quote.ask) / 2.0
+                    spread_pct = ((quote.ask - quote.bid) / price) * 100 if price > 0 else 999
 
-                    if not volume_24h or not price_change_24h:
-                        continue
-
-                    # Simple momentum screening:
-                    # - Price moved 2-8% in 24h (not too flat, not too volatile)
-                    # - Volume above average (indicates interest)
-                    abs_change = abs(price_change_24h)
-                    if 2.0 <= abs_change <= 8.0 and volume_24h > 0:
+                    # Simple screening criteria (since Alpaca doesn't provide historical bars for free):
+                    # - Price > $0.10 (avoid dust)
+                    # - Spread < 2% (liquid market)
+                    # - Has bid/ask size (market activity)
+                    if price > 0.10 and spread_pct < 2.0 and quote.bid_size > 0 and quote.ask_size > 0:
+                        # For now, accept all liquid cryptos since we can't check 24h momentum
+                        # This will get refined once we have better data sources
                         candidates.append({
                             "symbol": symbol,
                             "price": price,
-                            "change_24h": price_change_24h,
-                            "volume_24h": volume_24h,
-                            "momentum": "bullish" if price_change_24h > 0 else "bearish"
+                            "spread_pct": spread_pct,
+                            "bid_size": quote.bid_size,
+                            "ask_size": quote.ask_size,
+                            "momentum": "neutral"  # Can't determine without historical data
                         })
-                        logger.info(f"Candidate: {symbol} @ ${price} ({price_change_24h:+.2f}% 24h)")
+                        logger.info(f"Candidate: {symbol} @ ${price:.4f} (spread {spread_pct:.2f}%)")
 
                 except Exception as e:
                     logger.warning(f"Failed to screen {symbol}: {e}")
                     continue
 
-            # Sort by absolute momentum (highest movers first)
-            candidates.sort(key=lambda x: abs(x["change_24h"]), reverse=True)
-            self.watchlist = candidates[:5]  # Top 5 candidates
+            # Sort by liquidity (tightest spreads first)
+            candidates.sort(key=lambda x: x["spread_pct"])
+            self.watchlist = candidates[:3]  # Top 3 most liquid
 
             top_symbols = ", ".join([c["symbol"] for c in self.watchlist])
             self._notify(
