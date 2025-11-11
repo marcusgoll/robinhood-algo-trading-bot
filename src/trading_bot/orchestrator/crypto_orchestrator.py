@@ -209,31 +209,35 @@ class CryptoOrchestrator:
                     logger.info(f"Already have position in {symbol}, skipping")
                     continue
 
-                # Use fixed position size from config
+                # Use fixed position size from config (notional = dollar amount)
                 position_size_usd = self.config.position_size_usd
-                quantity = position_size_usd / price
 
                 logger.info(
-                    f"Placing Alpaca order: {symbol} @ ${price:.2f} x {quantity:.4f} "
-                    f"(~${position_size_usd:.2f}) - {momentum} momentum"
+                    f"Placing Alpaca order: {symbol} ${position_size_usd:.2f} notional "
+                    f"- {momentum} momentum"
                 )
 
-                # Submit market order to Alpaca (works for both paper and live)
+                # Submit market order to Alpaca using notional (dollar amount) instead of qty
+                # This is more reliable for crypto fractional orders
                 order_request = MarketOrderRequest(
                     symbol=symbol,
-                    qty=quantity,
+                    notional=position_size_usd,  # Dollar amount instead of qty
                     side=OrderSide.BUY,
-                    time_in_force=TimeInForce.GTC  # GTC for crypto (24/7 markets)
+                    time_in_force=TimeInForce.IOC  # IOC = immediate or cancel (better for market orders)
                 )
 
                 # Execute order via Alpaca
                 order_response = self.trading_client.submit_order(order_request)
 
+                # Calculate filled quantity from order response
+                filled_qty = float(order_response.filled_qty) if order_response.filled_qty else 0
+
                 # Track position with Alpaca order ID
                 position = {
                     "symbol": symbol,
                     "entry_price": price,
-                    "quantity": quantity,
+                    "quantity": filled_qty,
+                    "notional": position_size_usd,
                     "entry_time": datetime.now().isoformat(),
                     "momentum": momentum,
                     "alpaca_order_id": str(order_response.id),
@@ -242,11 +246,13 @@ class CryptoOrchestrator:
                 self.active_positions.append(position)
 
                 logger.info(f"✅ Order placed: {order_response.id} - Status: {order_response.status}")
+                if filled_qty > 0:
+                    logger.info(f"   Filled: {filled_qty:.8f} {symbol}")
 
                 self._notify(
                     f"🟢 *Paper Trade Entry*\n"
-                    f"{symbol} @ ${price:.2f}\n"
-                    f"Qty: {quantity:.4f} (~${position_size_usd:.2f})\n"
+                    f"{symbol} ${position_size_usd:.2f}\n"
+                    f"Status: {order_response.status}\n"
                     f"Momentum: {momentum}\n"
                     f"Order ID: {order_response.id}"
                 )
