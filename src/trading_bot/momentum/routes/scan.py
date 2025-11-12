@@ -18,19 +18,37 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, Field
 
 from .. import MomentumEngine
 from ..config import MomentumConfig
 
+# Import auth middleware
+try:
+    from api.app.middleware.auth import get_api_key
+    HAS_AUTH = True
+except ImportError:
+    # Fallback if API middleware not available
+    HAS_AUTH = False
+    def get_api_key():
+        """Dummy auth dependency for testing."""
+        return None
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/momentum", tags=["momentum"])
 
-# In-memory storage for scan results (MVP implementation)
-# TODO Phase 2: Replace with Redis or database for production
-_scan_results: dict[str, dict] = {}
+# Storage for scan results (Redis with in-memory fallback)
+from ..storage import ScanResultStorage
+import os
+
+# Initialize storage backend
+# Use Redis if REDIS_URL environment variable is set, otherwise use in-memory
+_storage = ScanResultStorage(
+    redis_url=os.getenv("REDIS_URL"),
+    ttl_seconds=int(os.getenv("SCAN_RESULT_TTL", "3600"))  # 1 hour default
+)
 
 
 class ScanRequest(BaseModel):
@@ -70,7 +88,10 @@ class ScanStatusResponse(BaseModel):
 
 
 @router.post("/scan", response_model=ScanResponse, status_code=status.HTTP_202_ACCEPTED)
-async def trigger_scan(request: ScanRequest) -> ScanResponse:
+async def trigger_scan(
+    request: ScanRequest,
+    api_key: str = Depends(get_api_key)
+) -> ScanResponse:
     """Trigger an on-demand momentum scan for specified symbols.
 
     Initiates a background scan task and returns immediately with scan_id.
@@ -120,8 +141,8 @@ async def trigger_scan(request: ScanRequest) -> ScanResponse:
                 detail=f"Invalid scan_types: {invalid_types}. Valid types: {valid_scan_types}"
             )
 
-        # Initialize scan result in memory
-        _scan_results[scan_id] = {
+        # Initialize scan result in storage
+        scan_data = {
             "scan_id": scan_id,
             "status": "queued",
             "created_at": datetime.now(UTC).isoformat(),
@@ -132,6 +153,7 @@ async def trigger_scan(request: ScanRequest) -> ScanResponse:
             "signals": [],
             "error": None
         }
+        _storage.store_scan(scan_id, scan_data)
 
         # Launch background scan task
         asyncio.create_task(_execute_scan(scan_id, symbols, scan_types))
@@ -158,7 +180,10 @@ async def trigger_scan(request: ScanRequest) -> ScanResponse:
 
 
 @router.get("/scans/{scan_id}", response_model=ScanStatusResponse)
-async def get_scan_status(scan_id: str) -> ScanStatusResponse:
+async def get_scan_status(
+    scan_id: str,
+    api_key: str = Depends(get_api_key)
+) -> ScanStatusResponse:
     """Get status and results of a momentum scan.
 
     Polls scan status using scan_id from POST /api/v1/momentum/scan.
@@ -185,13 +210,13 @@ async def get_scan_status(scan_id: str) -> ScanStatusResponse:
         }
     """
     # Check if scan exists
-    if scan_id not in _scan_results:
+    scan_result = _storage.get_scan(scan_id)
+
+    if not scan_result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Scan {scan_id} not found"
         )
-
-    scan_result = _scan_results[scan_id]
 
     return ScanStatusResponse(
         scan_id=scan_result["scan_id"],
@@ -208,7 +233,7 @@ async def get_scan_status(scan_id: str) -> ScanStatusResponse:
 async def _execute_scan(scan_id: str, symbols: list[str], scan_types: list[str]) -> None:
     """Execute momentum scan in background task.
 
-    Updates _scan_results with status and results.
+    Updates storage with status and results.
 
     Args:
         scan_id: Unique scan identifier
@@ -216,8 +241,11 @@ async def _execute_scan(scan_id: str, symbols: list[str], scan_types: list[str])
         scan_types: List of scan types to execute
     """
     try:
-        # Update status to running
-        _scan_results[scan_id]["status"] = "running"
+        # Get current scan data and update status to running
+        scan_data = _storage.get_scan(scan_id)
+        if scan_data:
+            scan_data["status"] = "running"
+            _storage.store_scan(scan_id, scan_data)
 
         # Initialize MomentumEngine
         # TODO: Get these from dependency injection or global state
@@ -241,10 +269,13 @@ async def _execute_scan(scan_id: str, symbols: list[str], scan_types: list[str])
         ]
 
         # Update scan result
-        _scan_results[scan_id]["status"] = "completed"
-        _scan_results[scan_id]["completed_at"] = datetime.now(UTC).isoformat()
-        _scan_results[scan_id]["signal_count"] = len(signal_dicts)
-        _scan_results[scan_id]["signals"] = signal_dicts
+        scan_data = _storage.get_scan(scan_id)
+        if scan_data:
+            scan_data["status"] = "completed"
+            scan_data["completed_at"] = datetime.now(UTC).isoformat()
+            scan_data["signal_count"] = len(signal_dicts)
+            scan_data["signals"] = signal_dicts
+            _storage.store_scan(scan_id, scan_data)
 
         logger.info(
             f"Scan {scan_id} completed: {len(signal_dicts)} signals detected"
@@ -252,8 +283,11 @@ async def _execute_scan(scan_id: str, symbols: list[str], scan_types: list[str])
 
     except Exception as e:
         # Update scan result with error
-        _scan_results[scan_id]["status"] = "failed"
-        _scan_results[scan_id]["completed_at"] = datetime.now(UTC).isoformat()
-        _scan_results[scan_id]["error"] = str(e)
+        scan_data = _storage.get_scan(scan_id)
+        if scan_data:
+            scan_data["status"] = "failed"
+            scan_data["completed_at"] = datetime.now(UTC).isoformat()
+            scan_data["error"] = str(e)
+            _storage.store_scan(scan_id, scan_data)
 
         logger.error(f"Scan {scan_id} failed: {e}")

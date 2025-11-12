@@ -16,8 +16,19 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from pydantic import BaseModel, Field
+
+# Import auth middleware
+try:
+    from api.app.middleware.auth import get_api_key
+    HAS_AUTH = True
+except ImportError:
+    # Fallback if API middleware not available
+    HAS_AUTH = False
+    def get_api_key():
+        """Dummy auth dependency for testing."""
+        return None
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +57,7 @@ class SignalsQueryResponse(BaseModel):
 
 @router.get("/signals", response_model=SignalsQueryResponse)
 async def get_signals(
+    api_key: str = Depends(get_api_key),
     symbols: str | None = Query(
         None,
         description="Comma-separated list of symbols to filter (e.g., 'AAPL,GOOGL')"

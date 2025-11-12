@@ -301,7 +301,7 @@ class RobinhoodAuth:
         if pickle_path.exists():
             pickle_path.unlink()
 
-        # TODO: Add logging - "Logged out successfully"
+        logger.info("Logged out successfully")
 
     def refresh_token(self) -> None:
         """Refresh expired authentication token."""
@@ -310,9 +310,49 @@ class RobinhoodAuth:
         # In a real implementation, this would call robin_stocks refresh method
         # and update the pickle file
         if self._authenticated:
-            # TODO: Add logging - "Token expired, refreshing"
+            logger.info("Token expired, refreshing")
             # For now, just maintain authenticated state
+            # robin_stocks handles automatic token refresh
             pass
+
+    def get_account_id(self) -> Optional[str]:
+        """
+        Get Robinhood account ID for the authenticated user.
+
+        Returns:
+            Account ID string if authenticated, None otherwise
+
+        Raises:
+            Exception: If unable to retrieve account profile
+        """
+        if not self._authenticated:
+            logger.warning("Cannot get account ID - not authenticated")
+            return None
+
+        try:
+            # Load account profile from Robinhood API
+            profile = robin_stocks.profiles.load_account_profile()
+
+            if profile and 'account_number' in profile:
+                account_id = profile['account_number']
+                logger.debug(f"Retrieved account ID: {account_id}")
+                return account_id
+            elif profile and 'url' in profile:
+                # Extract account ID from profile URL if account_number not present
+                # URL format: https://api.robinhood.com/accounts/ACCOUNT_ID/
+                url = profile['url']
+                match = re.search(r'/accounts/([^/]+)/', url)
+                if match:
+                    account_id = match.group(1)
+                    logger.debug(f"Extracted account ID from URL: {account_id}")
+                    return account_id
+
+            logger.warning("Account ID not found in profile")
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve account ID: {e}")
+            return None
 
     def save_device_token_to_env(self, device_token: str) -> None:
         """

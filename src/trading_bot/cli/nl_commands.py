@@ -5,6 +5,7 @@ Provides intent extraction, API routing, and response formatting for
 conversational bot queries.
 """
 
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -285,7 +286,7 @@ def main():
         sys.exit(1)
 
     # Route to API
-    api_key = None  # TODO: Read from environment variable
+    api_key = os.getenv("BOT_API_KEY")  # Read from environment variable
     try:
         api_response = route_to_api(intent, api_key=api_key)
     except Exception as e:

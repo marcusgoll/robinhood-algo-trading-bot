@@ -20,6 +20,11 @@ from trading_bot.orchestrator.workflow import (
 )
 from trading_bot.orchestrator.scheduler import TradingScheduler
 
+# Alpaca trading client for order execution
+from alpaca.trading.client import TradingClient
+from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
+from alpaca.trading.enums import OrderSide, TimeInForce
+
 # LLM imports are optional - only needed if MULTI_AGENT_ENABLED=true
 try:
     from trading_bot.llm.claude_manager import ClaudeCodeManager, LLMConfig, LLMModel
@@ -285,41 +290,95 @@ class TradingOrchestrator:
             logger.info(f"Executing {len(optimized_trades)} trades")
 
             for trade in optimized_trades:
-                # TODO: Integrate with existing order execution
-                # For now, just log the trade plan
                 symbol = trade.get("symbol")
                 optimization = trade.get("optimization", {})
+                recommended_entry = optimization.get('recommended_entry')
+                position_size = optimization.get('position_size')
+                stop_loss = optimization.get('stop_loss')
+                target = optimization.get('target_1')
 
                 logger.info(f"Trade plan for {symbol}:")
-                logger.info(f"  Entry: ${optimization.get('recommended_entry')}")
-                logger.info(f"  Shares: {optimization.get('position_size')}")
-                logger.info(f"  Stop: ${optimization.get('stop_loss')}")
-                logger.info(f"  Target: ${optimization.get('target_1')}")
+                logger.info(f"  Entry: ${recommended_entry}")
+                logger.info(f"  Shares: {position_size}")
+                logger.info(f"  Stop: ${stop_loss}")
+                logger.info(f"  Target: ${target}")
 
                 if self.mode == "live":
-                    # TODO: Implement live trading via Alpaca TradingClient
-                    # Example:
-                    #   from alpaca.trading.client import TradingClient
-                    #   from alpaca.trading.requests import MarketOrderRequest
-                    #   from alpaca.trading.enums import OrderSide, TimeInForce
-                    #
-                    #   if self.auth:  # auth should be TradingClient instance
-                    #       order_data = MarketOrderRequest(
-                    #           symbol=symbol,
-                    #           qty=optimization.get('position_size'),
-                    #           side=OrderSide.BUY,
-                    #           time_in_force=TimeInForce.DAY
-                    #       )
-                    #       order = self.auth.submit_order(order_data)
-                    pass
+                    # Execute live trading via Alpaca TradingClient
+                    if not self.auth:
+                        logger.error(f"Cannot execute live trade for {symbol}: No TradingClient configured")
+                        self._notify(
+                            f"❌ *Live Trade Failed*\n{symbol}: No authentication configured",
+                            "error"
+                        )
+                        continue
+
+                    if not isinstance(self.auth, TradingClient):
+                        logger.error(f"Auth object is not a TradingClient instance: {type(self.auth)}")
+                        self._notify(
+                            f"❌ *Live Trade Failed*\n{symbol}: Invalid auth object",
+                            "error"
+                        )
+                        continue
+
+                    try:
+                        # Submit market order for live execution
+                        order_request = MarketOrderRequest(
+                            symbol=symbol,
+                            qty=position_size,
+                            side=OrderSide.BUY,
+                            time_in_force=TimeInForce.DAY
+                        )
+
+                        logger.info(f"Submitting live order: {symbol} x {position_size} shares")
+                        order_response = self.auth.submit_order(order_request)
+
+                        # Log successful order
+                        logger.info(f"✅ Live order placed: {order_response.id} - Status: {order_response.status}")
+
+                        # Track the trade
+                        trade_record = {
+                            "symbol": symbol,
+                            "entry": recommended_entry,
+                            "shares": position_size,
+                            "stop_loss": stop_loss,
+                            "target": target,
+                            "timestamp": datetime.now().isoformat(),
+                            "order_id": str(order_response.id),
+                            "status": order_response.status
+                        }
+                        self.daily_trades.append(trade_record)
+
+                        # Send notification
+                        self._notify(
+                            f"🟢 *Live Trade Executed*\n"
+                            f"{symbol} x {position_size} shares\n"
+                            f"Entry: ${recommended_entry:.2f}\n"
+                            f"Stop: ${stop_loss:.2f}\n"
+                            f"Target: ${target:.2f}\n"
+                            f"Order ID: {order_response.id}"
+                        )
+
+                    except Exception as e:
+                        logger.error(f"Failed to execute live order for {symbol}: {e}")
+                        self._notify(
+                            f"❌ *Live Trade Failed*\n{symbol}: {str(e)}",
+                            "error"
+                        )
+
                 elif self.mode == "paper":
                     # Log paper trade (for testing without real orders)
-                    self.daily_trades.append({
+                    trade_record = {
                         "symbol": symbol,
-                        "entry": optimization.get("recommended_entry"),
-                        "shares": optimization.get("position_size"),
+                        "entry": recommended_entry,
+                        "shares": position_size,
+                        "stop_loss": stop_loss,
+                        "target": target,
                         "timestamp": datetime.now().isoformat()
-                    })
+                    }
+                    self.daily_trades.append(trade_record)
+
+                    logger.info(f"📝 Paper trade logged: {symbol} x {position_size} shares")
 
             self.workflow.transition(WorkflowTransition.EXECUTION_COMPLETE)
             self._notify(f"✅ *Market Open Complete*\nExecuted {len(optimized_trades)} trades")
@@ -336,15 +395,124 @@ class TradingOrchestrator:
             self.workflow.transition(WorkflowTransition.START_MONITORING)
 
         try:
-            # TODO: Implement position monitoring
-            # - Check P&L
-            # - Adjust stops if needed
-            # - Exit positions approaching targets
-            logger.info("Position monitoring complete")
+            # Get all open positions
+            if self.mode == "live" and self.auth and isinstance(self.auth, TradingClient):
+                try:
+                    # Get positions from Alpaca
+                    positions = self.auth.get_all_positions()
+                    logger.info(f"Monitoring {len(positions)} open positions")
+
+                    if not positions:
+                        logger.info("No open positions to monitor")
+                        return
+
+                    # Match positions with daily trades to get stop/target info
+                    for position in positions:
+                        symbol = position.symbol
+                        current_price = float(position.current_price)
+                        avg_entry = float(position.avg_entry_price)
+                        qty = float(position.qty)
+
+                        # Calculate P&L
+                        unrealized_pl = float(position.unrealized_pl)
+                        unrealized_plpc = float(position.unrealized_plpc) * 100  # Convert to percentage
+
+                        logger.info(
+                            f"{symbol}: Entry ${avg_entry:.2f} → Current ${current_price:.2f} "
+                            f"| P&L: ${unrealized_pl:.2f} ({unrealized_plpc:.2f}%)"
+                        )
+
+                        # Find trade record to get stop/target levels
+                        trade_record = next(
+                            (t for t in self.daily_trades if t["symbol"] == symbol),
+                            None
+                        )
+
+                        if not trade_record:
+                            logger.warning(f"No trade record found for {symbol}")
+                            continue
+
+                        stop_loss = trade_record.get("stop_loss")
+                        target = trade_record.get("target")
+
+                        # Check stop loss (exit if price <= stop)
+                        if stop_loss and current_price <= stop_loss:
+                            logger.warning(f"Stop loss hit for {symbol}: ${current_price:.2f} <= ${stop_loss:.2f}")
+                            self._execute_exit_order(
+                                symbol, qty, current_price, "Stop Loss",
+                                unrealized_pl, unrealized_plpc
+                            )
+                            continue
+
+                        # Check target (exit if price >= target)
+                        if target and current_price >= target:
+                            logger.info(f"Target reached for {symbol}: ${current_price:.2f} >= ${target:.2f}")
+                            self._execute_exit_order(
+                                symbol, qty, current_price, "Target",
+                                unrealized_pl, unrealized_plpc
+                            )
+                            continue
+
+                        # Optional: Implement trailing stop adjustment
+                        # For now, we just log and monitor
+
+                    logger.info("Position monitoring complete")
+
+                except Exception as e:
+                    logger.error(f"Failed to get positions from Alpaca: {e}")
+                    self._notify(f"⚠️ Position monitoring error: {str(e)}", "warning")
+
+            elif self.mode == "paper":
+                # For paper trading, we don't have real positions
+                # Just log that monitoring is running
+                logger.info(f"Paper mode: {len(self.daily_trades)} trades logged today")
+                logger.info("Position monitoring complete (paper mode)")
+
+            else:
+                logger.debug("No auth configured or not live mode - skipping position monitoring")
 
         except Exception as e:
             logger.error(f"Monitoring workflow error: {e}")
             self.workflow.add_error(str(e))
+
+    def _execute_exit_order(
+        self,
+        symbol: str,
+        qty: float,
+        current_price: float,
+        reason: str,
+        realized_pl: float,
+        realized_plpc: float
+    ):
+        """Execute exit order for a position."""
+        try:
+            # Submit SELL order
+            order_request = MarketOrderRequest(
+                symbol=symbol,
+                qty=qty,
+                side=OrderSide.SELL,
+                time_in_force=TimeInForce.DAY
+            )
+
+            logger.info(f"Executing {reason} exit for {symbol}: {qty} shares @ ${current_price:.2f}")
+            order_response = self.auth.submit_order(order_request)
+
+            logger.info(f"✅ Exit order placed: {order_response.id} - Status: {order_response.status}")
+
+            # Send notification
+            self._notify(
+                f"🔴 *{reason} Exit*\n"
+                f"{symbol} x {qty} shares @ ${current_price:.2f}\n"
+                f"P&L: ${realized_pl:.2f} ({realized_plpc:.2f}%)\n"
+                f"Order ID: {order_response.id}"
+            )
+
+            # Remove from daily trades tracking
+            self.daily_trades = [t for t in self.daily_trades if t["symbol"] != symbol]
+
+        except Exception as e:
+            logger.error(f"Failed to execute {reason} exit for {symbol}: {e}")
+            self._notify(f"❌ *Exit Order Failed*\n{symbol}: {str(e)}", "error")
 
     def run_eod_workflow(self):
         """End-of-day performance review."""

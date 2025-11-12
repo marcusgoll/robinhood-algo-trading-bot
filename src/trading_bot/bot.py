@@ -659,7 +659,7 @@ class TradingBot:
             # Execution Context
             order_id=order_id,
             execution_mode="PAPER" if self.paper_trading else "LIVE",
-            account_id=None,  # TODO: Get from RobinhoodAuth when live trading
+            account_id=self.auth.get_account_id() if self.auth and not self.paper_trading else None
             # Strategy Metadata
             strategy_name="manual",  # Manual trade execution
             entry_type="manual",

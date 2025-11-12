@@ -313,8 +313,18 @@ class RiskManager:
             # predefined exit criteria"
             self.order_manager.cancel_order(order_id=entry_envelope.order_id)
 
-            # TODO: Log error with correlation_id once logger is integrated (T026)
-            # self.logger.log_error(correlation_id, e)
+            # Log error with correlation_id for lifecycle tracing
+            correlation_id = str(uuid.uuid4())
+            error_log_entry = {
+                "event": "risk_management_error",
+                "correlation_id": correlation_id,
+                "entry_order_id": entry_envelope.order_id,
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+                "action_taken": "entry_order_cancelled",
+                "reason": "failed_to_place_stop_and_target_orders"
+            }
+            self._write_jsonl_log(error_log_entry, correlation_id=correlation_id)
 
             # Re-raise original exception to preserve error context
             raise

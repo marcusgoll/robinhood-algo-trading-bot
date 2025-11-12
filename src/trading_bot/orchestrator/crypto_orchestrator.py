@@ -303,15 +303,215 @@ class CryptoOrchestrator:
                         f"Entry: ${entry_price:.2f} → Current: ${current_price:.2f}",
                         "warning"
                     )
-                    # TODO: Execute sell order
+
+                    # Execute sell order at stop loss
+                    try:
+                        # Get fresh quote for limit price (use bid price for sell orders)
+                        quote = self.crypto_data.get_latest_quote(symbol)
+                        if not quote:
+                            logger.error(f"No quote available for stop loss sell on {symbol}")
+                            continue
+
+                        # Use bid price as limit for sell (market price)
+                        limit_price = quote.bid
+                        quantity = position["quantity"]
+
+                        logger.info(
+                            f"Executing stop loss sell: {symbol} @ ${limit_price:.4f} x {quantity:.8f}"
+                        )
+
+                        # Submit LIMIT sell order with IOC (Immediate or Cancel)
+                        order_request = LimitOrderRequest(
+                            symbol=symbol,
+                            qty=quantity,
+                            limit_price=limit_price,
+                            side=OrderSide.SELL,
+                            time_in_force=TimeInForce.IOC  # Immediate or Cancel for quick exit
+                        )
+
+                        # Execute sell order via Alpaca
+                        sell_order = self.trading_client.submit_order(order_request)
+
+                        logger.info(
+                            f"✅ Stop loss order placed: {sell_order.id} - Status: {sell_order.status}"
+                        )
+
+                        # Calculate realized P&L
+                        position_value = entry_price * quantity
+                        realized_pnl = (current_price - entry_price) * quantity
+                        realized_pnl_pct = (realized_pnl / position_value) * 100
+
+                        self._notify(
+                            f"🔴 *Stop Loss Executed*\n"
+                            f"{symbol} @ ${limit_price:.4f}\n"
+                            f"Qty: {quantity:.8f}\n"
+                            f"P&L: ${realized_pnl:.2f} ({realized_pnl_pct:.2f}%)\n"
+                            f"Order ID: {sell_order.id}"
+                        )
+
+                        # Remove position from tracking
+                        self.active_positions.remove(position)
+                        logger.info(f"Position removed from tracking: {symbol}")
+
+                    except Exception as e:
+                        logger.error(f"Failed to execute stop loss sell for {symbol}: {e}")
+                        self._notify(
+                            f"❌ *Stop Loss Execution Failed*\n{symbol}: {str(e)}",
+                            "error"
+                        )
 
             except Exception as e:
                 logger.error(f"Error monitoring {position.get('symbol')}: {e}")
 
     def run_rebalance_workflow(self):
-        """Daily portfolio rebalancing."""
+        """
+        Daily portfolio rebalancing.
+
+        Rebalances portfolio to maintain equal weights across all positions.
+        Triggers when position weights drift more than 20% from target.
+        """
         logger.info("Running crypto portfolio rebalance")
-        # TODO: Implement rebalancing logic
+
+        if not self.active_positions:
+            logger.info("No active positions to rebalance")
+            return
+
+        try:
+            # Calculate total portfolio value
+            total_value = 0.0
+            position_values = {}
+
+            for position in self.active_positions:
+                symbol = position["symbol"]
+                try:
+                    current_price = self.crypto_data.get_current_price(symbol)
+                    if not current_price:
+                        continue
+
+                    quantity = position["quantity"]
+                    value = current_price * quantity
+                    position_values[symbol] = {
+                        "value": value,
+                        "quantity": quantity,
+                        "price": current_price
+                    }
+                    total_value += value
+                except Exception as e:
+                    logger.warning(f"Failed to get value for {symbol}: {e}")
+                    continue
+
+            if total_value == 0:
+                logger.warning("Portfolio total value is 0, skipping rebalance")
+                return
+
+            # Calculate current weights and target weights
+            num_positions = len(position_values)
+            target_weight = 1.0 / num_positions if num_positions > 0 else 0
+            rebalance_threshold = 0.20  # 20% drift triggers rebalance
+
+            rebalance_needed = []
+
+            logger.info(f"Portfolio value: ${total_value:.2f}")
+            logger.info(f"Target weight per position: {target_weight * 100:.1f}%")
+
+            for symbol, pos_data in position_values.items():
+                current_weight = pos_data["value"] / total_value
+                weight_diff = abs(current_weight - target_weight)
+                weight_diff_pct = weight_diff / target_weight if target_weight > 0 else 0
+
+                logger.info(
+                    f"{symbol}: Current {current_weight * 100:.1f}%, "
+                    f"Target {target_weight * 100:.1f}%, "
+                    f"Drift {weight_diff_pct * 100:.1f}%"
+                )
+
+                if weight_diff_pct > rebalance_threshold:
+                    target_value = total_value * target_weight
+                    value_adjustment = target_value - pos_data["value"]
+                    quantity_adjustment = value_adjustment / pos_data["price"]
+
+                    rebalance_needed.append({
+                        "symbol": symbol,
+                        "current_weight": current_weight,
+                        "target_weight": target_weight,
+                        "value_adjustment": value_adjustment,
+                        "quantity_adjustment": quantity_adjustment,
+                        "action": "BUY" if quantity_adjustment > 0 else "SELL"
+                    })
+
+            if not rebalance_needed:
+                logger.info("Portfolio is balanced, no rebalancing needed")
+                self._notify("✅ *Rebalance Check*\nPortfolio is balanced")
+                return
+
+            # Execute rebalancing trades
+            logger.info(f"Rebalancing {len(rebalance_needed)} positions")
+            self._notify(
+                f"📊 *Portfolio Rebalance*\n"
+                f"Adjusting {len(rebalance_needed)} positions"
+            )
+
+            for rebalance in rebalance_needed:
+                try:
+                    symbol = rebalance["symbol"]
+                    action = rebalance["action"]
+                    quantity = abs(rebalance["quantity_adjustment"])
+
+                    # Get fresh quote
+                    quote = self.crypto_data.get_latest_quote(symbol)
+                    if not quote:
+                        logger.warning(f"No quote for {symbol}, skipping rebalance")
+                        continue
+
+                    # Use appropriate limit price based on action
+                    limit_price = quote.ask if action == "BUY" else quote.bid
+
+                    logger.info(
+                        f"Rebalancing {symbol}: {action} {quantity:.8f} @ ${limit_price:.4f}"
+                    )
+
+                    # Submit rebalance order
+                    order_request = LimitOrderRequest(
+                        symbol=symbol,
+                        qty=quantity,
+                        limit_price=limit_price,
+                        side=OrderSide.BUY if action == "BUY" else OrderSide.SELL,
+                        time_in_force=TimeInForce.GTC
+                    )
+
+                    order_response = self.trading_client.submit_order(order_request)
+                    logger.info(f"Rebalance order placed: {order_response.id}")
+
+                    # Update position tracking
+                    if action == "BUY":
+                        # Find and update position
+                        for pos in self.active_positions:
+                            if pos["symbol"] == symbol:
+                                pos["quantity"] += quantity
+                                break
+                    elif action == "SELL":
+                        # Reduce position
+                        for pos in self.active_positions:
+                            if pos["symbol"] == symbol:
+                                pos["quantity"] -= quantity
+                                # Remove if fully closed
+                                if pos["quantity"] <= 0:
+                                    self.active_positions.remove(pos)
+                                break
+
+                except Exception as e:
+                    logger.error(f"Failed to rebalance {rebalance['symbol']}: {e}")
+                    self._notify(
+                        f"⚠️ *Rebalance Failed*\n{rebalance['symbol']}: {str(e)}",
+                        "warning"
+                    )
+
+            self._notify("✅ *Rebalance Complete*\nPortfolio rebalanced")
+            logger.info("Rebalance workflow complete")
+
+        except Exception as e:
+            self._notify(f"❌ Rebalance error: {str(e)}", "error")
+            logger.error(f"Rebalance workflow error: {e}")
 
     def run_loop(self):
         """Main event loop - check scheduler every 60 seconds."""
