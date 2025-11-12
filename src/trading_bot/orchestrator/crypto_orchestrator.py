@@ -284,6 +284,34 @@ class CryptoOrchestrator:
             try:
                 symbol = position["symbol"]
                 entry_price = position["entry_price"]
+                order_id = position.get("alpaca_order_id")
+
+                # Check order status before monitoring
+                if order_id:
+                    try:
+                        order = self.trading_client.get_order_by_id(order_id)
+                        position["alpaca_status"] = order.status
+
+                        # Skip monitoring if order not filled yet
+                        if order.status in ["new", "pending_new", "accepted", "pending_replace"]:
+                            logger.debug(f"Order {order_id} for {symbol} not filled yet (status: {order.status}), skipping monitoring")
+                            continue
+
+                        # Remove position if order was cancelled/expired
+                        if order.status in ["cancelled", "expired", "rejected"]:
+                            logger.warning(f"Order {order_id} for {symbol} was {order.status}, removing from tracking")
+                            self.active_positions.remove(position)
+                            continue
+
+                        # Update quantity if filled (in case partial fills)
+                        if order.status == "filled" and order.filled_qty:
+                            position["quantity"] = float(order.filled_qty)
+                            logger.debug(f"Order {order_id} filled: {order.filled_qty} {symbol}")
+
+                    except Exception as e:
+                        logger.warning(f"Failed to check order status for {order_id}: {e}")
+                        # Continue monitoring even if status check fails
+                        pass
 
                 # Get current price
                 current_price = self.crypto_data.get_current_price(symbol)
@@ -375,11 +403,34 @@ class CryptoOrchestrator:
             return
 
         try:
+            # Filter to only filled positions for rebalancing
+            filled_positions = []
+            for position in self.active_positions:
+                order_id = position.get("alpaca_order_id")
+                if order_id:
+                    try:
+                        order = self.trading_client.get_order_by_id(order_id)
+                        if order.status == "filled":
+                            filled_positions.append(position)
+                        else:
+                            logger.debug(f"Excluding {position['symbol']} from rebalance (order status: {order.status})")
+                    except Exception as e:
+                        logger.warning(f"Failed to check order status for {order_id}: {e}")
+                        # Include in rebalancing if status check fails (assume filled)
+                        filled_positions.append(position)
+                else:
+                    # No order ID, include it
+                    filled_positions.append(position)
+
+            if not filled_positions:
+                logger.info("No filled positions to rebalance")
+                return
+
             # Calculate total portfolio value
             total_value = 0.0
             position_values = {}
 
-            for position in self.active_positions:
+            for position in filled_positions:
                 symbol = position["symbol"]
                 try:
                     current_price = self.crypto_data.get_current_price(symbol)
