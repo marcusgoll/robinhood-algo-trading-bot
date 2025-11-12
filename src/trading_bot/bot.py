@@ -659,7 +659,7 @@ class TradingBot:
             # Execution Context
             order_id=order_id,
             execution_mode="PAPER" if self.paper_trading else "LIVE",
-            account_id=self.auth.get_account_id() if self.auth and not self.paper_trading else None
+            account_id=self.auth.get_account_id() if self.auth and not self.paper_trading else None,
             # Strategy Metadata
             strategy_name="manual",  # Manual trade execution
             entry_type="manual",
@@ -771,14 +771,14 @@ class TradingBot:
 
     def check_stop_loss(self, symbol: str, current_price: Decimal) -> bool:
         """
-        Check if stop loss triggered (§Risk_Management).
+        Check if stop loss triggered and execute sell order (§Risk_Management).
 
         Args:
             symbol: Stock symbol
             current_price: Current market price
 
         Returns:
-            True if stop loss hit, False otherwise
+            True if stop loss hit and sell executed, False otherwise
         """
         if symbol not in self.positions:
             return False
@@ -793,7 +793,63 @@ class TradingBot:
                 f"Stop=${stop_loss} | "
                 f"Entry=${position['entry_price']}"
             )
-            return True
+
+            # Execute sell order at stop loss
+            if not self.paper_trading and self.order_manager is not None:
+                try:
+                    from .order_management.models import OrderRequest
+
+                    shares = position["shares"]
+                    entry_price = Decimal(str(position["entry_price"]))
+
+                    # Calculate P&L
+                    realized_pnl = (current_price - entry_price) * shares
+                    realized_pnl_pct = (realized_pnl / (entry_price * shares)) * 100
+
+                    logger.info(
+                        f"Executing stop loss sell: {symbol} @ ${current_price} x {shares} shares"
+                    )
+
+                    # Create sell order request
+                    sell_order = OrderRequest(
+                        symbol=symbol,
+                        side="SELL",
+                        quantity=shares,
+                        reference_price=current_price,
+                        order_type="limit",
+                        time_in_force="gfd"
+                    )
+
+                    # Submit sell order via OrderManager
+                    order_envelope = self.order_manager.place_limit_order(
+                        sell_order,
+                        strategy_name="stop_loss"
+                    )
+
+                    logger.info(
+                        f"✅ Stop loss order placed: {order_envelope.order_id} - {symbol} x {shares} shares"
+                    )
+
+                    # Log P&L
+                    logger.info(
+                        f"Stop Loss P&L: {symbol} | ${realized_pnl:.2f} ({realized_pnl_pct:.2f}%)"
+                    )
+
+                    # Remove position from tracking
+                    del self.positions[symbol]
+                    logger.info(f"Position removed from tracking: {symbol}")
+
+                    return True
+
+                except Exception as e:
+                    logger.error(f"Failed to execute stop loss sell for {symbol}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    return False
+            else:
+                # Paper trading mode - just log
+                logger.info(f"Paper trading: Would sell {position['shares']} shares of {symbol}")
+                return True
 
         return False
 
@@ -846,6 +902,10 @@ class TradingBot:
             if self._is_market_hours() and (last_scan is None or current_time - last_scan >= scan_interval):
                 await self._run_momentum_scan()
                 last_scan = current_time
+
+            # Position monitoring - check stop losses and targets
+            if self.positions and not self.paper_trading:
+                await self._monitor_positions()
 
             # Check every 30 seconds
             await asyncio.sleep(30)
@@ -976,6 +1036,39 @@ class TradingBot:
                 "error": str(e),
                 "timestamp": time.time(),
             }
+
+    async def _monitor_positions(self) -> None:
+        """
+        Monitor active positions and check stop losses.
+
+        Fetches current prices for all positions and executes
+        stop loss orders if triggered.
+        """
+        if not self.positions or not self.market_data:
+            return
+
+        try:
+            logger.debug(f"Monitoring {len(self.positions)} positions")
+
+            # Check each position
+            for symbol in list(self.positions.keys()):
+                try:
+                    # Get current price
+                    current_price = self.market_data.get_current_price(symbol)
+
+                    if current_price is None:
+                        logger.warning(f"Could not fetch current price for {symbol}")
+                        continue
+
+                    # Check stop loss
+                    self.check_stop_loss(symbol, Decimal(str(current_price)))
+
+                except Exception as e:
+                    logger.error(f"Error monitoring position {symbol}: {e}")
+                    continue
+
+        except Exception as e:
+            logger.error(f"Position monitoring failed: {e}", exc_info=True)
 
     def _load_scan_watchlist(self) -> list[str]:
         """
