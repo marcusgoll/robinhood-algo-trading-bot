@@ -103,7 +103,7 @@ class CryptoOrchestrator:
         else:
             logger.info(message)
 
-        if self.claude_manager.telegram_enabled:
+        if self.claude_manager and self.claude_manager.telegram_enabled:
             emoji = {"error": "🚨", "warning": "⚠️"}.get(level, "🪙")
             self.claude_manager._send_telegram_notification(f"{emoji} {message}")
 
