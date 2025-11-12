@@ -47,20 +47,148 @@ sed -n '/## Blockers/,/^## /p' specs/$SLUG/NOTES.md | head -20
 
 ## Design System Integration
 
-**When `design/$FEATURE_SLUG/implementation-spec.md` exists, achieve pixel-perfect fidelity.**
+**All UI implementations must follow the comprehensive style guide.**
 
-### Pre-Implementation Checklist
+### Rapid Prototyping with Style Guide
 
-Read if design artifacts exist:
+**For all UI features** (triggered automatically by `/quick` or `/feature` with UI components):
 
-1. `design/$FEATURE_SLUG/implementation-spec.md` - Component breakdown, tokens, interactions
-2. `design/design-system/tokens.json` - Colors, typography, spacing, elevations
-3. `mock/*/polished/*.tsx` - Visual reference for layout
+**Required Reading**:
+1. `docs/project/style-guide.md` - **Comprehensive UI/UX SST** (single source of truth)
+2. `design/systems/tokens.json` - Color values, typography, spacing scales
+3. `design/systems/ui-inventory.md` - Available shadcn/ui components (if exists)
+
+**Core 9 Rules** (always enforce):
+1. Text line length: 50-75 chars (max-w-[600px] to max-w-[700px])
+2. Use bullet points with icons when listing features/benefits
+3. 8pt grid spacing (all values divisible by 4/8, no arbitrary [Npx])
+4. Layout rules: baseline value, double spacing between groups, 2:1 line height ratios
+5. Letter-spacing: Display -tracking-px, Body tracking-normal, CTAs tracking-wide
+6. Font superfamilies (matching character sizes)
+7. OKLCH colors from tokens.json (never hex/rgb/hsl)
+8. Subtle design elements: gradients <20% opacity, soft shadows
+9. Squint test: CTAs and headlines must stand out when blurred
+
+**Component Strategy**:
+1. Check `ui-inventory.md` first for available shadcn/ui components
+2. Use existing components (Button, Input, Card, etc.) - don't create custom
+3. Compose primitives - don't build from scratch
+4. Follow lightweight guidelines in style guide Section 6 (Components)
 
 ### Token-Based Styling Rules
 
 ✅ **Use Tailwind tokens**: `bg-blue-600`, `shadow-md`, `space-y-4`, `text-4xl`
 ❌ **Never hardcode**: `style={{color: '#fff'}}`, `text-[#000]`, `space-y-[17px]`
+
+### Context-Aware Token Mapping (Design Polish Phase)
+
+**When applying brand tokens from `design/systems/tokens.json` to replace grayscale:**
+
+#### Buttons & CTAs (Interactive Elements)
+✅ **DO**:
+- `bg-gray-900` → `bg-brand-primary`
+- `hover:bg-gray-800` → `hover:bg-brand-primary-600`
+- `text-white` → keep (high contrast on brand background)
+- `border-gray-900` → `border-brand-primary`
+
+❌ **DON'T**:
+- Force brand colors on non-interactive elements
+- Use brand-primary for body text or structural elements
+
+#### Headings & Typography (Content Structure)
+✅ **DO**:
+- `text-gray-900` → `text-neutral-900` (NOT brand-primary)
+- `text-gray-800` → `text-neutral-800`
+- `text-gray-700` → `text-neutral-700`
+- Keep semantic weight hierarchy, don't force brand
+
+❌ **DON'T**:
+- Apply brand-primary to headings (unless explicitly accented)
+- Mix neutral and gray in same component
+
+#### Backgrounds & Surfaces
+✅ **DO**:
+- `bg-gray-50` → `bg-neutral-50` (default backgrounds)
+- `bg-gray-100` → `bg-neutral-100` (elevated surfaces)
+- `bg-gray-900` → `bg-brand-primary` (ONLY for accent sections/cards)
+
+❌ **DON'T**:
+- Use brand background tints everywhere
+- Apply brand-primary-50 to default page backgrounds
+
+#### Borders & Dividers
+✅ **DO**:
+- `border-gray-300` → `border-neutral-300` (default)
+- `border-gray-200` → `border-neutral-200` (subtle)
+- `focus:border-gray-900` → `focus:border-brand-primary` (interactive)
+- `divide-gray-300` → `divide-neutral-300`
+
+❌ **DON'T**:
+- Use brand colors for structural dividers
+- Mix brand and neutral borders on same element
+
+#### Semantic States (Alerts, Notifications, Status)
+✅ **DO**:
+- `bg-red-50` + `text-red-900` → `bg-semantic-error-bg` + `text-semantic-error-fg`
+- `bg-green-50` + `text-green-900` → `bg-semantic-success-bg` + `text-semantic-success-fg`
+- `bg-yellow-50` + `text-yellow-900` → `bg-semantic-warning-bg` + `text-semantic-warning-fg`
+- `bg-blue-50` + `text-blue-900` → `bg-semantic-info-bg` + `text-semantic-info-fg`
+
+❌ **DON'T**:
+- Use generic brand colors for semantic feedback
+- Mix hardcoded colors with semantic tokens
+
+#### Context Detection Rules
+
+**When you see grayscale**, ask:
+
+1. **"What is this element's PURPOSE?"**
+   - CTA / Button → brand-primary
+   - Heading / Body Text → neutral-*
+   - Background / Surface → neutral-*
+   - Border / Divider → neutral-*
+   - Status / Alert → semantic-*
+
+2. **"Does it need EMPHASIS?"**
+   - High emphasis interactive → brand-primary
+   - Medium emphasis → neutral-900
+   - Low emphasis → neutral-600
+
+3. **"What is the CONTEXT?"**
+   - Inside a button → brand tokens
+   - Inside a heading → neutral tokens
+   - Inside an alert → semantic tokens
+
+#### Anti-Patterns to Avoid
+
+❌ **Forcing brand everywhere**:
+```tsx
+// BAD: All gray-900 becomes brand-primary blindly
+<h1 className="text-brand-primary">...</h1>
+<p className="text-brand-primary">...</p>
+<div className="bg-brand-primary-50">...</div>
+```
+
+✅ **Context-aware mapping**:
+```tsx
+// GOOD: Different contexts get appropriate tokens
+<h1 className="text-neutral-900">...</h1>      // Structure
+<p className="text-neutral-700">...</p>        // Content
+<button className="bg-brand-primary">...</button>  // Action
+<div className="bg-neutral-50">...</div>       // Surface
+```
+
+❌ **Mixing token systems**:
+```tsx
+// BAD: Gray + neutral + brand inconsistently
+<div className="text-gray-900 bg-neutral-50 border-brand-primary">
+```
+
+✅ **Consistent token family**:
+```tsx
+// GOOD: All from same system (neutral for structure)
+<div className="text-neutral-900 bg-neutral-50 border-neutral-300">
+```
 
 ### Post-Implementation Validation
 
@@ -176,6 +304,100 @@ Only refactor when you see duplication:
 - 3+ API calls with same error handling ? Extract fetcher
 
 Do NOT refactor prematurely.
+
+## Task Tool Integration
+
+When invoked via Task() from `implement-phase-agent`, you are executing a single frontend task in parallel with other specialists (backend-dev, database-architect).
+
+**Inputs** (from Task() prompt):
+- Task ID (e.g., T007)
+- Task description and acceptance criteria
+- Feature directory path (e.g., specs/001-feature-slug)
+- Domain: "frontend" (Next.js, React, components, pages, Tailwind)
+
+**Workflow**:
+1. **Read task details** from `${FEATURE_DIR}/tasks.md`
+2. **Load selective context** from NOTES.md (<500 tokens):
+   ```bash
+   sed -n '/## Key Decisions/,/^## /p' ${FEATURE_DIR}/NOTES.md | head -20
+   sed -n '/## Blockers/,/^## /p' ${FEATURE_DIR}/NOTES.md | head -20
+   ```
+3. **Load design system context**:
+   - Read `docs/project/style-guide.md` (comprehensive UI/UX SST)
+   - Read `design/systems/tokens.json` (colors, typography, spacing)
+   - Read `design/systems/ui-inventory.md` (available shadcn/ui components)
+4. **Execute TDD workflow** (described above):
+   - RED: Write failing Jest/RTL test, commit
+   - GREEN: Implement component to pass, commit
+   - REFACTOR: Apply design tokens (OKLCH colors, 8pt grid), commit
+5. **Run quality gates**:
+   - ESLint (pnpm lint)
+   - TypeScript (pnpm type-check)
+   - Tests (pnpm test --coverage)
+   - Design lint (design-lint.js - 0 critical/errors)
+6. **Run performance gates**:
+   - Lighthouse ≥85 (Performance, Accessibility, Best Practices, SEO)
+   - Core Web Vitals (LCP <2.5s, FID <100ms, CLS <0.1)
+   - Bundle size <200kb for page chunks
+7. **Run accessibility gates**:
+   - WCAG 2.1 AA compliance
+   - axe-core violations ≥95 score
+   - Keyboard navigation functional
+8. **Update task-tracker** with completion:
+   ```bash
+   .spec-flow/scripts/bash/task-tracker.sh mark-done-with-notes \
+     -TaskId "${TASK_ID}" \
+     -Notes "Implementation summary (1-2 sentences)" \
+     -Evidence "jest: NN/NN passing, Lighthouse: 92, WCAG score: 96" \
+     -Coverage "NN% line (+ΔΔ%)" \
+     -CommitHash "$(git rev-parse --short HEAD)" \
+     -FeatureDir "${FEATURE_DIR}"
+   ```
+9. **Return JSON** to implement-phase-agent:
+   ```json
+   {
+     "task_id": "T007",
+     "status": "completed",
+     "summary": "Implemented StudyProgressCard component with accessible progress indicator. Passes all quality/performance gates.",
+     "files_changed": ["components/StudyProgressCard.tsx", "components/StudyProgressCard.test.tsx"],
+     "test_results": "jest: 12/12 passing, coverage: 89% (+6%), Lighthouse: 92, WCAG: 96",
+     "commits": ["a1b2c3d", "e4f5g6h", "i7j8k9l"]
+   }
+   ```
+
+**On task failure** (tests fail, quality gates fail, a11y issues):
+```bash
+# Rollback uncommitted changes
+git restore .
+
+# Mark task failed with specific error
+.spec-flow/scripts/bash/task-tracker.sh mark-failed \
+  -TaskId "${TASK_ID}" \
+  -ErrorMessage "Detailed error: [jest output, ESLint errors, or axe violations]" \
+  -FeatureDir "${FEATURE_DIR}"
+```
+
+Return failure JSON:
+```json
+{
+  "task_id": "T007",
+  "status": "failed",
+  "summary": "Failed: WCAG AA violations (color contrast 3.2:1, need 4.5:1 minimum)",
+  "files_changed": [],
+  "test_results": "jest: 0/12 passing (component import failed)",
+  "blockers": ["axe-core: 12 violations (color-contrast, aria-required-children)"]
+}
+```
+
+**Critical rules**:
+- ✅ Always use task-tracker.sh for status updates (never manually edit tasks.md/NOTES.md)
+- ✅ Follow style-guide.md Core 9 Rules (line length, bullet icons, 8pt grid, OKLCH colors)
+- ✅ Use tokens from tokens.json (never hardcode hex/rgb/hsl colors)
+- ✅ Context-aware token mapping (brand for CTAs, neutral for structure, semantic for states)
+- ✅ Provide commit hash with completion (Git Workflow Enforcer blocks without it)
+- ✅ Return structured JSON for orchestrator parsing
+- ✅ Include specific evidence (test counts, Lighthouse scores, WCAG score, bundle size)
+- ✅ Rollback on failure before returning (leave clean state)
 
 ## API Integration
 
