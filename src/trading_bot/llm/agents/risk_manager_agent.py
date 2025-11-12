@@ -59,7 +59,7 @@ Reject trades that exceed risk limits or have poor risk/reward."""
 
     def __init__(
         self,
-        model: str = "claude-haiku-4-20250514",
+        model: str = "claude-haiku-4-5",
         memory: Optional[Any] = None,
         api_key: Optional[str] = None,
         max_position_size: float = 0.20,  # Max 20% of portfolio in single position
@@ -67,6 +67,9 @@ Reject trades that exceed risk limits or have poor risk/reward."""
         kelly_fraction: float = 0.25  # Use 25% of full Kelly
     ):
         """Initialize risk manager agent.
+
+        Args:
+            model: Claude model to use (default: claude-haiku-4-5, latest as of Oct 2025)
 
         Args:
             model: Claude model to use

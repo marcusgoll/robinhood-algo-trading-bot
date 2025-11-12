@@ -62,7 +62,7 @@ Flag overfitting risks when sample sizes are small."""
 
     def __init__(
         self,
-        model: str = "claude-haiku-4-20250514",
+        model: str = "claude-haiku-4-5",
         memory: Optional[Any] = None,
         api_key: Optional[str] = None,
         min_trades_for_insight: int = 30  # Need 30+ trades for statistically meaningful insights
@@ -70,6 +70,7 @@ Flag overfitting risks when sample sizes are small."""
         """Initialize learning agent.
 
         Args:
+            model: Claude model to use (default: claude-haiku-4-5, latest as of Oct 2025)
             model: Claude model to use
             memory: AgentMemory instance
             api_key: Anthropic API key

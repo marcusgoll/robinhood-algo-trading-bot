@@ -66,13 +66,16 @@ Track A/B test results to validate proposals."""
 
     def __init__(
         self,
-        model: str = "claude-haiku-4-20250514",
+        model: str = "claude-haiku-4-5",
         memory: Optional[Any] = None,
         api_key: Optional[str] = None,
         min_trades_for_analysis: int = 20,  # Need at least 20 trades for statistical significance
         lookback_days: int = 30  # Analyze last 30 days by default
     ):
         """Initialize strategy builder agent.
+
+        Args:
+            model: Claude model to use (default: claude-haiku-4-5, latest as of Oct 2025)
 
         Args:
             model: Claude model to use

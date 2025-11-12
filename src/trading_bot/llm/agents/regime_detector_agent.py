@@ -70,14 +70,14 @@ Be conservative. Mixed signals → SIDEWAYS or moderate confidence."""
 
     def __init__(
         self,
-        model: str = "claude-haiku-4-20250514",
+        model: str = "claude-haiku-4-5",
         memory: Optional[Any] = None,
         api_key: Optional[str] = None
     ):
         """Initialize regime detector agent.
 
         Args:
-            model: Claude model to use
+            model: Claude model to use (default: claude-haiku-4-5, latest as of Oct 2025)
             memory: AgentMemory instance
             api_key: Anthropic API key
         """
