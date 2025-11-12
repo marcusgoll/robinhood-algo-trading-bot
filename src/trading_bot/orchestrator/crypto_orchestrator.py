@@ -22,10 +22,12 @@ from alpaca.trading.enums import OrderSide, TimeInForce
 # LLM imports are optional - only needed if MULTI_AGENT_ENABLED=true
 try:
     from trading_bot.llm.claude_manager import ClaudeCodeManager
+    from trading_bot.llm.examples.multi_agent_consensus_workflow import MultiAgentTradingWorkflow
     HAS_LLM = True
 except ImportError:
     # Multi-agent system not available (excluded from Docker or incomplete setup)
     ClaudeCodeManager = None
+    MultiAgentTradingWorkflow = None
     HAS_LLM = False
 
 # Crypto config imports are optional - only needed for crypto trading mode
@@ -87,6 +89,18 @@ class CryptoOrchestrator:
         self.active_positions = []
         self.watchlist = []
 
+        # Portfolio tracking (for multi-agent position sizing)
+        self.portfolio_value = 10000.0  # Default $10k for crypto portfolio
+        self.cash_available = 10000.0   # Default $10k cash
+
+        # Initialize multi-agent trading workflow if LLM available
+        if HAS_LLM and MultiAgentTradingWorkflow is not None:
+            self.multi_agent_workflow = MultiAgentTradingWorkflow()
+            logger.info("Multi-agent LLM system initialized for crypto trading")
+        else:
+            self.multi_agent_workflow = None
+            logger.info("Multi-agent system not available - using rule-based trading")
+
         # Setup scheduled workflows
         self._setup_schedule()
 
@@ -134,12 +148,12 @@ class CryptoOrchestrator:
         )
 
     def run_screening_workflow(self):
-        """Screen crypto symbols for trading opportunities."""
-        self._notify("🔍 *Crypto Screening Started*")
+        """Screen crypto symbols using multi-agent AI consensus."""
+        self._notify("🔍 *AI-Powered Crypto Screening Started*")
 
         try:
-            # Direct technical screening (bypass broken MCP /screen command)
-            candidates = []
+            # Initial liquidity filtering
+            liquid_candidates = []
 
             for symbol in self.config.symbols:
                 try:
@@ -152,49 +166,111 @@ class CryptoOrchestrator:
                     price = (quote.bid + quote.ask) / 2.0
                     spread_pct = ((quote.ask - quote.bid) / price) * 100 if price > 0 else 999
 
-                    # Simple screening criteria (since Alpaca doesn't provide historical bars for free):
-                    # - Price > $0.10 (avoid dust)
-                    # - Spread < 2% (liquid market)
-                    # - Has bid/ask size (market activity)
+                    # Basic liquidity filter (price > $0.10, spread < 2%, has volume)
                     if price > 0.10 and spread_pct < 2.0 and quote.bid_size > 0 and quote.ask_size > 0:
-                        # For now, accept all liquid cryptos since we can't check 24h momentum
-                        # This will get refined once we have better data sources
-                        candidates.append({
+                        liquid_candidates.append({
                             "symbol": symbol,
                             "price": price,
                             "spread_pct": spread_pct,
                             "bid_size": quote.bid_size,
-                            "ask_size": quote.ask_size,
-                            "momentum": "neutral"  # Can't determine without historical data
+                            "ask_size": quote.ask_size
                         })
-                        logger.info(f"Candidate: {symbol} @ ${price:.4f} (spread {spread_pct:.2f}%)")
+                        logger.info(f"Liquid candidate: {symbol} @ ${price:.4f} (spread {spread_pct:.2f}%)")
 
                 except Exception as e:
                     logger.warning(f"Failed to screen {symbol}: {e}")
                     continue
 
-            # Sort by liquidity (tightest spreads first)
-            candidates.sort(key=lambda x: x["spread_pct"])
-            self.watchlist = candidates[:3]  # Top 3 most liquid
+            if not liquid_candidates:
+                logger.info("No liquid candidates found")
+                return
+
+            # Use multi-agent AI to evaluate each liquid candidate
+            ai_approved = []
+
+            if self.multi_agent_workflow:
+                self._notify(f"🤖 *AI Evaluation*\nAnalyzing {len(liquid_candidates)} candidates with 8-agent consensus...")
+
+                for candidate in liquid_candidates:
+                    try:
+                        symbol = candidate["symbol"]
+                        price = candidate["price"]
+
+                        # Build technical indicators for multi-agent evaluation
+                        # For crypto, we use spread, volume, and basic metrics
+                        technical_indicators = {
+                            "price": price,
+                            "spread_pct": candidate["spread_pct"],
+                            "bid_size": candidate["bid_size"],
+                            "ask_size": candidate["ask_size"],
+                            "liquidity_score": 100 - (candidate["spread_pct"] * 10),  # Higher = better
+                            # Basic crypto-specific indicators
+                            "RSI": 50.0,  # Neutral (would need historical data to calculate)
+                            "SMA_20": price,  # Placeholder (current price)
+                            "ATR": price * 0.05,  # Assume 5% volatility
+                            "ADX": 25.0  # Neutral trend strength
+                        }
+
+                        # Evaluate with multi-agent consensus
+                        logger.info(f"Evaluating {symbol} with AI agents...")
+                        result = self.evaluate_trade_with_agents(
+                            symbol=symbol,
+                            current_price=price,
+                            technical_indicators=technical_indicators
+                        )
+
+                        # Check if agents recommend BUY
+                        if result['decision'] == 'BUY' and result['consensus_reached']:
+                            ai_approved.append({
+                                **candidate,
+                                "ai_decision": result['decision'],
+                                "position_size_shares": result['position_size_shares'],
+                                "position_size_pct": result['position_size_pct'],
+                                "stop_loss_pct": result['stop_loss_pct'],
+                                "take_profit_pct": result['take_profit_pct'],
+                                "regime": result.get('regime', 'UNKNOWN'),
+                                "ai_summary": result['summary']
+                            })
+                            logger.info(f"✅ AI approved {symbol}: {result['summary']}")
+                            self._notify(
+                                f"✅ *AI Approved*\n"
+                                f"{symbol} @ ${price:.2f}\n"
+                                f"Regime: {result.get('regime', 'UNKNOWN')}\n"
+                                f"Position: {result['position_size_pct']:.1f}% of portfolio"
+                            )
+                        else:
+                            logger.info(f"❌ AI rejected {symbol}: {result['decision']}")
+
+                    except Exception as e:
+                        logger.error(f"AI evaluation failed for {candidate['symbol']}: {e}")
+                        continue
+
+                self.watchlist = ai_approved[:3]  # Top 3 AI-approved
+            else:
+                # Fallback to rule-based if multi-agent not available
+                logger.warning("Multi-agent system not available, using rule-based fallback")
+                liquid_candidates.sort(key=lambda x: x["spread_pct"])
+                self.watchlist = liquid_candidates[:3]
 
             top_symbols = ", ".join([c["symbol"] for c in self.watchlist])
             self._notify(
                 f"✅ *Screening Complete*\n"
-                f"Found {len(candidates)} total, tracking top {len(self.watchlist)}\n"
-                f"Top candidates: {top_symbols or 'None'}"
+                f"AI evaluated {len(liquid_candidates)} liquid candidates\n"
+                f"Approved {len(self.watchlist)} for trading\n"
+                f"Top picks: {top_symbols or 'None'}"
             )
 
-            # Execute trades for top candidates (if not at max positions)
-            # Max positions = 100% / max_position_pct (e.g., 3% each = max 33 positions)
+            # Execute trades for AI-approved candidates
             max_positions = int(100 / self.config.max_position_pct)
             if self.watchlist and len(self.active_positions) < max_positions:
                 self._execute_entry_orders()
 
         except Exception as e:
             self._notify(f"Screening error: {str(e)}", "error")
+            logger.error(f"Screening workflow error: {e}", exc_info=True)
 
     def _execute_entry_orders(self):
-        """Execute entry orders for watchlist candidates via Alpaca API."""
+        """Execute entry orders for AI-approved candidates via Alpaca API."""
         max_positions = int(100 / self.config.max_position_pct)
         slots_available = max_positions - len(self.active_positions)
 
@@ -203,15 +279,23 @@ class CryptoOrchestrator:
                 symbol = candidate["symbol"]
                 price = candidate["price"]  # Mid-point from quote
                 spread_pct = candidate["spread_pct"]
-                momentum = candidate["momentum"]
 
                 # Skip if already have position in this symbol
                 if any(p["symbol"] == symbol for p in self.active_positions):
                     logger.info(f"Already have position in {symbol}, skipping")
                     continue
 
-                # Use fixed position size from config
-                position_size_usd = self.config.position_size_usd
+                # Use AI-calculated position size if available, otherwise use config default
+                if "position_size_shares" in candidate and candidate["position_size_shares"] > 0:
+                    # AI-determined position size (in crypto quantity)
+                    quantity = candidate["position_size_shares"]
+                    position_size_usd = quantity * price
+                    logger.info(f"Using AI position size: {quantity:.8f} {symbol} (${position_size_usd:.2f})")
+                else:
+                    # Fallback to fixed position size from config
+                    position_size_usd = self.config.position_size_usd
+                    quantity = position_size_usd / price
+                    logger.info(f"Using config position size: ${position_size_usd:.2f}")
 
                 # Get fresh quote for limit price (use ask price for buy orders)
                 quote = self.crypto_data.get_latest_quote(symbol)
@@ -221,10 +305,12 @@ class CryptoOrchestrator:
 
                 # Use ask price as limit (ensures we can buy at market)
                 limit_price = quote.ask
+
+                # Recalculate quantity based on limit price
                 quantity = position_size_usd / limit_price
 
                 logger.info(
-                    f"Placing Alpaca limit order: {symbol} @ ${limit_price:.4f} x {quantity:.8f} "
+                    f"Placing AI-optimized Alpaca limit order: {symbol} @ ${limit_price:.4f} x {quantity:.8f} "
                     f"(${position_size_usd:.2f} notional)"
                 )
 
@@ -241,7 +327,7 @@ class CryptoOrchestrator:
                 # Execute order via Alpaca
                 order_response = self.trading_client.submit_order(order_request)
 
-                # Track position with intended quantity (not filled_qty)
+                # Track position with AI-calculated risk parameters
                 # Paper trading limit orders may not fill immediately, but we track
                 # the intended quantity since orders are at market price (ask) and will fill
                 position = {
@@ -250,19 +336,36 @@ class CryptoOrchestrator:
                     "quantity": quantity,  # Use intended quantity (not filled_qty which is 0 initially)
                     "notional": position_size_usd,
                     "entry_time": datetime.now().isoformat(),
-                    "momentum": momentum,
                     "alpaca_order_id": str(order_response.id),
-                    "alpaca_status": order_response.status
+                    "alpaca_status": order_response.status,
+                    # AI-calculated risk parameters
+                    "ai_stop_loss_pct": candidate.get("stop_loss_pct", self.config.stop_loss_pct),
+                    "ai_take_profit_pct": candidate.get("take_profit_pct", 10.0),  # Default 10%
+                    "ai_regime": candidate.get("regime", "UNKNOWN"),
+                    "ai_summary": candidate.get("ai_summary", "Rule-based entry")
                 }
                 self.active_positions.append(position)
+
+                # Update cash tracking
+                self.cash_available -= position_size_usd
 
                 logger.info(f"✅ Order placed: {order_response.id} - Status: {order_response.status}")
                 logger.info(f"   Tracking position: {quantity:.8f} {symbol} @ ${limit_price:.4f}")
 
+                # Build notification with AI insights
+                ai_info = ""
+                if "ai_regime" in candidate:
+                    ai_info = (
+                        f"AI Regime: {candidate.get('regime', 'N/A')}\n"
+                        f"Stop Loss: {candidate.get('stop_loss_pct', 0):.1f}%\n"
+                        f"Take Profit: {candidate.get('take_profit_pct', 0):.1f}%\n"
+                    )
+
                 self._notify(
-                    f"🟢 *Paper Trade Entry*\n"
+                    f"🟢 *AI-Optimized Entry*\n"
                     f"{symbol} @ ${limit_price:.4f}\n"
                     f"Qty: {quantity:.8f} (${position_size_usd:.2f})\n"
+                    f"{ai_info}"
                     f"Type: Limit (GTC)\n"
                     f"Status: {order_response.status}\n"
                     f"Order ID: {order_response.id}"
@@ -321,8 +424,11 @@ class CryptoOrchestrator:
                 # Calculate P&L
                 pnl_pct = ((current_price - entry_price) / entry_price) * 100
 
+                # Use AI-calculated stop loss if available, otherwise use config default
+                stop_loss_pct = position.get("ai_stop_loss_pct", self.config.stop_loss_pct)
+
                 # Check stop loss
-                if pnl_pct <= -self.config.stop_loss_pct:
+                if pnl_pct <= -stop_loss_pct:
                     self._notify(
                         f"🛑 *Stop Loss Hit*\n"
                         f"{symbol}: {pnl_pct:.2f}%\n"
@@ -593,6 +699,83 @@ class CryptoOrchestrator:
         logger.info("Stopping crypto orchestrator")
         self.running = False
 
+    def evaluate_trade_with_agents(
+        self,
+        symbol: str,
+        current_price: float,
+        technical_indicators: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Evaluate a crypto trade using multi-agent AI consensus.
+
+        Uses 8 specialized agents (RegimeDetector, Research, NewsAnalyst, RiskManager)
+        to vote on trade decisions. If 2/3 consensus reached for BUY, RiskManager
+        calculates position size with Kelly Criterion.
+
+        Args:
+            symbol: Crypto symbol (e.g., 'BTC/USD')
+            current_price: Current crypto price
+            technical_indicators: Technical data (spread, volume, RSI, etc.)
+
+        Returns:
+            {
+                'symbol': str,
+                'decision': str,                    # BUY/HOLD/SKIP
+                'consensus_reached': bool,
+                'votes': List[dict],                # Agent votes with reasoning
+                'position_size_shares': float,      # If BUY (in crypto quantity)
+                'position_size_pct': float,         # If BUY (% of portfolio)
+                'stop_loss_pct': float,            # If BUY
+                'take_profit_pct': float,          # If BUY
+                'summary': str,
+                'total_cost_usd': float,           # LLM API cost
+                'total_tokens': int,               # Tokens used
+                'regime': str,                      # Market regime
+                'regime_confidence': float         # Regime confidence %
+            }
+        """
+        try:
+            logger.info(f"Evaluating {symbol} @ ${current_price} using multi-agent AI consensus")
+
+            # Call multi-agent trading workflow
+            result = self.multi_agent_workflow.evaluate_trade_opportunity(
+                symbol=symbol,
+                current_price=current_price,
+                portfolio_value=self.portfolio_value,
+                cash_available=self.cash_available,
+                technical_indicators=technical_indicators
+            )
+
+            # Log cost tracking
+            logger.info(f"Multi-agent evaluation cost: ${result['total_cost_usd']:.4f} ({result['total_tokens']:,} tokens)")
+            logger.info(f"Decision: {result['decision']} (consensus: {result['consensus_reached']})")
+
+            # Update cash if BUY decision (for next evaluation)
+            if result['decision'] == 'BUY' and result['position_size_shares'] > 0:
+                trade_cost = current_price * result['position_size_shares']
+                # Don't actually deduct yet - that happens in _execute_entry_orders
+                logger.info(f"Projected cash after trade: ${self.cash_available - trade_cost:.2f}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Multi-agent evaluation failed for {symbol}: {e}")
+            return {
+                'symbol': symbol,
+                'decision': 'SKIP',
+                'consensus_reached': False,
+                'votes': [],
+                'position_size_shares': 0,
+                'position_size_pct': 0.0,
+                'stop_loss_pct': 0.0,
+                'take_profit_pct': 0.0,
+                'summary': f"Error: {str(e)}",
+                'total_cost_usd': 0.0,
+                'total_tokens': 0,
+                'regime': 'UNKNOWN',
+                'regime_confidence': 0.0
+            }
+
     def get_status(self) -> Dict[str, Any]:
         """Get current crypto orchestrator status."""
         next_task = self.scheduler.get_next_trigger()
@@ -604,5 +787,7 @@ class CryptoOrchestrator:
             "active_positions": len(self.active_positions),
             "watchlist_size": len(self.watchlist),
             "next_task": next_task["task"] if next_task else None,
-            "next_run_seconds": next_task["seconds_until"] if next_task else None
+            "next_run_seconds": next_task["seconds_until"] if next_task else None,
+            "portfolio_value": self.portfolio_value,
+            "cash_available": self.cash_available
         }
