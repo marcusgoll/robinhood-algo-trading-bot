@@ -98,6 +98,7 @@ Only recommend BUY_SIGNAL/SELL_SIGNAL for high-credibility, high-impact news."""
         Returns:
             {
                 'symbol': str,
+                'decision': str,               # BUY/SKIP/HOLD (for consensus voting)
                 'sentiment': str,              # BULLISH/NEUTRAL/BEARISH
                 'sentiment_score': float,      # -100 to +100
                 'key_themes': List[str],       # Major topics
@@ -106,6 +107,7 @@ Only recommend BUY_SIGNAL/SELL_SIGNAL for high-credibility, high-impact news."""
                 'urgency': str,                # IMMEDIATE/NEAR_TERM/LONG_TERM
                 'summary': str,                # Brief summary
                 'confidence': float,           # 0-100
+                'reasoning': str,              # Reasoning for decision
                 'articles_analyzed': int,
                 'tokens_used': int,
                 'cost_usd': float,
@@ -116,6 +118,29 @@ Only recommend BUY_SIGNAL/SELL_SIGNAL for high-credibility, high-impact news."""
         symbol = context.get('symbol')
         if not symbol:
             raise ValueError("Symbol required in context")
+
+        # Check if this is a crypto symbol (contains '/')
+        is_crypto = '/' in symbol
+
+        if is_crypto:
+            logger.info(f"NewsAnalystAgent skipping {symbol} (crypto - FMP free tier doesn't support crypto news)")
+            return {
+                'symbol': symbol,
+                'decision': 'SKIP',
+                'sentiment': 'NEUTRAL',
+                'sentiment_score': 0.0,
+                'key_themes': [],
+                'credibility': 50.0,
+                'trading_impact': 'NEUTRAL',
+                'urgency': 'LONG_TERM',
+                'summary': 'Crypto news analysis not available (FMP free tier limitation)',
+                'confidence': 50.0,
+                'reasoning': 'Cannot evaluate crypto sentiment - FMP API does not provide crypto news on free tier. Defer to technical analysis.',
+                'articles_analyzed': 0,
+                'tokens_used': 0,
+                'cost_usd': 0.0,
+                'latency_ms': 0
+            }
 
         max_articles = context.get('max_articles', 10)
 
@@ -132,6 +157,7 @@ Only recommend BUY_SIGNAL/SELL_SIGNAL for high-credibility, high-impact news."""
                 logger.warning(f"No news articles found for {symbol}")
                 return {
                     'symbol': symbol,
+                    'decision': 'SKIP',
                     'sentiment': 'NEUTRAL',
                     'sentiment_score': 0.0,
                     'key_themes': [],
@@ -140,6 +166,7 @@ Only recommend BUY_SIGNAL/SELL_SIGNAL for high-credibility, high-impact news."""
                     'urgency': 'LONG_TERM',
                     'summary': 'No recent news available',
                     'confidence': 0.0,
+                    'reasoning': 'No news articles found to analyze sentiment',
                     'articles_analyzed': 0,
                     'tokens_used': 0,
                     'cost_usd': 0.0,
@@ -174,8 +201,18 @@ Only recommend BUY_SIGNAL/SELL_SIGNAL for high-credibility, high-impact news."""
                 if analysis['trading_impact'] in ['BUY_SIGNAL', 'SELL_SIGNAL']:
                     analysis['trading_impact'] = 'NOISE'
 
+            # Map trading_impact to decision for consensus voting
+            decision_map = {
+                'BUY_SIGNAL': 'BUY',
+                'SELL_SIGNAL': 'SKIP',  # Treat sell signals as skip for now
+                'NEUTRAL': 'SKIP',
+                'NOISE': 'SKIP'
+            }
+            decision = decision_map.get(analysis['trading_impact'], 'SKIP')
+
             return {
                 'symbol': symbol,
+                'decision': decision,
                 'sentiment': analysis['sentiment'],
                 'sentiment_score': analysis['sentiment_score'],
                 'key_themes': analysis['key_themes'],
@@ -184,6 +221,7 @@ Only recommend BUY_SIGNAL/SELL_SIGNAL for high-credibility, high-impact news."""
                 'urgency': analysis['urgency'],
                 'summary': analysis['summary'],
                 'confidence': analysis['confidence'],
+                'reasoning': analysis['summary'],  # Use summary as reasoning
                 'articles_analyzed': len(news_articles),
                 'tokens_used': llm_result['tokens_used'],
                 'cost_usd': llm_result['cost_usd'],
@@ -195,6 +233,7 @@ Only recommend BUY_SIGNAL/SELL_SIGNAL for high-credibility, high-impact news."""
             logger.error(f"FMP rate limit exceeded: {e}")
             return {
                 'symbol': symbol,
+                'decision': 'SKIP',
                 'sentiment': 'NEUTRAL',
                 'sentiment_score': 0.0,
                 'key_themes': [],
@@ -203,6 +242,7 @@ Only recommend BUY_SIGNAL/SELL_SIGNAL for high-credibility, high-impact news."""
                 'urgency': 'LONG_TERM',
                 'summary': 'FMP API rate limit exceeded',
                 'confidence': 0.0,
+                'reasoning': 'Cannot evaluate news sentiment - FMP API rate limit exceeded',
                 'articles_analyzed': 0,
                 'tokens_used': 0,
                 'cost_usd': 0.0,
