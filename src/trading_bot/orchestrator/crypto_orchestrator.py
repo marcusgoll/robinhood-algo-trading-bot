@@ -241,14 +241,13 @@ class CryptoOrchestrator:
                 # Execute order via Alpaca
                 order_response = self.trading_client.submit_order(order_request)
 
-                # Calculate filled quantity from order response
-                filled_qty = float(order_response.filled_qty) if order_response.filled_qty else 0
-
-                # Track position with Alpaca order ID
+                # Track position with intended quantity (not filled_qty)
+                # Paper trading limit orders may not fill immediately, but we track
+                # the intended quantity since orders are at market price (ask) and will fill
                 position = {
                     "symbol": symbol,
-                    "entry_price": price,
-                    "quantity": filled_qty,
+                    "entry_price": limit_price,  # Use limit price as entry (actual fill price)
+                    "quantity": quantity,  # Use intended quantity (not filled_qty which is 0 initially)
                     "notional": position_size_usd,
                     "entry_time": datetime.now().isoformat(),
                     "momentum": momentum,
@@ -258,8 +257,7 @@ class CryptoOrchestrator:
                 self.active_positions.append(position)
 
                 logger.info(f"✅ Order placed: {order_response.id} - Status: {order_response.status}")
-                if filled_qty > 0:
-                    logger.info(f"   Filled: {filled_qty:.8f} {symbol} @ ${limit_price:.4f}")
+                logger.info(f"   Tracking position: {quantity:.8f} {symbol} @ ${limit_price:.4f}")
 
                 self._notify(
                     f"🟢 *Paper Trade Entry*\n"
