@@ -32,7 +32,7 @@ class BaseAgent(ABC):
     def __init__(
         self,
         agent_name: str,
-        model: str = "claude-haiku-4-20250514",
+        model: str = "claude-haiku-4-5",
         memory: Optional[AgentMemory] = None,
         api_key: Optional[str] = None
     ):
@@ -40,7 +40,7 @@ class BaseAgent(ABC):
 
         Args:
             agent_name: Identifier for this agent (e.g., 'research', 'strategy_builder')
-            model: Claude model to use (default: claude-haiku-4-20250514)
+            model: Claude model to use (default: claude-haiku-4-5, latest as of Oct 2025)
             memory: AgentMemory instance (creates new if None)
             api_key: Anthropic API key (uses ANTHROPIC_API_KEY env var if None)
         """
