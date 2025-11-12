@@ -149,7 +149,7 @@ class CryptoOrchestrator:
 
     def run_screening_workflow(self):
         """Screen crypto symbols using multi-agent AI consensus."""
-        self._notify("🔍 *AI-Powered Crypto Screening Started*")
+        logger.info("🔍 Starting AI-powered crypto screening...")
 
         try:
             # Initial liquidity filtering
@@ -187,9 +187,10 @@ class CryptoOrchestrator:
 
             # Use multi-agent AI to evaluate each liquid candidate
             ai_approved = []
+            previous_watchlist_symbols = set(c["symbol"] for c in self.watchlist)
 
             if self.multi_agent_workflow:
-                self._notify(f"🤖 *AI Evaluation*\nAnalyzing {len(liquid_candidates)} candidates with 8-agent consensus...")
+                logger.info(f"🤖 AI evaluating {len(liquid_candidates)} candidates with multi-agent consensus...")
 
                 for candidate in liquid_candidates:
                     try:
@@ -252,13 +253,34 @@ class CryptoOrchestrator:
                 liquid_candidates.sort(key=lambda x: x["spread_pct"])
                 self.watchlist = liquid_candidates[:3]
 
+            # Only notify if watchlist changed
+            new_watchlist_symbols = set(c["symbol"] for c in self.watchlist)
+            watchlist_changed = previous_watchlist_symbols != new_watchlist_symbols
+
             top_symbols = ", ".join([c["symbol"] for c in self.watchlist])
-            self._notify(
-                f"✅ *Screening Complete*\n"
-                f"AI evaluated {len(liquid_candidates)} liquid candidates\n"
-                f"Approved {len(self.watchlist)} for trading\n"
+            logger.info(
+                f"✅ Screening complete: "
+                f"AI evaluated {len(liquid_candidates)} liquid candidates, "
+                f"approved {len(self.watchlist)} for trading. "
                 f"Top picks: {top_symbols or 'None'}"
             )
+
+            # Send Telegram notification ONLY if watchlist changed
+            if watchlist_changed:
+                added_symbols = new_watchlist_symbols - previous_watchlist_symbols
+                removed_symbols = previous_watchlist_symbols - new_watchlist_symbols
+
+                change_msg = ""
+                if added_symbols:
+                    change_msg += f"\n➕ Added: {', '.join(sorted(added_symbols))}"
+                if removed_symbols:
+                    change_msg += f"\n➖ Removed: {', '.join(sorted(removed_symbols))}"
+
+                self._notify(
+                    f"📊 *Watchlist Updated*\n"
+                    f"Total: {len(self.watchlist)} symbols"
+                    f"{change_msg}"
+                )
 
             # Execute trades for AI-approved candidates
             max_positions = int(100 / self.config.max_position_pct)

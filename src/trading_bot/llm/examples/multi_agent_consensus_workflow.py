@@ -48,7 +48,12 @@ class MultiAgentTradingWorkflow:
         self.news_analyst = NewsAnalystAgent(memory=self.memory)
         self.risk_manager = RiskManagerAgent(memory=self.memory)
 
-        logger.info("Multi-agent workflow initialized")
+        # Register all agents with orchestrator
+        self.orchestrator.register_agent(self.research_agent)
+        self.orchestrator.register_agent(self.news_analyst)
+        self.orchestrator.register_agent(self.risk_manager)
+
+        logger.info("Multi-agent workflow initialized - 3 agents registered")
 
     def evaluate_trade_opportunity(
         self,
@@ -157,7 +162,17 @@ class MultiAgentTradingWorkflow:
 
         # Step 3: If consensus is BUY, get position sizing from RiskManager
         if consensus_reached and final_decision == 'BUY':
-            logger.info("\nStep 3: Consensus reached for BUY - calculating position size...")
+            logger.info(f"\n✅ CONSENSUS: BUY - {symbol} APPROVED BY AGENTS")
+            logger.info(f"  Market Regime: {regime} ({regime_confidence:.0f}% confidence)")
+            logger.info(f"  Agreement: {consensus_result['agreement_count']}/{len(consensus_result['votes'])} agents")
+            logger.info(f"  Avg Confidence: {consensus_result['confidence_avg']:.1f}%")
+            logger.info(f"  Why agents recommended BUY:")
+            for vote in consensus_result['votes']:
+                if vote['decision'] == 'BUY':
+                    reasoning = vote['reasoning'][:150] + "..." if len(vote['reasoning']) > 150 else vote['reasoning']
+                    logger.info(f"    • {vote['agent_name']}: {reasoning}")
+
+            logger.info("\nStep 3: Calculating position size with RiskManager...")
 
             risk_result = self.risk_manager.execute({
                 'symbol': symbol,
@@ -226,10 +241,41 @@ class MultiAgentTradingWorkflow:
 
         else:
             # No consensus or decision is not BUY
-            summary = (
-                f"SKIP {symbol} - "
-                f"{'No consensus reached' if not consensus_reached else f'Consensus was {final_decision}'}"
-            )
+            if not consensus_reached:
+                # Log detailed reasoning why no consensus
+                logger.info(f"\n❌ NO CONSENSUS - {symbol} SKIPPED")
+                logger.info(f"  Market Regime: {regime} ({regime_confidence:.0f}% confidence)")
+                logger.info(f"  Agent Votes Summary:")
+
+                vote_summary = {}
+                for vote in consensus_result['votes']:
+                    decision = vote['decision']
+                    vote_summary[decision] = vote_summary.get(decision, [])
+                    vote_summary[decision].append(vote['agent_name'])
+
+                for decision, agents in vote_summary.items():
+                    logger.info(f"    {decision}: {', '.join(agents)}")
+
+                # Log top reasoning from each vote
+                logger.info(f"  Why agents skipped:")
+                for vote in consensus_result['votes']:
+                    reasoning = vote['reasoning'][:150] + "..." if len(vote['reasoning']) > 150 else vote['reasoning']
+                    logger.info(f"    • {vote['agent_name']}: {reasoning}")
+
+                summary = f"SKIP {symbol} - No consensus reached ({consensus_result['agreement_count']}/{len(consensus_result['votes'])} agents agreed)"
+            else:
+                # Consensus reached but decision was not BUY
+                logger.info(f"\n⚠️  CONSENSUS: {final_decision} - {symbol} SKIPPED")
+                logger.info(f"  Market Regime: {regime} ({regime_confidence:.0f}% confidence)")
+                logger.info(f"  Agreement: {consensus_result['agreement_count']}/{len(consensus_result['votes'])} agents")
+                logger.info(f"  Avg Confidence: {consensus_result['confidence_avg']:.1f}%")
+                logger.info(f"  Why agents recommended {final_decision}:")
+                for vote in consensus_result['votes']:
+                    if vote['decision'] == final_decision:
+                        reasoning = vote['reasoning'][:150] + "..." if len(vote['reasoning']) > 150 else vote['reasoning']
+                        logger.info(f"    • {vote['agent_name']}: {reasoning}")
+
+                summary = f"SKIP {symbol} - Consensus was {final_decision}"
 
             return {
                 'symbol': symbol,
