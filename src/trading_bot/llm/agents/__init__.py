@@ -9,6 +9,9 @@ Agents:
 - NewsAnalystAgent: Sentiment analysis from news
 - RegimeDetectorAgent: Market regime classification
 - LearningAgent: Self-improvement from trade outcomes
+- TrendAnalystAgent: Technical trend analysis (crypto)
+- MomentumAnalystAgent: Momentum and oscillator analysis (crypto)
+- VolatilityAnalystAgent: Volatility and risk assessment (crypto)
 """
 
 from .base_agent import BaseAgent
@@ -19,6 +22,9 @@ from .strategy_builder_agent import StrategyBuilderAgent
 from .news_analyst_agent import NewsAnalystAgent
 from .regime_detector_agent import RegimeDetectorAgent
 from .learning_agent import LearningAgent
+from .trend_analyst_agent import TrendAnalystAgent
+from .momentum_analyst_agent import MomentumAnalystAgent
+from .volatility_analyst_agent import VolatilityAnalystAgent
 
 __all__ = [
     "BaseAgent",
@@ -28,5 +34,8 @@ __all__ = [
     "StrategyBuilderAgent",
     "NewsAnalystAgent",
     "RegimeDetectorAgent",
-    "LearningAgent"
+    "LearningAgent",
+    "TrendAnalystAgent",
+    "MomentumAnalystAgent",
+    "VolatilityAnalystAgent"
 ]

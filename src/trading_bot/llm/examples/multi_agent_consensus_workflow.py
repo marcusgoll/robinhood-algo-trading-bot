@@ -24,7 +24,10 @@ from trading_bot.llm.agents import (
     ResearchAgent,
     NewsAnalystAgent,
     RegimeDetectorAgent,
-    RiskManagerAgent
+    RiskManagerAgent,
+    TrendAnalystAgent,
+    MomentumAnalystAgent,
+    VolatilityAnalystAgent
 )
 
 logging.basicConfig(
@@ -41,19 +44,29 @@ class MultiAgentTradingWorkflow:
         """Initialize all agents with shared memory."""
         self.memory = AgentMemory()
 
-        # Initialize agents
+        # Initialize orchestrator and regime detector (used for all assets)
         self.orchestrator = AgentOrchestrator(memory=self.memory)
         self.regime_detector = RegimeDetectorAgent(memory=self.memory)
-        self.research_agent = ResearchAgent(memory=self.memory)
-        self.news_analyst = NewsAnalystAgent(memory=self.memory)
         self.risk_manager = RiskManagerAgent(memory=self.memory)
 
-        # Register all agents with orchestrator
+        # Stock-focused agents (use fundamental + news data)
+        self.research_agent = ResearchAgent(memory=self.memory)
+        self.news_analyst = NewsAnalystAgent(memory=self.memory)
+
+        # Crypto-focused agents (use technical analysis)
+        self.trend_analyst = TrendAnalystAgent(memory=self.memory)
+        self.momentum_analyst = MomentumAnalystAgent(memory=self.memory)
+        self.volatility_analyst = VolatilityAnalystAgent(memory=self.memory)
+
+        # Register all voting agents with orchestrator
         self.orchestrator.register_agent(self.research_agent)
         self.orchestrator.register_agent(self.news_analyst)
+        self.orchestrator.register_agent(self.trend_analyst)
+        self.orchestrator.register_agent(self.momentum_analyst)
+        self.orchestrator.register_agent(self.volatility_analyst)
         self.orchestrator.register_agent(self.risk_manager)
 
-        logger.info("Multi-agent workflow initialized - 3 agents registered")
+        logger.info("Multi-agent workflow initialized - 6 voting agents registered (2 stock, 3 crypto, 1 risk)")
 
     def evaluate_trade_opportunity(
         self,
@@ -120,8 +133,18 @@ class MultiAgentTradingWorkflow:
         )
         logger.info(f"  Key indicators: {', '.join(regime_result['key_indicators'])}")
 
-        # Step 2: Run Research, News, and optional agents in consensus
-        logger.info("\nStep 2: Running multi-agent consensus vote...")
+        # Step 2: Run multi-agent consensus vote
+        # Route to different agents based on asset type
+        is_crypto = '/' in symbol  # Crypto symbols contain '/'
+
+        if is_crypto:
+            logger.info("\nStep 2: Running crypto technical analysis consensus (3 technical agents)...")
+            agent_names = ['trend_analyst', 'momentum_analyst', 'volatility_analyst']
+            min_agreement = 2  # 2 of 3 technical agents must agree for BUY
+        else:
+            logger.info("\nStep 2: Running stock fundamental analysis consensus (2 fundamental agents)...")
+            agent_names = ['research', 'news_analyst']
+            min_agreement = 2  # Both must agree for BUY
 
         # Build context for all voting agents
         consensus_context = {
@@ -132,11 +155,11 @@ class MultiAgentTradingWorkflow:
             'regime_confidence': regime_confidence
         }
 
-        # Use orchestrator for consensus (Research + News must agree)
+        # Use orchestrator for consensus
         consensus_result = self.orchestrator.multi_agent_consensus(
-            agent_names=['research', 'news_analyst'],
+            agent_names=agent_names,
             context=consensus_context,
-            min_agreement=2  # Both must agree for BUY
+            min_agreement=min_agreement
         )
 
         total_cost += sum(vote.get('cost_usd', 0) for vote in consensus_result.get('votes', []))
