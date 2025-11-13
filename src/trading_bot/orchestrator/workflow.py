@@ -116,6 +116,7 @@ class WorkflowStateMachine:
         },
         WorkflowState.INTRADAY_MONITORING: {
             WorkflowTransition.START_MONITORING: WorkflowState.INTRADAY_MONITORING,  # Allow continuous monitoring (after-hours scans)
+            WorkflowTransition.MARKET_OPEN: WorkflowState.MARKET_EXECUTION,  # Allow execution when market opens during monitoring
             WorkflowTransition.MARKET_CLOSE: WorkflowState.END_OF_DAY_REVIEW,
             WorkflowTransition.ERROR_OCCURRED: WorkflowState.ERROR,
             WorkflowTransition.RESET: WorkflowState.IDLE,
