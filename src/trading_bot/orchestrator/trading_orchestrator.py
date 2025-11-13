@@ -159,12 +159,20 @@ class TradingOrchestrator:
             run_once_per_day=True
         )
 
-        # Intraday monitoring - Every hour during market hours
-        for hour in [10, 11, 12, 13, 14, 15]:
+        # Intraday scanning - Every 30 minutes during market hours (10am-3:30pm)
+        scan_times = [
+            (10, 0), (10, 30),
+            (11, 0), (11, 30),
+            (12, 0), (12, 30),
+            (13, 0), (13, 30),
+            (14, 0), (14, 30),
+            (15, 0), (15, 30)
+        ]
+        for hour, minute in scan_times:
             self.scheduler.schedule(
-                f"monitor_{hour}",
-                datetime_time(hour, 0),
-                self.run_monitoring_workflow,
+                f"intraday_scan_{hour:02d}{minute:02d}",
+                datetime_time(hour, minute),
+                self.run_intraday_scan_workflow,
                 run_once_per_day=False
             )
 
@@ -386,6 +394,130 @@ class TradingOrchestrator:
         except Exception as e:
             self._notify(f"Market open workflow error: {str(e)}", "error")
             self.workflow.add_error(str(e))
+
+    def run_intraday_scan_workflow(self):
+        """Quick intraday scan for new opportunities + monitor existing positions."""
+        logger.info("Running intraday scan workflow")
+
+        try:
+            # First, monitor existing positions
+            self.run_monitoring_workflow()
+
+            # Then scan for new opportunities (lighter than pre-market)
+            logger.info("Scanning for intraday breakouts/momentum plays")
+
+            # Use LLM for quick momentum screening
+            scan_response = self.claude_manager.invoke(
+                "/screen-momentum --intraday --limit 5",
+                output_format="json"
+            )
+
+            if not scan_response.success or not scan_response.data:
+                logger.info("No new intraday opportunities found")
+                return
+
+            candidates = scan_response.data.get("candidates", [])
+            if not candidates:
+                logger.info("Screening returned no candidates")
+                return
+
+            logger.info(f"Found {len(candidates)} intraday candidates")
+            symbols = [c.get("symbol") for c in candidates[:3]]
+            self._notify(f"📊 *Intraday Scan*\nFound {len(candidates)} opportunities\nTop: {', '.join(symbols)}")
+
+            # Analyze top 2 candidates only (faster than pre-market)
+            trades_executed = 0
+            for stock in candidates[:2]:
+                symbol = stock.get("symbol")
+                logger.info(f"Analyzing intraday setup for {symbol}")
+
+                analysis_response = self.claude_manager.invoke(
+                    f"/analyze-trade {symbol} --quick",
+                    output_format="json"
+                )
+
+                if not analysis_response.success:
+                    logger.warning(f"Analysis failed for {symbol}")
+                    continue
+
+                analysis = analysis_response.data
+                signal = analysis.get("analysis", {}).get("signal", "AVOID") if analysis else "AVOID"
+
+                if signal in ["STRONG_BUY", "BUY"]:
+                    # Get quick optimization
+                    opt_response = self.claude_manager.invoke(
+                        f"/optimize-entry {symbol} --quick",
+                        output_format="json"
+                    )
+
+                    if opt_response.success and opt_response.data:
+                        trade = opt_response.data
+                        optimization = trade.get("optimization", {})
+                        recommended_entry = optimization.get('recommended_entry')
+                        position_size = optimization.get('position_size')
+                        stop_loss = optimization.get('stop_loss')
+                        target = optimization.get('target_1')
+
+                        logger.info(f"Intraday trade setup for {symbol}:")
+                        logger.info(f"  Entry: ${recommended_entry}, Size: {position_size}, Stop: ${stop_loss}, Target: ${target}")
+
+                        if self.mode == "live" and self.auth and isinstance(self.auth, TradingClient):
+                            try:
+                                order_request = MarketOrderRequest(
+                                    symbol=symbol,
+                                    qty=position_size,
+                                    side=OrderSide.BUY,
+                                    time_in_force=TimeInForce.DAY
+                                )
+
+                                order_response = self.auth.submit_order(order_request)
+                                logger.info(f"✅ Intraday order placed: {order_response.id}")
+
+                                trade_record = {
+                                    "symbol": symbol,
+                                    "entry": recommended_entry,
+                                    "shares": position_size,
+                                    "stop_loss": stop_loss,
+                                    "target": target,
+                                    "timestamp": datetime.now().isoformat(),
+                                    "order_id": str(order_response.id),
+                                    "type": "intraday"
+                                }
+                                self.daily_trades.append(trade_record)
+                                trades_executed += 1
+
+                                self._notify(
+                                    f"🟢 *Intraday Trade*\n"
+                                    f"{symbol} x {position_size} shares\n"
+                                    f"Entry: ${recommended_entry:.2f}\n"
+                                    f"Stop: ${stop_loss:.2f}\n"
+                                    f"Target: ${target:.2f}"
+                                )
+
+                            except Exception as e:
+                                logger.error(f"Failed to execute intraday order for {symbol}: {e}")
+                                self._notify(f"❌ *Intraday Trade Failed*\n{symbol}: {str(e)}", "error")
+
+                        elif self.mode == "paper":
+                            trade_record = {
+                                "symbol": symbol,
+                                "entry": recommended_entry,
+                                "shares": position_size,
+                                "stop_loss": stop_loss,
+                                "target": target,
+                                "timestamp": datetime.now().isoformat(),
+                                "type": "intraday"
+                            }
+                            self.daily_trades.append(trade_record)
+                            trades_executed += 1
+                            logger.info(f"📝 Intraday paper trade logged: {symbol}")
+
+            if trades_executed > 0:
+                self._notify(f"✅ *Intraday Scan Complete*\nExecuted {trades_executed} new trades")
+
+        except Exception as e:
+            logger.error(f"Intraday scan error: {e}")
+            self._notify(f"Intraday scan error: {str(e)}", "error")
 
     def run_monitoring_workflow(self):
         """Monitor positions and adjust stops."""
