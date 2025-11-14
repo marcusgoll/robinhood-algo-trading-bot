@@ -844,19 +844,10 @@ class TradingOrchestrator:
         logger.info("Starting orchestrator event loop")
         self.running = True
 
-        # Send startup notification (only once per instance)
-        if not self._startup_notification_sent:
-            startup_msg = (
-                f"🤖 *Trading Bot Started*\n\n"
-                f"Mode: `{self.mode}`\n"
-                f"Crypto: `{'enabled' if hasattr(self, 'crypto_enabled') else 'disabled'}`\n"
-                f"Multi-Agent: `{'enabled' if self.multi_agent_workflow else 'disabled'}`\n"
-                f"Daily Budget: `$5.00`\n\n"
-                f"_Monitoring markets..._"
-            )
-            self._notify(startup_msg, level="info")
-            self._startup_notification_sent = True
-            logger.debug("Startup notification sent (will not repeat)")
+        # Startup notification removed - only notify on actual events
+        # (watchlist updates, trades, circuit breakers)
+        self._startup_notification_sent = True
+        logger.debug("Startup logged (no notification sent)")
 
         try:
             while self.running:

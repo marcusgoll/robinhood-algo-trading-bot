@@ -779,18 +779,10 @@ class CryptoOrchestrator:
         self.running = True
 
         # Send startup notification (only once per instance)
-        if not self._startup_notification_sent:
-            startup_msg = (
-                f"🪙 *Crypto Bot Started (24/7)*\n\n"
-                f"Mode: `{self.mode}`\n"
-                f"Screening: every `{self.config.screening_interval_hours}hr`\n"
-                f"Monitoring: every `{self.config.monitoring_interval_minutes}min`\n"
-                f"Technical Analysis Agents: `3`\n\n"
-                f"_Monitoring crypto markets..._"
-            )
-            self._notify(startup_msg, level="info")
-            self._startup_notification_sent = True
-            logger.debug("Crypto startup notification sent (will not repeat)")
+        # Startup notification removed - only notify on actual events
+        # (watchlist updates, trades, circuit breakers)
+        self._startup_notification_sent = True
+        logger.debug("Crypto startup logged (no notification sent)")
 
         try:
             while self.running:
