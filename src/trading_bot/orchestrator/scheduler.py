@@ -66,10 +66,17 @@ class TradingScheduler:
 
             # Check if current time matches trigger time (within 1 minute)
             if self._time_matches(current_time, task.trigger_time):
-                # Check if already run today
+                # Check if already run today (for daily tasks)
                 if task.run_once_per_day and task.last_run:
                     if task.last_run.date() == now.date():
                         continue  # Already run today
+
+                # For tasks that can run multiple times per day, add 5-minute cooldown
+                # to prevent repeated triggers during the 1-minute tolerance window
+                if not task.run_once_per_day and task.last_run:
+                    minutes_since_last_run = (now - task.last_run).total_seconds() / 60
+                    if minutes_since_last_run < 5:
+                        continue  # Cooldown period
 
                 # Execute task
                 try:
