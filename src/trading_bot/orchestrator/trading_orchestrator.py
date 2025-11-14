@@ -38,6 +38,14 @@ except ImportError:
     MultiAgentTradingWorkflow = None
     HAS_LLM = False
 
+# Technical Analysis framework
+try:
+    from trading_bot.technical_analysis import TACoordinator
+    HAS_TA_FRAMEWORK = True
+except ImportError:
+    TACoordinator = None
+    HAS_TA_FRAMEWORK = False
+
 from trading_bot.config import Config
 
 logger = logging.getLogger(__name__)
@@ -95,6 +103,14 @@ class TradingOrchestrator:
             self.claude_manager = None
             self.multi_agent_workflow = None
             logger.info("Multi-agent system not available - running in basic mode")
+
+        # Initialize Technical Analysis framework (if available)
+        if HAS_TA_FRAMEWORK:
+            self.ta_coordinator = TACoordinator(account_size=100000.0)
+            logger.info("Technical Analysis framework initialized (20 quantifiable tools)")
+        else:
+            self.ta_coordinator = None
+            logger.info("TA framework not available - skipping TA analysis")
 
         # Initialize workflow and scheduler
         self.workflow = WorkflowStateMachine()

@@ -41,6 +41,14 @@ except ImportError:
     CryptoDataService = None
     HAS_CRYPTO = False
 
+# Technical Analysis framework
+try:
+    from trading_bot.technical_analysis import TACoordinator
+    HAS_TA_FRAMEWORK = True
+except ImportError:
+    TACoordinator = None
+    HAS_TA_FRAMEWORK = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -100,6 +108,14 @@ class CryptoOrchestrator:
         else:
             self.multi_agent_workflow = None
             logger.info("Multi-agent system not available - using rule-based trading")
+
+        # Initialize Technical Analysis framework (if available)
+        if HAS_TA_FRAMEWORK:
+            self.ta_coordinator = TACoordinator(account_size=10000.0)
+            logger.info("Technical Analysis framework initialized for crypto (20 quantifiable tools)")
+        else:
+            self.ta_coordinator = None
+            logger.info("TA framework not available - skipping TA analysis")
 
         # Setup scheduled workflows
         self._setup_schedule()
