@@ -956,6 +956,120 @@ def view():
 
 
 # ============================================================================
+# TECHNICAL ANALYSIS COMMANDS
+# ============================================================================
+@cli.group()
+def ta():
+    """Technical analysis framework commands."""
+    pass
+
+
+@ta.command()
+@click.argument("symbol")
+@click.option("--timeframe", default="1d", help="Timeframe (1h, 4h, 1d, 1w)")
+@click.option("--lookback", default=100, help="Number of bars to analyze")
+@click.option("--account-size", default=10000.0, help="Account size for position sizing")
+def analyze(symbol: str, timeframe: str, lookback: int, account_size: float):
+    """Analyze a symbol using the TA framework."""
+    from trading_bot.technical_analysis import TACoordinator
+    from trading_bot.data.providers import get_market_data
+    import pandas as pd
+
+    console.print(Panel(
+        f"[bold cyan]Technical Analysis[/bold cyan]\n\n"
+        f"Symbol: {symbol}\n"
+        f"Timeframe: {timeframe}\n"
+        f"Lookback: {lookback} bars",
+        title="TA Analysis",
+        border_style="cyan"
+    ))
+
+    try:
+        # Initialize TA coordinator
+        ta_coordinator = TACoordinator(account_size=account_size)
+
+        # Get market data
+        console.print("[yellow]Fetching market data...[/yellow]")
+        # For now, create sample data - in production, fetch real data
+        dates = pd.date_range(end=datetime.now(), periods=lookback, freq='D')
+        df = pd.DataFrame({
+            'timestamp': dates,
+            'open': 100 + pd.Series(range(lookback)).cumsum() * 0.1,
+            'high': 102 + pd.Series(range(lookback)).cumsum() * 0.1,
+            'low': 98 + pd.Series(range(lookback)).cumsum() * 0.1,
+            'close': 101 + pd.Series(range(lookback)).cumsum() * 0.1,
+            'volume': 1000000
+        })
+
+        # Analyze
+        console.print("[yellow]Running TA analysis...[/yellow]")
+        signal = ta_coordinator.analyze_simple(symbol=symbol, df=df)
+
+        # Display results
+        table = Table(title=f"TA Signal: {symbol}", box=box.ROUNDED)
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
+
+        signal_color = {
+            'LONG': 'green',
+            'SHORT': 'red',
+            'HOLD': 'yellow',
+            'SKIP': 'dim'
+        }.get(signal.signal, 'white')
+
+        table.add_row("Signal", f"[{signal_color}]{signal.signal}[/{signal_color}]")
+        table.add_row("Confidence", f"{signal.confidence:.1f}%")
+        table.add_row("Entry Price", format_currency(signal.entry_price))
+
+        if signal.stop_loss:
+            table.add_row("Stop Loss", format_currency(signal.stop_loss))
+        if signal.take_profit:
+            table.add_row("Take Profit", format_currency(signal.take_profit))
+        if signal.position_size_usd:
+            table.add_row("Position Size", format_currency(signal.position_size_usd))
+        if signal.risk_reward_ratio:
+            table.add_row("Risk/Reward", f"{signal.risk_reward_ratio:.2f}")
+
+        console.print(table)
+
+        # Display reasoning
+        if signal.reasoning:
+            console.print(Panel(
+                signal.reasoning,
+                title="Analysis Reasoning",
+                border_style="cyan"
+            ))
+
+    except Exception as e:
+        console.print(f"[red]Error analyzing {symbol}: {e}[/red]")
+        import traceback
+        console.print(f"[dim]{traceback.format_exc()}[/dim]")
+
+
+@ta.command()
+@click.argument("symbol")
+@click.option("--start-date", help="Start date (YYYY-MM-DD)")
+@click.option("--end-date", help="End date (YYYY-MM-DD)")
+@click.option("--initial-capital", default=10000.0, help="Initial capital")
+def backtest(symbol: str, start_date: Optional[str], end_date: Optional[str], initial_capital: float):
+    """Backtest TA framework on historical data."""
+    from trading_bot.technical_analysis import TACoordinator, TradingJournal
+    from datetime import datetime
+
+    console.print(Panel(
+        f"[bold cyan]TA Framework Backtest[/bold cyan]\n\n"
+        f"Symbol: {symbol}\n"
+        f"Period: {start_date or 'auto'} to {end_date or 'now'}\n"
+        f"Capital: {format_currency(initial_capital)}",
+        title="Backtest",
+        border_style="cyan"
+    ))
+
+    console.print("[yellow]Backtesting functionality coming soon![/yellow]")
+    console.print("This will run historical analysis using the TA framework and generate performance reports.")
+
+
+# ============================================================================
 # MAIN ENTRY POINT
 # ============================================================================
 if __name__ == "__main__":
