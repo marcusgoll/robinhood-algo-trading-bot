@@ -9,6 +9,7 @@ Coordinates screening every 2hrs, position monitoring every 5min.
 import time
 import logging
 import os
+import pandas as pd
 from datetime import datetime
 from typing import Optional, Any, List, Dict
 
@@ -270,19 +271,87 @@ class CryptoOrchestrator:
                         price = candidate["price"]
 
                         # Build technical indicators for multi-agent evaluation
-                        # For crypto, we use spread, volume, and basic metrics
-                        technical_indicators = {
-                            "price": price,
-                            "spread_pct": candidate["spread_pct"],
-                            "bid_size": candidate["bid_size"],
-                            "ask_size": candidate["ask_size"],
-                            "liquidity_score": 100 - (candidate["spread_pct"] * 10),  # Higher = better
-                            # Basic crypto-specific indicators
-                            "RSI": 50.0,  # Neutral (would need historical data to calculate)
-                            "SMA_20": price,  # Placeholder (current price)
-                            "ATR": price * 0.05,  # Assume 5% volatility
-                            "ADX": 25.0  # Neutral trend strength
-                        }
+                        # Fetch real historical data to calculate proper indicators
+                        try:
+                            historical_df = self.crypto_data.get_historical_bars(
+                                symbol=symbol,
+                                timeframe="1h",
+                                limit=200  # Need enough data for 200 SMA
+                            )
+
+                            if historical_df is not None and len(historical_df) >= 50:
+                                # Calculate real technical indicators
+                                close_prices = historical_df['close']
+                                high_prices = historical_df['high']
+                                low_prices = historical_df['low']
+                                volumes = historical_df['volume']
+
+                                # RSI (14-period)
+                                delta = close_prices.diff()
+                                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                                rs = gain / loss
+                                rsi = 100 - (100 / (1 + rs))
+
+                                # Moving averages
+                                sma_20 = close_prices.rolling(window=20).mean()
+                                sma_50 = close_prices.rolling(window=50).mean()
+                                sma_200 = close_prices.rolling(window=200).mean() if len(close_prices) >= 200 else None
+
+                                # ATR (14-period)
+                                high_low = high_prices - low_prices
+                                high_close = abs(high_prices - close_prices.shift())
+                                low_close = abs(low_prices - close_prices.shift())
+                                true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+                                atr = true_range.rolling(window=14).mean()
+
+                                # Volume trend (20-period average)
+                                volume_sma = volumes.rolling(window=20).mean()
+
+                                technical_indicators = {
+                                    "price": price,
+                                    "spread_pct": candidate["spread_pct"],
+                                    "bid_size": candidate["bid_size"],
+                                    "ask_size": candidate["ask_size"],
+                                    "liquidity_score": 100 - (candidate["spread_pct"] * 10),
+                                    # Real technical indicators
+                                    "RSI": float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50.0,
+                                    "SMA_20": float(sma_20.iloc[-1]) if not pd.isna(sma_20.iloc[-1]) else price,
+                                    "SMA_50": float(sma_50.iloc[-1]) if not pd.isna(sma_50.iloc[-1]) else price,
+                                    "SMA_200": float(sma_200.iloc[-1]) if sma_200 is not None and not pd.isna(sma_200.iloc[-1]) else None,
+                                    "ATR": float(atr.iloc[-1]) if not pd.isna(atr.iloc[-1]) else price * 0.05,
+                                    "volume": float(volumes.iloc[-1]),
+                                    "volume_sma": float(volume_sma.iloc[-1]) if not pd.isna(volume_sma.iloc[-1]) else float(volumes.iloc[-1]),
+                                    "ADX": 25.0  # TODO: Calculate ADX when needed
+                                }
+                            else:
+                                # Fallback to placeholder if insufficient data
+                                logger.warning(f"{symbol}: Insufficient historical data, using placeholders")
+                                technical_indicators = {
+                                    "price": price,
+                                    "spread_pct": candidate["spread_pct"],
+                                    "bid_size": candidate["bid_size"],
+                                    "ask_size": candidate["ask_size"],
+                                    "liquidity_score": 100 - (candidate["spread_pct"] * 10),
+                                    "RSI": None,
+                                    "SMA_20": None,
+                                    "ATR": None,
+                                    "ADX": None
+                                }
+                        except Exception as e:
+                            logger.warning(f"{symbol}: Failed to calculate indicators: {e}")
+                            # Fallback to placeholder if error
+                            technical_indicators = {
+                                "price": price,
+                                "spread_pct": candidate["spread_pct"],
+                                "bid_size": candidate["bid_size"],
+                                "ask_size": candidate["ask_size"],
+                                "liquidity_score": 100 - (candidate["spread_pct"] * 10),
+                                "RSI": None,
+                                "SMA_20": None,
+                                "ATR": None,
+                                "ADX": None
+                            }
 
                         # Evaluate with multi-agent consensus
                         logger.info(f"Evaluating {symbol} with AI agents...")
