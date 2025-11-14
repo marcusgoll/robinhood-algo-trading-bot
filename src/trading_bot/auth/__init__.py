@@ -1,7 +1,7 @@
 """
 Authentication Module
 
-Robinhood authentication with MFA support, session management, and token refresh.
+Alpaca authentication wrapper that provides shared Trading/Data clients.
 
 Enforces Constitution v1.0.0:
 - §Security: Credentials from environment only, never logged
@@ -9,6 +9,9 @@ Enforces Constitution v1.0.0:
 - §Safety_First: Bot fails to start if auth fails
 """
 
-from trading_bot.auth.robinhood_auth import AuthenticationError, RobinhoodAuth
+from trading_bot.auth.alpaca_auth import AlpacaAuth, AuthenticationError
 
-__all__ = ["RobinhoodAuth", "AuthenticationError"]
+# Backwards compatibility: legacy RobinhoodAuth imports now resolve to AlpacaAuth
+RobinhoodAuth = AlpacaAuth
+
+__all__ = ["AlpacaAuth", "AuthenticationError", "RobinhoodAuth"]
