@@ -698,6 +698,17 @@ class CryptoOrchestrator:
 
         self.running = True
 
+        # Send startup notification
+        startup_msg = (
+            f"🪙 *Crypto Bot Started (24/7)*\n\n"
+            f"Mode: `{self.mode}`\n"
+            f"Screening: every `{self.config.screening_interval_hours}hr`\n"
+            f"Monitoring: every `{self.config.monitoring_interval_minutes}min`\n"
+            f"Technical Analysis Agents: `3`\n\n"
+            f"_Monitoring crypto markets..._"
+        )
+        self._notify(startup_msg, level="info")
+
         try:
             while self.running:
                 # Check scheduled tasks

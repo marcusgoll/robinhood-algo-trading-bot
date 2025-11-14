@@ -749,6 +749,17 @@ class TradingOrchestrator:
         logger.info("Starting orchestrator event loop")
         self.running = True
 
+        # Send startup notification
+        startup_msg = (
+            f"🤖 *Trading Bot Started*\n\n"
+            f"Mode: `{self.mode}`\n"
+            f"Crypto: `{'enabled' if hasattr(self, 'crypto_enabled') else 'disabled'}`\n"
+            f"Multi-Agent: `{'enabled' if self.multi_agent_workflow else 'disabled'}`\n"
+            f"Daily Budget: `$5.00`\n\n"
+            f"_Monitoring markets..._"
+        )
+        self._notify(startup_msg, level="info")
+
         try:
             while self.running:
                 # Check scheduled tasks
