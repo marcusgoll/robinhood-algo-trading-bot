@@ -67,7 +67,7 @@ tenacity==8.2.3  # Retry library (dependency of openai)
 tiktoken==0.5.2  # Token encoding for OpenAI models
 
 # Telegram Notifications (030-telegram-notifications)
-python-telegram-bot==20.7  # Async Telegram Bot API wrapper
+python-telegram-bot==22.5  # Async Telegram Bot API wrapper
 
 # Telegram Command Handlers (031-telegram-command-handlers)
 httpx~=0.25.2  # Async HTTP client for internal API calls (compatible with python-telegram-bot)
