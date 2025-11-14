@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from trading_bot.auth.robinhood_auth import RobinhoodAuth
+from trading_bot.auth import AlpacaAuth
 from trading_bot.config import Config
 from trading_bot.market_data.market_data_service import MarketDataService
 from trading_bot.ml.config import MLConfig
@@ -47,8 +47,8 @@ class MLStrategyGenerator:
         config = Config.from_env_and_json()
 
         # Initialize market data service (DRY - reuse existing auth)
-        logger.info("Authenticating with Robinhood...")
-        self.auth = RobinhoodAuth(config)
+        logger.info("Authenticating with Alpaca...")
+        self.auth = AlpacaAuth(config)
         self.auth.login()
 
         self.market_data_service = MarketDataService(self.auth)

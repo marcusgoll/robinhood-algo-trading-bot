@@ -7,7 +7,7 @@ Enforces Constitution v1.0.0:
 - §Data_Integrity: Validate all inputs
 
 Dual configuration system:
-- .env: Credentials (username, password, MFA secret)
+- .env: Credentials (Alpaca API key/secret)
 - config.json: Trading parameters (position sizes, hours, strategy)
 """
 
@@ -207,9 +207,16 @@ class Config:
     - config.json: Trading parameters (§Risk_Management)
     """
 
-    # Robinhood API credentials (§Security: from .env)
-    robinhood_username: str
-    robinhood_password: str
+    # Alpaca API credentials (§Security: from .env)
+    alpaca_api_key: str
+    alpaca_secret_key: str
+    alpaca_paper: bool = True
+    alpaca_base_url: str = "https://paper-api.alpaca.markets"
+    alpaca_data_url: str = "https://data.alpaca.markets"
+
+    # Legacy Robinhood fields (deprecated, retained for compatibility)
+    robinhood_username: str = "deprecated"
+    robinhood_password: str = "deprecated"
     robinhood_mfa_secret: str | None = None
     robinhood_device_token: str | None = None
 
@@ -257,7 +264,7 @@ class Config:
         Load configuration from .env (credentials) and config.json (parameters).
 
         Dual configuration system (Constitution v1.0.0):
-        - .env: Credentials (username, password, MFA secret) - §Security
+        - .env: Credentials (Alpaca API key/secret) - §Security
         - config.json: Trading parameters (position sizes, hours, strategy)
 
         Args:
@@ -290,23 +297,24 @@ class Config:
         is_paper_trading = paper_trading_env or paper_trading_config
 
         # Load credentials from .env (only required for LIVE trading)
-        username = os.getenv("ROBINHOOD_USERNAME")
-        password = os.getenv("ROBINHOOD_PASSWORD")
+        alpaca_api_key = os.getenv("ALPACA_API_KEY")
+        alpaca_secret_key = os.getenv("ALPACA_SECRET_KEY")
+        if not alpaca_api_key or not alpaca_secret_key:
+            raise ValueError(
+                "Missing Alpaca credentials. Set ALPACA_API_KEY and ALPACA_SECRET_KEY "
+                "in your environment or .env file."
+            )
 
-        # Validate credentials only if NOT in paper trading mode
-        if not is_paper_trading:
-            if not username or not password:
-                raise ValueError(
-                    "Missing required environment variables: "
-                    "ROBINHOOD_USERNAME and ROBINHOOD_PASSWORD must be set in .env file "
-                    "for LIVE trading mode"
-                )
-        elif not username or not password:
-            # Paper mode without credentials - use placeholder values
-            logger = logging.getLogger(__name__)
-            logger.info("Paper trading mode enabled - Robinhood credentials not required")
-            username = "paper-trading-placeholder"
-            password = "paper-trading-placeholder"
+        alpaca_paper_env = os.getenv("ALPACA_PAPER")
+        if alpaca_paper_env is not None:
+            alpaca_paper = alpaca_paper_env.lower() not in {"0", "false", "no"}
+        else:
+            alpaca_paper = is_paper_trading
+
+        alpaca_base_url = os.getenv("ALPACA_BASE_URL") or (
+            "https://paper-api.alpaca.markets" if alpaca_paper else "https://api.alpaca.markets"
+        )
+        alpaca_data_url = os.getenv("ALPACA_DATA_URL") or "https://data.alpaca.markets"
 
         risk = config_data.get("risk_management", {})
         phase = config_data.get("phase_progression", {})
@@ -330,9 +338,14 @@ class Config:
         max_trades_per_day = 999 if max_trades is None else int(max_trades)
 
         return cls(
-            # Credentials from .env (placeholders used in paper mode if not provided)
-            robinhood_username=username,
-            robinhood_password=password,
+            alpaca_api_key=alpaca_api_key,
+            alpaca_secret_key=alpaca_secret_key,
+            alpaca_paper=alpaca_paper,
+            alpaca_base_url=alpaca_base_url,
+            alpaca_data_url=alpaca_data_url,
+            # Legacy placeholders
+            robinhood_username=os.getenv("ROBINHOOD_USERNAME", "deprecated"),
+            robinhood_password=os.getenv("ROBINHOOD_PASSWORD", "deprecated"),
             robinhood_mfa_secret=os.getenv("ROBINHOOD_MFA_SECRET"),
             robinhood_device_token=os.getenv("ROBINHOOD_DEVICE_TOKEN"),
             # Trading mode (computed earlier from ENV or config)
@@ -378,6 +391,14 @@ class Config:
         Raises:
             ValueError: If configuration invalid
         """
+        # Credential validation
+        if not self.alpaca_api_key or not self.alpaca_secret_key:
+            raise ValueError("Alpaca API credentials must be configured")
+
+        # Credential validation
+        if not self.alpaca_api_key or not self.alpaca_secret_key:
+            raise ValueError("Alpaca API credentials must be configured")
+
         # Risk parameter validation
         if self.max_position_pct <= 0 or self.max_position_pct > 100:
             raise ValueError(

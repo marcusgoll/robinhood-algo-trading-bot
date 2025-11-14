@@ -20,7 +20,7 @@ import logging
 import sys
 from pathlib import Path
 
-from trading_bot.auth.robinhood_auth import RobinhoodAuth
+from trading_bot.auth import AlpacaAuth
 from trading_bot.config import Config
 from trading_bot.market_data.market_data_service import MarketDataService
 from trading_bot.ml.backtesting.validator import StrategyValidator
@@ -125,8 +125,8 @@ def main():
 
     # Initialize services
     config = Config.from_env_and_json()
-    logger.info("Authenticating with Robinhood...")
-    auth = RobinhoodAuth(config)
+    logger.info("Authenticating with Alpaca...")
+    auth = AlpacaAuth(config)
     auth.login()
     market_data_service = MarketDataService(auth)
 

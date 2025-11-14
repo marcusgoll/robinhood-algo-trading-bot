@@ -596,7 +596,7 @@ ssh hetzner 'grep ROBINHOOD /opt/trading-bot/.env'
 ssh hetzner 'rm -f /opt/trading-bot/data/auth_token.json'
 
 # Test authentication
-ssh hetzner 'cd /opt/trading-bot && python -c "from trading_bot.services.auth import RobinhoodAuth; RobinhoodAuth()"'
+ssh hetzner 'cd /opt/trading-bot && python -c "from trading_bot.auth import AlpacaAuth; AlpacaAuth().login()"'
 ```
 
 ### Network Issues

@@ -8,7 +8,7 @@ from pathlib import Path
 from rich.console import Console
 
 from ..account.account_data import AccountData
-from ..auth.robinhood_auth import RobinhoodAuth
+from ..auth import AlpacaAuth
 from ..config import Config
 from ..logger import get_logger
 from ..logging.query_helper import TradeQueryHelper
@@ -24,10 +24,10 @@ def main() -> int:
     try:
         config = Config.from_env_and_json()
 
-        auth = RobinhoodAuth(config=config)
-        logger.info("Attempting Robinhood login")
+        auth = AlpacaAuth(config=config)
+        logger.info("Authenticating with Alpaca")
         auth.login()
-        logger.info("Robinhood login successful")
+        logger.info("Alpaca authentication successful")
 
         account_data = AccountData(auth=auth)
         trade_helper = TradeQueryHelper(log_dir=Path("logs"))

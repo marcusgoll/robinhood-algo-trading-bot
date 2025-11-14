@@ -18,6 +18,7 @@ import asyncio
 import json
 import sys
 from datetime import datetime, timedelta
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -31,6 +32,37 @@ from rich import box
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 console = Console()
+
+
+@lru_cache(maxsize=1)
+def _resolve_account_data():
+    """Shared helper to initialize AccountData with Alpaca credentials."""
+    try:
+        from trading_bot.account import AccountData
+        from trading_bot.auth import AlpacaAuth, AuthenticationError
+
+        auth = AlpacaAuth(None)
+        if not auth.is_authenticated():
+            auth.login()
+        return AccountData(auth)
+    except AuthenticationError as exc:
+        raise click.ClickException(f"Alpaca authentication failed: {exc}") from exc
+    except Exception as exc:
+        raise click.ClickException(f"Unable to initialize account data: {exc}") from exc
+
+
+def _load_persisted_risk_metrics() -> dict:
+    """Load persisted risk metrics written by the trading engine (if available)."""
+    metrics_path = Path("data/risk_metrics.json")
+    if not metrics_path.exists():
+        return {}
+
+    try:
+        with metrics_path.open() as fh:
+            return json.load(fh)
+    except Exception as exc:
+        console.print(f"[yellow]Warning: Failed to read {metrics_path}: {exc}[/yellow]")
+        return {}
 
 
 def format_currency(value: float) -> str:
@@ -252,17 +284,22 @@ def trading():
               default="table", help="Output format")
 def positions(output_format: str):
     """View current positions."""
-    from trading_bot.services.account_data import AccountData
-    from trading_bot.services.auth import RobinhoodAuth
-
     try:
-        auth = RobinhoodAuth()
-        account_data = AccountData(auth)
-
+        account_data = _resolve_account_data()
         positions_data = account_data.get_positions()
 
         if output_format == "json":
-            console.print_json(data=positions_data)
+            console.print_json(data=[
+                {
+                    "symbol": pos.symbol,
+                    "quantity": pos.quantity,
+                    "average_buy_price": float(pos.average_buy_price),
+                    "current_price": float(pos.current_price),
+                    "unrealized_pl": float(pos.profit_loss),
+                    "unrealized_pl_pct": float(pos.profit_loss_pct),
+                }
+                for pos in positions_data
+            ])
             return
 
         table = Table(title="Current Positions", box=box.ROUNDED)
@@ -274,12 +311,12 @@ def positions(output_format: str):
         table.add_column("P&L %", justify="right")
 
         for pos in positions_data:
-            symbol = pos.get("symbol", "N/A")
-            quantity = pos.get("quantity", 0)
-            avg_cost = pos.get("average_buy_price", 0)
-            current_price = pos.get("current_price", 0)
-            pnl = (current_price - avg_cost) * quantity
-            pnl_pct = ((current_price / avg_cost) - 1) * 100 if avg_cost > 0 else 0
+            symbol = pos.symbol
+            quantity = pos.quantity
+            avg_cost = float(pos.average_buy_price)
+            current_price = float(pos.current_price)
+            pnl = float(pos.profit_loss)
+            pnl_pct = float(pos.profit_loss_pct)
 
             table.add_row(
                 symbol,
@@ -358,27 +395,16 @@ def orders(days: int, status: str):
 @trading.command()
 def portfolio():
     """View portfolio summary."""
-    from trading_bot.services.account_data import AccountData
-    from trading_bot.services.auth import RobinhoodAuth
-
     try:
-        auth = RobinhoodAuth()
-        account_data = AccountData(auth)
-
-        # Get account summary
-        equity = account_data.get_total_equity()
-        buying_power = account_data.get_buying_power()
+        account_data = _resolve_account_data()
+        balance = account_data.get_account_balance()
+        buying_power = float(balance.buying_power)
+        equity = float(balance.equity)
         positions = account_data.get_positions()
 
         # Calculate totals
-        total_pnl = sum(
-            (pos.get("current_price", 0) - pos.get("average_buy_price", 0)) * pos.get("quantity", 0)
-            for pos in positions
-        )
-        total_invested = sum(
-            pos.get("average_buy_price", 0) * pos.get("quantity", 0)
-            for pos in positions
-        )
+        total_pnl = sum(float(pos.profit_loss) for pos in positions)
+        total_invested = sum(float(pos.cost_basis) for pos in positions)
         pnl_pct = (total_pnl / total_invested * 100) if total_invested > 0 else 0
 
         # Create summary panel
@@ -492,7 +518,7 @@ def consensus(symbol: str, task_type: str):
     """Get consensus decision from multiple agents."""
     console.print(f"[cyan]Getting consensus for {symbol} - {task_type}...[/cyan]")
 
-    from trading_bot.agents.agent_orchestrator import AgentOrchestrator
+    from trading_bot.llm.agents.orchestrator import AgentOrchestrator
 
     try:
         orchestrator = AgentOrchestrator()
@@ -535,7 +561,7 @@ def workflow():
 @click.option("--dry-run", is_flag=True, help="Simulate without executing")
 def execute(workflow_name: str, dry_run: bool):
     """Execute a specific workflow."""
-    from trading_bot.orchestration.trading_orchestrator import TradingOrchestrator
+    from trading_bot.orchestrator.trading_orchestrator import TradingOrchestrator
 
     console.print(f"[cyan]Executing workflow: {workflow_name}...[/cyan]")
 
@@ -606,19 +632,21 @@ def risk():
 @risk.command()
 def metrics():
     """Show current risk metrics."""
-    from trading_bot.services.risk_manager import RiskManager
-    from trading_bot.services.account_data import AccountData
-    from trading_bot.services.auth import RobinhoodAuth
-
     try:
-        auth = RobinhoodAuth()
-        account_data = AccountData(auth)
-        risk_manager = RiskManager(account_data)
+        from trading_bot.config import Config
 
-        # Get risk metrics
-        equity = account_data.get_total_equity()
-        daily_loss_limit = risk_manager.max_daily_loss
-        current_loss = risk_manager.get_daily_loss()
+        account_data = _resolve_account_data()
+        balance = account_data.get_account_balance()
+        positions = account_data.get_positions()
+        config = Config.from_env_and_json()
+
+        equity = float(balance.equity)
+        unrealized_pnl = sum(float(pos.profit_loss) for pos in positions)
+        daily_loss_limit = equity * (config.max_daily_loss_pct / 100.0)
+        persisted_metrics = _load_persisted_risk_metrics()
+        realized_pnl = float(persisted_metrics.get("realized_pnl_today", 0.0))
+        total_pnl = realized_pnl + unrealized_pnl
+        total_pct = (total_pnl / equity * 100.0) if equity else 0.0
 
         table = Table(title="Risk Metrics", box=box.ROUNDED)
         table.add_column("Metric", style="cyan")
@@ -631,14 +659,19 @@ def metrics():
             "-"
         )
         table.add_row(
-            "Daily Loss",
-            format_currency(abs(current_loss)),
+            "Realized P&L (Today)",
+            format_currency(realized_pnl),
             format_currency(daily_loss_limit)
         )
         table.add_row(
-            "Loss %",
-            f"{(current_loss / equity * 100):.2f}%",
-            f"{(daily_loss_limit / equity * 100):.2f}%"
+            "Unrealized P&L",
+            format_currency(unrealized_pnl),
+            "-"
+        )
+        table.add_row(
+            "Total P&L %",
+            f"{total_pct:.2f}%",
+            f"{config.max_daily_loss_pct:.2f}%"
         )
 
         console.print(table)
@@ -650,20 +683,22 @@ def metrics():
 @risk.command()
 def limits():
     """Show configured risk limits."""
-    from trading_bot.config import load_config
+    from trading_bot.config import Config
 
     try:
-        config = load_config()
+        cfg = Config.from_env_and_json()
+        rm = cfg.risk_management
 
         table = Table(title="Risk Limits", box=box.ROUNDED)
         table.add_column("Parameter", style="cyan")
         table.add_column("Value", style="yellow")
 
-        table.add_row("Max Daily Loss", f"{config.get('max_daily_loss_pct', 2)}%")
-        table.add_row("Max Position Size", f"{config.get('max_position_size_pct', 10)}%")
-        table.add_row("Stop Loss", f"{config.get('stop_loss_pct', 2)}%")
-        table.add_row("Take Profit", f"{config.get('take_profit_pct', 5)}%")
-        table.add_row("Max Open Positions", str(config.get('max_positions', 5)))
+        table.add_row("Trading Mode", "Paper" if cfg.paper_trading else "Live")
+        table.add_row("Max Daily Loss %", f"{cfg.max_daily_loss_pct:.2f}%")
+        table.add_row("Max Position Size %", f"{cfg.max_position_pct:.2f}%")
+        table.add_row("Account Risk %", f"{rm.account_risk_pct:.2f}%")
+        table.add_row("Default Stop %", f"{rm.default_stop_pct:.2f}%")
+        table.add_row("Risk/Reward", f"{rm.min_risk_reward_ratio:.2f}:1")
 
         console.print(table)
 
@@ -715,21 +750,26 @@ def config():
               default="table", help="Output format")
 def view(output_format: str):
     """View current configuration."""
-    from trading_bot.config import load_config
+    from trading_bot.config import Config
 
     try:
-        cfg = load_config()
+        cfg = Config.from_env_and_json()
+        cfg_dict = cfg.to_dict()
 
         if output_format == "json":
-            console.print_json(data=cfg)
+            console.print_json(data=cfg_dict)
             return
 
         table = Table(title="Configuration", box=box.ROUNDED)
         table.add_column("Parameter", style="cyan")
         table.add_column("Value", style="yellow")
 
-        for key, value in cfg.items():
-            table.add_row(key, str(value))
+        table.add_row("Alpaca Mode", "Paper" if cfg.alpaca_paper else "Live")
+        table.add_row("Trading Hours", f"{cfg.trading_start_time} - {cfg.trading_end_time} ({cfg.trading_timezone})")
+        table.add_row("Max Daily Loss %", f"{cfg.max_daily_loss_pct:.2f}%")
+        table.add_row("Max Position %", f"{cfg.max_position_pct:.2f}%")
+        table.add_row("Account Risk %", f"{cfg.risk_management.account_risk_pct:.2f}%")
+        table.add_row("Stop Loss %", f"{cfg.risk_management.default_stop_pct:.2f}%")
 
         console.print(table)
 
@@ -972,7 +1012,7 @@ def ta():
 def analyze(symbol: str, timeframe: str, lookback: int, account_size: float):
     """Analyze a symbol using the TA framework."""
     from trading_bot.technical_analysis import TACoordinator
-    from trading_bot.data.providers import get_market_data
+    from trading_bot.market_data.alpaca_market_data import AlpacaMarketData
     import pandas as pd
 
     console.print(Panel(
@@ -990,16 +1030,22 @@ def analyze(symbol: str, timeframe: str, lookback: int, account_size: float):
 
         # Get market data
         console.print("[yellow]Fetching market data...[/yellow]")
-        # For now, create sample data - in production, fetch real data
-        dates = pd.date_range(end=datetime.now(), periods=lookback, freq='D')
-        df = pd.DataFrame({
-            'timestamp': dates,
-            'open': 100 + pd.Series(range(lookback)).cumsum() * 0.1,
-            'high': 102 + pd.Series(range(lookback)).cumsum() * 0.1,
-            'low': 98 + pd.Series(range(lookback)).cumsum() * 0.1,
-            'close': 101 + pd.Series(range(lookback)).cumsum() * 0.1,
-            'volume': 1000000
-        })
+        market_data = AlpacaMarketData()
+        try:
+            df = market_data.get_dataframe(symbol=symbol, timeframe=timeframe, limit=lookback)
+            if df.empty:
+                raise RuntimeError("No data returned from Alpaca")
+        except Exception as exc:
+            console.print(f"[yellow]Warning: {exc}. Using synthetic sample data.[/yellow]")
+            dates = pd.date_range(end=datetime.now(), periods=lookback, freq='D')
+            df = pd.DataFrame({
+                'timestamp': dates,
+                'open': 100 + pd.Series(range(lookback)).cumsum() * 0.1,
+                'high': 102 + pd.Series(range(lookback)).cumsum() * 0.1,
+                'low': 98 + pd.Series(range(lookback)).cumsum() * 0.1,
+                'close': 101 + pd.Series(range(lookback)).cumsum() * 0.1,
+                'volume': 1000000
+            })
 
         # Analyze
         console.print("[yellow]Running TA analysis...[/yellow]")

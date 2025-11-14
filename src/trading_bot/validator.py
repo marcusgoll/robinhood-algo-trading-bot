@@ -8,10 +8,7 @@ Enforces Constitution v1.0.0:
 """
 
 import logging
-import os
-import re
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 from .config import Config
 
@@ -74,83 +71,25 @@ class ConfigValidator:
         return is_valid, self.errors, self.warnings
 
     def _validate_credentials(self) -> None:
-        """
-        Validate that credentials exist in .env file (§Security).
-
-        Required:
-        - ROBINHOOD_USERNAME
-        - ROBINHOOD_PASSWORD
-        """
-        # Check .env file exists
+        """Validate Alpaca credentials and dotenv presence (§Security)."""
         env_file = Path(".env")
         if not env_file.exists():
             self.errors.append(
-                "Missing .env file. Copy .env.example to .env and add your credentials."
+                "Missing .env file. Copy .env.example to .env and add your Alpaca credentials."
             )
             return
 
-        # Check required credentials
-        if not self.config.robinhood_username:
-            self.errors.append(
-                "Missing ROBINHOOD_USERNAME in .env file (§Security: required)"
-            )
+        if not self.config.alpaca_api_key:
+            self.errors.append("Missing ALPACA_API_KEY in environment (§Security: required)")
+        if not self.config.alpaca_secret_key:
+            self.errors.append("Missing ALPACA_SECRET_KEY in environment (§Security: required)")
 
-        if not self.config.robinhood_password:
-            self.errors.append(
-                "Missing ROBINHOOD_PASSWORD in .env file (§Security: required)"
-            )
-
-        # Check optional credentials (warnings only)
-        if not self.config.robinhood_mfa_secret:
+        if self.config.alpaca_paper is False:
             self.warnings.append(
-                "ROBINHOOD_MFA_SECRET not set. MFA will require manual input."
+                "⚠️  LIVE Alpaca trading enabled. Ensure paper trading validation is complete."
             )
-
-        if not self.config.robinhood_device_token:
-            self.warnings.append(
-                "ROBINHOOD_DEVICE_TOKEN not set. Authentication may be slower."
-            )
-
-        # Validate credential formats
-        self._validate_mfa_secret_format()
-        self._validate_device_token_format()
 
         logger.info("Credentials validation completed")
-
-    def _validate_mfa_secret_format(self) -> None:
-        """
-        Validate MFA secret format (FR-008, FR-009).
-
-        MFA secret must be exactly 16 characters using base32 alphabet (A-Z, 2-7).
-        Pattern: ^[A-Z2-7]{16}$
-        """
-        # Skip validation if MFA secret not provided (it's optional)
-        if not self.config.robinhood_mfa_secret:
-            return
-
-        mfa_secret = self.config.robinhood_mfa_secret
-
-        # Check length
-        if len(mfa_secret) != 16:
-            self.errors.append("MFA secret must be 16 characters")
-            return
-
-        # Check base32 format (A-Z, 2-7 only)
-        if not re.match(r'^[A-Z2-7]{16}$', mfa_secret):
-            self.errors.append(
-                "MFA secret must contain only base32 characters (A-Z, 2-7)"
-            )
-
-    def _validate_device_token_format(self) -> None:
-        """
-        Validate device token format (FR-004).
-
-        Device token is optional. No format validation needed as Robinhood
-        device tokens are opaque strings without a defined pattern.
-        """
-        # Device token is optional - no validation needed
-        # This method exists for consistency with validation pattern
-        pass
 
     def _validate_config_parameters(self) -> None:
         """
@@ -205,37 +144,24 @@ class ConfigValidator:
             self.errors.append(f"Failed to create directories: {str(e)}")
 
     def _test_api_connection(self) -> None:
-        """
-        Test API connection to Robinhood (§Safety_First).
-
-        NOTE: This is a placeholder. Actual implementation requires robin_stocks.
-        For now, we just check if credentials are set.
-        """
+        """Test Alpaca API connectivity (§Safety_First)."""
         logger.info("API connection test requested")
 
-        # Placeholder: Will implement with robin_stocks in authentication-module
-        # For now, just verify credentials are present
-        if not self.config.robinhood_username or not self.config.robinhood_password:
-            self.errors.append(
-                "Cannot test API connection: Missing credentials"
-            )
+        if not self.config.alpaca_api_key or not self.config.alpaca_secret_key:
+            self.errors.append("Cannot test API connection: Missing Alpaca credentials")
             return
 
-        self.warnings.append(
-            "API connection test skipped (requires authentication-module implementation)"
-        )
+        from trading_bot.auth import AlpacaAuth, AuthenticationError
 
-        # TODO: Implement actual API test when authentication-module is ready
-        # try:
-        #     import robin_stocks.robinhood as rh
-        #     # Test connection without logging in
-        #     response = rh.helper.request_get("https://api.robinhood.com/")
-        #     if response.status_code == 200:
-        #         logger.info("API connection test passed")
-        #     else:
-        #         self.errors.append(f"API connection failed: {response.status_code}")
-        # except Exception as e:
-        #     self.errors.append(f"API connection test failed: {str(e)}")
+        try:
+            auth = AlpacaAuth(self.config)
+            auth.login()
+        except AuthenticationError as exc:
+            self.errors.append(f"Alpaca authentication failed: {exc}")
+        except Exception as exc:  # pragma: no cover - defensive
+            self.errors.append(f"API connection test failed: {exc}")
+        else:
+            self.warnings.append("Alpaca API connection verified")
 
     def print_report(self) -> None:
         """Print validation report to console."""

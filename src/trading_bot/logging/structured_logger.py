@@ -12,6 +12,7 @@ Feature: trade-logging
 Tasks: T018-T021 [GREEN] - Implement StructuredTradeLogger
 """
 
+import json
 import sys
 import threading
 from datetime import UTC, datetime
@@ -69,6 +70,40 @@ class StructuredTradeLogger:
         """
         self.log_dir = log_dir
         self._lock = threading.Lock()
+
+    def _update_risk_metrics(self, record: TradeRecord) -> None:
+        """Persist realized P&L aggregates for CLI risk reporting."""
+        pnl_source = record.net_profit_loss or record.profit_loss
+        if pnl_source is None:
+            return
+
+        try:
+            pnl_value = float(pnl_source)
+        except Exception:
+            return
+
+        metrics_path = Path("data") / "risk_metrics.json"
+        metrics_path.parent.mkdir(parents=True, exist_ok=True)
+
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
+        metrics: dict[str, float | str] = {"date": today, "realized_pnl_today": 0.0}
+
+        if metrics_path.exists():
+            try:
+                existing = json.loads(metrics_path.read_text())
+                if isinstance(existing, dict) and existing.get("date") == today:
+                    metrics = existing  # type: ignore[assignment]
+            except Exception:
+                pass
+
+        current_total = float(metrics.get("realized_pnl_today", 0.0))  # type: ignore[arg-type]
+        metrics["realized_pnl_today"] = current_total + pnl_value
+        metrics["last_updated"] = datetime.now(UTC).isoformat()
+
+        try:
+            metrics_path.write_text(json.dumps(metrics, indent=2))
+        except OSError:
+            print(f"WARNING: Failed to write risk metrics to {metrics_path}", file=sys.stderr)
 
     def _get_daily_file_path(self) -> Path:
         """Get path to today's JSONL log file based on UTC date.
@@ -183,6 +218,7 @@ class StructuredTradeLogger:
 
                     # Note: File automatically flushed on close via context manager
                     # This provides <5ms write latency while ensuring durability
+            self._update_risk_metrics(record)
         except OSError as e:
             # Graceful degradation: Log error to stderr but don't crash bot
             # This ensures bot continues operating even if disk is full or permissions denied

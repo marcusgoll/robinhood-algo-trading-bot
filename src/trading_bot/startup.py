@@ -450,7 +450,7 @@ class StartupOrchestrator:
         mode_display = "PAPER TRADING (Simulation - No Real Money)" if self.config.paper_trading else "LIVE TRADING (Real Money)"
 
         print("=" * 60)
-        print("         ROBINHOOD TRADING BOT - STARTUP SEQUENCE")
+        print("         ALPACA TRADING BOT - STARTUP SEQUENCE")
         print("=" * 60)
         print(f"Mode: {mode_display}")
         print("=" * 60)

@@ -1,13 +1,13 @@
-"""Session health monitoring for Robinhood trading bot.
+"""Session health monitoring for Alpaca trading bot.
 
 This module provides the core SessionHealthMonitor service that proactively
 checks API session health every 5 minutes and triggers automatic reauth when needed.
 
 Usage:
     from trading_bot.health import SessionHealthMonitor
-    from trading_bot.auth import RobinhoodAuth
+    from trading_bot.auth import AlpacaAuth
 
-    auth = RobinhoodAuth(config)
+    auth = AlpacaAuth(config)
     health_monitor = SessionHealthMonitor(auth)
 
     # Start periodic health checks (every 5 minutes)
@@ -37,9 +37,8 @@ import time
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 
-import robin_stocks.robinhood.profiles  # type: ignore[import-untyped]
 
-from trading_bot.auth.robinhood_auth import RobinhoodAuth
+from trading_bot.auth import AlpacaAuth
 from trading_bot.error_handling.circuit_breaker import circuit_breaker
 from trading_bot.error_handling.retry import with_retry
 from trading_bot.health.health_logger import HealthCheckLogger
@@ -97,7 +96,7 @@ class HealthCheckResult:
 
 
 class SessionHealthMonitor:
-    """Session health monitor for Robinhood trading bot.
+    """Session health monitor for Alpaca trading bot.
 
     Proactively monitors API session health and triggers automatic reauth
     when authentication failures are detected.
@@ -111,7 +110,7 @@ class SessionHealthMonitor:
     - Structured JSONL logging
 
     Attributes:
-        _auth: RobinhoodAuth instance for authentication
+        _auth: AlpacaAuth instance for authentication
         _status: Current session health status
         _timer: Threading timer for periodic checks
         _lock: Lock for thread-safe state mutations
@@ -120,18 +119,18 @@ class SessionHealthMonitor:
         _last_check_time: Timestamp of last check for caching
     """
 
-    def __init__(self, auth: RobinhoodAuth) -> None:
+    def __init__(self, auth: AlpacaAuth) -> None:
         """Initialize SessionHealthMonitor.
 
         Args:
-            auth: RobinhoodAuth instance for session management
+            auth: AlpacaAuth instance for session management
 
         Raises:
-            TypeError: If auth is not a RobinhoodAuth instance
+            TypeError: If auth is not an AlpacaAuth instance
         """
         # Validate auth parameter
-        if not isinstance(auth, RobinhoodAuth):
-            raise TypeError("auth must be a RobinhoodAuth instance")
+        if not isinstance(auth, AlpacaAuth):
+            raise TypeError("auth must be an AlpacaAuth instance")
 
         self._auth = auth
 
@@ -161,7 +160,7 @@ class SessionHealthMonitor:
     def check_health(self, context: str = "periodic") -> HealthCheckResult:
         """Execute health check by probing API.
 
-        Checks session validity by calling a lightweight Robinhood API endpoint.
+        Checks session validity by calling a lightweight Alpaca API endpoint.
         Automatically triggers reauth if session is invalid (401/403).
         Results are cached for 10 seconds to reduce API load.
 
@@ -307,13 +306,10 @@ class SessionHealthMonitor:
         Raises:
             Exception: If API call fails after retries
         """
-        # Use lightweight profile API call
-        result = robin_stocks.robinhood.profiles.load_account_profile()
-
-        # Verify we got a valid response
-        if not result:
+        trading_client = self._auth.get_trading_client()
+        account = trading_client.get_account()
+        if not account:
             raise Exception("API returned empty response")
-
         return True
 
     def _attempt_reauth(self) -> bool:

@@ -1,6 +1,8 @@
-# Robinhood Trading Bot
+# Alpaca Trading Bot
 
-A Python-based algorithmic trading bot using the `robin_stocks` library, built with safety and risk management as top priorities.
+A Python-based algorithmic trading bot powered by the Alpaca Trade API. Safety, risk management, and full auditability remain the core pillars of the project.
+
+> **Migration Note:** Earlier documentation referenced Robinhood integrations. The runtime now uses Alpaca for authentication, account data, and market access. Legacy references will be updated progressively.
 
 **⚠️ DISCLAIMER**: This bot is for **personal educational use only**. Not financial advice. You are responsible for all trading decisions and tax reporting.
 
@@ -29,6 +31,20 @@ A Python-based algorithmic trading bot using the `robin_stocks` library, built w
 - [Support](#-support)
 
 ---
+
+## Broker Credentials (Alpaca)
+
+Set the following environment variables in your `.env` file before running any CLI commands or services:
+
+```bash
+ALPACA_API_KEY=your_key
+ALPACA_SECRET_KEY=your_secret
+ALPACA_PAPER=true        # use false for live trading
+ALPACA_BASE_URL=https://paper-api.alpaca.markets
+ALPACA_DATA_URL=https://data.alpaca.markets
+```
+
+These values replace the legacy Robinhood credentials referenced throughout the docs. The legacy keys remain in some walkthroughs for historical context but are no longer consumed by the codebase.
 
 ## What's New
 
