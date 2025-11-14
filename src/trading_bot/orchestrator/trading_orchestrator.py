@@ -858,9 +858,79 @@ class TradingOrchestrator:
             }
         """
         try:
-            logger.info(f"Evaluating {symbol} @ ${current_price} using multi-agent consensus")
+            logger.info(f"Evaluating {symbol} @ ${current_price}")
 
-            # Call multi-agent trading workflow
+            # Step 1: TA Framework pre-filtering (if available)
+            ta_signal = None
+            if self.ta_coordinator:
+                try:
+                    # Get historical data for TA analysis
+                    logger.info(f"Running TA framework analysis on {symbol}...")
+
+                    # TODO: Fetch historical data from Alpaca or market data provider
+                    # For now, create sample data structure
+                    # In production, fetch real historical bars
+                    import pandas as pd
+                    from datetime import datetime, timedelta
+
+                    # Generate sample historical data (replace with real data fetch)
+                    dates = pd.date_range(end=datetime.now(), periods=100, freq='D')
+                    historical_df = pd.DataFrame({
+                        'timestamp': dates,
+                        'open': current_price * 0.98,
+                        'high': current_price * 1.02,
+                        'low': current_price * 0.96,
+                        'close': current_price,
+                        'volume': 1000000
+                    })
+
+                    if len(historical_df) >= 50:
+                        # Run TA framework analysis
+                        ta_signal = self.ta_coordinator.analyze_simple(
+                            symbol=symbol,
+                            df=historical_df
+                        )
+
+                        logger.info(
+                            f"TA Signal: {ta_signal.signal} "
+                            f"(confidence: {ta_signal.confidence:.1f}%)"
+                        )
+
+                        # Early exit if TA says SKIP
+                        if ta_signal.signal == 'SKIP':
+                            logger.info(f"TA framework rejected {symbol} - skipping LLM evaluation (cost savings!)")
+                            return {
+                                'symbol': symbol,
+                                'decision': 'SKIP',
+                                'consensus_reached': False,
+                                'votes': [],
+                                'position_size_shares': 0,
+                                'position_size_pct': 0.0,
+                                'stop_loss_pct': 0.0,
+                                'take_profit_pct': 0.0,
+                                'summary': f"TA Framework: {ta_signal.reasoning}",
+                                'total_cost_usd': 0.0,
+                                'total_tokens': 0,
+                                'regime': ta_signal.regime or 'UNKNOWN',
+                                'regime_confidence': ta_signal.confidence
+                            }
+
+                        # Enhance technical indicators with TA metrics
+                        technical_indicators['ta_signal'] = ta_signal.signal
+                        technical_indicators['ta_confidence'] = ta_signal.confidence
+                        technical_indicators['ta_regime'] = ta_signal.regime
+                        if ta_signal.stop_loss:
+                            technical_indicators['ta_stop_loss'] = ta_signal.stop_loss
+                        if ta_signal.take_profit:
+                            technical_indicators['ta_take_profit'] = ta_signal.take_profit
+
+                        logger.info(f"TA approved {symbol} - proceeding to LLM evaluation")
+
+                except Exception as e:
+                    logger.warning(f"TA analysis failed for {symbol}: {e} - proceeding without TA")
+
+            # Step 2: Multi-agent LLM consensus
+            logger.info(f"Evaluating {symbol} with multi-agent consensus")
             result = self.multi_agent_workflow.evaluate_trade_opportunity(
                 symbol=symbol,
                 current_price=current_price,
