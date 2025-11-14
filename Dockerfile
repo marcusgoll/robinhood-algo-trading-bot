@@ -42,6 +42,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy application code
 COPY src/ ./src/
+COPY scripts/ ./scripts/
 COPY mcp_servers/ ./mcp_servers/
 
 # Create necessary directories
@@ -50,6 +51,9 @@ RUN mkdir -p /app/logs/orchestrator \
              /app/logs/backtest \
              /app/logs/trades \
              /app/.backtest_cache
+
+# Initialize SQLite database tables
+RUN python scripts/init_sqlite_tables.py
 
 # Set Python path
 ENV PYTHONPATH=/app/src
