@@ -311,7 +311,7 @@ class TradingOrchestrator:
                 if signal in ["STRONG_BUY", "BUY"]:
                     self.workflow.context.analyzed_symbols[symbol] = analysis
                     logger.info(f"{symbol}: {signal}")
-                    self._notify(f"📈 *Buy Signal: {symbol}*\nSignal: {signal}")
+                    # Note: Notification consolidated below with pre-market summary
 
             self.workflow.transition(WorkflowTransition.ANALYSIS_COMPLETE)
 
@@ -420,15 +420,7 @@ class TradingOrchestrator:
                         }
                         self.daily_trades.append(trade_record)
 
-                        # Send notification
-                        self._notify(
-                            f"🟢 *Live Trade Executed*\n"
-                            f"{symbol} x {position_size} shares\n"
-                            f"Entry: ${recommended_entry:.2f}\n"
-                            f"Stop: ${stop_loss:.2f}\n"
-                            f"Target: ${target:.2f}\n"
-                            f"Order ID: {order_response.id}"
-                        )
+                        # Note: Notification consolidated below with market open summary
 
                     except Exception as e:
                         logger.error(f"Failed to execute live order for {symbol}: {e}")
@@ -452,7 +444,32 @@ class TradingOrchestrator:
                     logger.info(f"📝 Paper trade logged: {symbol} x {position_size} shares")
 
             self.workflow.transition(WorkflowTransition.EXECUTION_COMPLETE)
-            self._notify(f"✅ *Market Open Complete*\nExecuted {len(optimized_trades)} trades")
+
+            # Enhanced consolidated notification with trade details
+            if self.daily_trades:
+                trade_details = []
+                for trade in self.daily_trades:
+                    if trade.get("type") != "intraday":  # Only market open trades
+                        symbol = trade["symbol"]
+                        entry = trade.get("entry", 0)
+                        shares = trade.get("shares", 0)
+                        order_id = trade.get("order_id", "N/A")
+                        trade_details.append(
+                            f"   • {symbol} x {shares} @ ${entry:.2f} | Order: {order_id}"
+                        )
+
+                if trade_details:
+                    details_msg = "\n" + "\n".join(trade_details)
+                else:
+                    details_msg = ""
+
+                self._notify(
+                    f"✅ *Market Open Complete*\n"
+                    f"Executed {len(optimized_trades)} trades"
+                    f"{details_msg}"
+                )
+            else:
+                self._notify(f"✅ *Market Open Complete*\nExecuted {len(optimized_trades)} trades")
 
         except Exception as e:
             self._notify(f"Market open workflow error: {str(e)}", "error")
@@ -549,13 +566,7 @@ class TradingOrchestrator:
                                 self.daily_trades.append(trade_record)
                                 trades_executed += 1
 
-                                self._notify(
-                                    f"🟢 *Intraday Trade*\n"
-                                    f"{symbol} x {position_size} shares\n"
-                                    f"Entry: ${recommended_entry:.2f}\n"
-                                    f"Stop: ${stop_loss:.2f}\n"
-                                    f"Target: ${target:.2f}"
-                                )
+                                # Note: Notification consolidated below with intraday summary
 
                             except Exception as e:
                                 logger.error(f"Failed to execute intraday order for {symbol}: {e}")
@@ -576,7 +587,28 @@ class TradingOrchestrator:
                             logger.info(f"📝 Intraday paper trade logged: {symbol}")
 
             if trades_executed > 0:
-                self._notify(f"✅ *Intraday Scan Complete*\nExecuted {trades_executed} new trades")
+                # Enhanced consolidated notification with trade details
+                trade_details = []
+                for trade in self.daily_trades:
+                    if trade.get("type") == "intraday":
+                        symbol = trade["symbol"]
+                        entry = trade.get("entry", 0)
+                        shares = trade.get("shares", 0)
+                        order_id = trade.get("order_id", "N/A")
+                        trade_details.append(
+                            f"   • {symbol} x {shares} @ ${entry:.2f} | Order: {order_id}"
+                        )
+
+                if trade_details:
+                    details_msg = "\n" + "\n".join(trade_details[-trades_executed:])  # Only recent trades
+                else:
+                    details_msg = ""
+
+                self._notify(
+                    f"✅ *Intraday Scan Complete*\n"
+                    f"Executed {trades_executed} new trades"
+                    f"{details_msg}"
+                )
 
         except Exception as e:
             logger.error(f"Intraday scan error: {e}")

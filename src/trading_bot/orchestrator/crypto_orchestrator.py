@@ -305,12 +305,7 @@ class CryptoOrchestrator:
                                 "ai_summary": result['summary']
                             })
                             logger.info(f"✅ AI approved {symbol}: {result['summary']}")
-                            self._notify(
-                                f"✅ *AI Approved*\n"
-                                f"{symbol} @ ${price:.2f}\n"
-                                f"Regime: {result.get('regime', 'UNKNOWN')}\n"
-                                f"Position: {result['position_size_pct']:.1f}% of portfolio"
-                            )
+                            # Note: Notification consolidated below with watchlist update
                         else:
                             logger.info(f"❌ AI rejected {symbol}: {result['decision']}")
 
@@ -344,9 +339,22 @@ class CryptoOrchestrator:
 
                 change_msg = ""
                 if added_symbols:
-                    change_msg += f"\n➕ Added: {', '.join(sorted(added_symbols))}"
+                    # Build detailed info for added symbols
+                    added_details = []
+                    for c in self.watchlist:
+                        if c["symbol"] in added_symbols:
+                            symbol = c["symbol"]
+                            price = c.get("price", 0)
+                            regime = c.get("regime", "UNKNOWN")
+                            position_pct = c.get("position_size_pct", 0)
+                            added_details.append(
+                                f"   • {symbol} @ ${price:.2f} | {regime} | {position_pct:.1f}%"
+                            )
+
+                    change_msg += f"\n➕ *Added:*\n" + "\n".join(added_details)
+
                 if removed_symbols:
-                    change_msg += f"\n➖ Removed: {', '.join(sorted(removed_symbols))}"
+                    change_msg += f"\n➖ *Removed:* {', '.join(sorted(removed_symbols))}"
 
                 self._notify(
                     f"📊 *Watchlist Updated*\n"
