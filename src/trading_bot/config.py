@@ -28,6 +28,72 @@ load_dotenv()
 
 
 @dataclass
+class TelegramConfig:
+    """
+    Telegram notification configuration.
+
+    Supports quiet hours and notification throttling.
+    """
+
+    enabled: bool
+    quiet_hours_start: str  # HH:MM format (e.g., "22:00")
+    quiet_hours_end: str    # HH:MM format (e.g., "06:00")
+    quiet_hours_timezone: str
+    critical_bypass_quiet: bool  # Allow critical notifications during quiet hours
+    duplicate_suppress_minutes: int  # Suppress duplicate messages within N minutes
+
+    @classmethod
+    def default(cls) -> "TelegramConfig":
+        """Return default configuration."""
+        return cls(
+            enabled=os.getenv("TELEGRAM_ENABLED", "false").lower() == "true",
+            quiet_hours_start="22:00",
+            quiet_hours_end="06:00",
+            quiet_hours_timezone="America/New_York",
+            critical_bypass_quiet=True,
+            duplicate_suppress_minutes=10,
+        )
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any] | None) -> "TelegramConfig":
+        """Create configuration from JSON payload or environment."""
+        data = data or {}
+
+        # Load from environment if not in JSON
+        enabled = data.get("enabled")
+        if enabled is None:
+            enabled = os.getenv("TELEGRAM_ENABLED", "false").lower() == "true"
+
+        quiet_hours_start = data.get("quiet_hours_start", os.getenv("TELEGRAM_QUIET_HOURS_START", "22:00"))
+        quiet_hours_end = data.get("quiet_hours_end", os.getenv("TELEGRAM_QUIET_HOURS_END", "06:00"))
+        quiet_hours_timezone = data.get("quiet_hours_timezone", os.getenv("TELEGRAM_QUIET_HOURS_TIMEZONE", "America/New_York"))
+        critical_bypass_quiet = data.get("critical_bypass_quiet", os.getenv("TELEGRAM_CRITICAL_BYPASS_QUIET", "true").lower() == "true")
+        duplicate_suppress_minutes = int(data.get("duplicate_suppress_minutes", os.getenv("TELEGRAM_DUPLICATE_SUPPRESS_MINUTES", "10")))
+
+        return cls(
+            enabled=enabled,
+            quiet_hours_start=quiet_hours_start,
+            quiet_hours_end=quiet_hours_end,
+            quiet_hours_timezone=quiet_hours_timezone,
+            critical_bypass_quiet=critical_bypass_quiet,
+            duplicate_suppress_minutes=duplicate_suppress_minutes,
+        )
+
+    def validate(self) -> None:
+        """Validate configuration."""
+        # Validate time format (HH:MM)
+        import re
+        time_pattern = r"^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+        if not re.match(time_pattern, self.quiet_hours_start):
+            raise ValueError(f"Invalid quiet_hours_start format: {self.quiet_hours_start} (expected HH:MM)")
+        if not re.match(time_pattern, self.quiet_hours_end):
+            raise ValueError(f"Invalid quiet_hours_end format: {self.quiet_hours_end} (expected HH:MM)")
+
+        if self.duplicate_suppress_minutes < 0:
+            raise ValueError("duplicate_suppress_minutes must be >= 0")
+
+
+@dataclass
 class OrderManagementConfig:
     """
     Order management configuration values.
@@ -181,6 +247,9 @@ class Config:
     crypto: CryptoConfig = field(
         default_factory=CryptoConfig.default
     )
+    telegram: TelegramConfig = field(
+        default_factory=TelegramConfig.default
+    )
 
     @classmethod
     def from_env_and_json(cls, config_file: str = "config.json") -> "Config":
@@ -252,6 +321,9 @@ class Config:
         crypto_config = CryptoConfig.from_dict(
             config_data.get("crypto")
         )
+        telegram_config = TelegramConfig.from_dict(
+            config_data.get("telegram")
+        )
 
         # Handle max_trades_per_day: None means unlimited (999 sentinel)
         max_trades = phase_config.get("max_trades_per_day", 999)
@@ -284,6 +356,7 @@ class Config:
             order_management=order_management_config,
             risk_management=risk_management_config,
             crypto=crypto_config,
+            telegram=telegram_config,
         )
 
     @classmethod

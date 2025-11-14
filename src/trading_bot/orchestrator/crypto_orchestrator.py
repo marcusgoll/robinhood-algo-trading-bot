@@ -72,6 +72,10 @@ class CryptoOrchestrator:
         self.claude_manager = claude_manager
         self.mode = mode
 
+        # Initialize telegram config from environment (for quiet hours checking)
+        from trading_bot.config import TelegramConfig
+        self.telegram_config = TelegramConfig.default()
+
         # Initialize crypto data service
         self.crypto_data = CryptoDataService()
 
@@ -93,6 +97,9 @@ class CryptoOrchestrator:
         self.portfolio_value = 10000.0  # Default $10k for crypto portfolio
         self.cash_available = 10000.0   # Default $10k cash
 
+        # Notification tracking
+        self._startup_notification_sent = False
+
         # Initialize multi-agent trading workflow if LLM available
         if HAS_LLM and MultiAgentTradingWorkflow is not None:
             self.multi_agent_workflow = MultiAgentTradingWorkflow()
@@ -108,8 +115,51 @@ class CryptoOrchestrator:
         logger.info(f"Alpaca paper trading: {is_paper}")
         logger.info(f"Symbols: {', '.join(crypto_config.symbols)}")
 
-    def _notify(self, message: str, level: str = "info"):
-        """Send log + Telegram notification."""
+    def _is_quiet_hours(self, is_critical: bool = False) -> bool:
+        """
+        Check if currently in quiet hours.
+
+        Args:
+            is_critical: If True, check if critical notifications bypass quiet hours
+
+        Returns:
+            True if in quiet hours and notification should be suppressed
+        """
+        from datetime import datetime
+        import pytz
+
+        # Critical notifications can bypass quiet hours if configured
+        if is_critical and self.telegram_config.critical_bypass_quiet:
+            return False
+
+        # Not in quiet hours if disabled (start == end)
+        if self.telegram_config.quiet_hours_start == self.telegram_config.quiet_hours_end:
+            return False
+
+        # Get current time in configured timezone
+        tz = pytz.timezone(self.telegram_config.quiet_hours_timezone)
+        now = datetime.now(tz)
+        current_time = now.strftime("%H:%M")
+
+        # Check if in quiet hours window
+        start = self.telegram_config.quiet_hours_start
+        end = self.telegram_config.quiet_hours_end
+
+        # Handle overnight quiet hours (e.g., 22:00 to 06:00)
+        if start > end:
+            return current_time >= start or current_time < end
+        else:
+            return start <= current_time < end
+
+    def _notify(self, message: str, level: str = "info", is_critical: bool = False):
+        """
+        Send log + Telegram notification.
+
+        Args:
+            message: Message to send
+            level: Log level (info, warning, error)
+            is_critical: If True, notification bypasses quiet hours
+        """
         if level == "error":
             logger.error(message)
         elif level == "warning":
@@ -118,8 +168,14 @@ class CryptoOrchestrator:
             logger.info(message)
 
         if self.claude_manager and self.claude_manager.telegram_enabled:
+            # Check quiet hours
+            if self._is_quiet_hours(is_critical):
+                logger.debug(f"Suppressing crypto notification during quiet hours (critical={is_critical})")
+                return
+
             emoji = {"error": "🚨", "warning": "⚠️"}.get(level, "🪙")
-            self.claude_manager._send_telegram_notification(f"{emoji} {message}")
+            suppress_minutes = self.telegram_config.duplicate_suppress_minutes
+            self.claude_manager._send_telegram_notification(f"{emoji} {message}", suppress_minutes=suppress_minutes)
 
     def _setup_schedule(self):
         """Setup interval-based workflows."""
@@ -698,16 +754,19 @@ class CryptoOrchestrator:
 
         self.running = True
 
-        # Send startup notification
-        startup_msg = (
-            f"🪙 *Crypto Bot Started (24/7)*\n\n"
-            f"Mode: `{self.mode}`\n"
-            f"Screening: every `{self.config.screening_interval_hours}hr`\n"
-            f"Monitoring: every `{self.config.monitoring_interval_minutes}min`\n"
-            f"Technical Analysis Agents: `3`\n\n"
-            f"_Monitoring crypto markets..._"
-        )
-        self._notify(startup_msg, level="info")
+        # Send startup notification (only once per instance)
+        if not self._startup_notification_sent:
+            startup_msg = (
+                f"🪙 *Crypto Bot Started (24/7)*\n\n"
+                f"Mode: `{self.mode}`\n"
+                f"Screening: every `{self.config.screening_interval_hours}hr`\n"
+                f"Monitoring: every `{self.config.monitoring_interval_minutes}min`\n"
+                f"Technical Analysis Agents: `3`\n\n"
+                f"_Monitoring crypto markets..._"
+            )
+            self._notify(startup_msg, level="info")
+            self._startup_notification_sent = True
+            logger.debug("Crypto startup notification sent (will not repeat)")
 
         try:
             while self.running:

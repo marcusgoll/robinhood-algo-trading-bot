@@ -50,6 +50,56 @@ def format_timestamp(ts: datetime) -> str:
     return ts.strftime("%Y-%m-%d %H:%M:%S")
 
 
+def send_cli_notification(message: str):
+    """
+    Send Telegram notification for CLI operations.
+
+    Args:
+        message: Notification message
+    """
+    import os
+    import asyncio
+    import threading
+
+    # Check if Telegram is enabled
+    if os.getenv("TELEGRAM_ENABLED", "false").lower() != "true":
+        return
+
+    telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
+    if not telegram_bot_token or not telegram_chat_id:
+        return
+
+    def _send_async():
+        """Send notification in background thread."""
+        try:
+            from trading_bot.notifications.telegram_client import TelegramClient
+
+            # Create new event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            try:
+                client = TelegramClient(bot_token=telegram_bot_token, timeout=5.0)
+                loop.run_until_complete(
+                    client.send_message(
+                        chat_id=telegram_chat_id,
+                        text=f"🔧 *CLI Command*\n\n{message}",
+                        parse_mode="Markdown"
+                    )
+                )
+            finally:
+                loop.close()
+        except Exception as e:
+            # Silent fail - don't block CLI operations
+            pass
+
+    # Run in background thread
+    thread = threading.Thread(target=_send_async, daemon=True)
+    thread.start()
+
+
 @click.group()
 @click.version_option(version="1.0.0", prog_name="Trading Bot CLI")
 def cli():
@@ -83,6 +133,14 @@ def start(dry_run: bool, mode: str, orchestrator: bool):
         title="Bot Startup",
         border_style="green"
     ))
+
+    # Send Telegram notification
+    send_cli_notification(
+        f"Bot started via CLI\n"
+        f"Mode: `{mode}`\n"
+        f"Dry Run: `{dry_run}`\n"
+        f"Orchestrator: `{orchestrator}`"
+    )
 
     try:
         # Prepare arguments
@@ -123,6 +181,8 @@ def stop():
         console.print("[yellow]No running bot processes found[/yellow]")
     else:
         console.print("[green]✓ Bot stopped successfully[/green]")
+        # Send Telegram notification
+        send_cli_notification("Bot stopped via CLI")
 
 
 @bot.command()
@@ -162,6 +222,9 @@ def status():
 def restart(dry_run: bool, mode: str):
     """Restart the trading bot."""
     console.print("[yellow]Restarting bot...[/yellow]")
+
+    # Send Telegram notification
+    send_cli_notification(f"Bot restart initiated via CLI\nMode: `{mode}`")
 
     # Stop first
     ctx = click.get_current_context()

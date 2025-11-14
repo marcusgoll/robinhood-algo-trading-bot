@@ -111,15 +111,55 @@ class TradingOrchestrator:
         self.portfolio_value = 100000.0  # Default $100k portfolio
         self.cash_available = 100000.0   # Default $100k cash
 
+        # Notification tracking
+        self._startup_notification_sent = False
+
         logger.info(f"TradingOrchestrator initialized in {mode} mode")
 
-    def _notify(self, message: str, level: str = "info"):
+    def _is_quiet_hours(self, is_critical: bool = False) -> bool:
+        """
+        Check if currently in quiet hours.
+
+        Args:
+            is_critical: If True, check if critical notifications bypass quiet hours
+
+        Returns:
+            True if in quiet hours and notification should be suppressed
+        """
+        from datetime import datetime
+        import pytz
+
+        # Critical notifications can bypass quiet hours if configured
+        if is_critical and self.config.telegram.critical_bypass_quiet:
+            return False
+
+        # Not in quiet hours if disabled (start == end)
+        if self.config.telegram.quiet_hours_start == self.config.telegram.quiet_hours_end:
+            return False
+
+        # Get current time in configured timezone
+        tz = pytz.timezone(self.config.telegram.quiet_hours_timezone)
+        now = datetime.now(tz)
+        current_time = now.strftime("%H:%M")
+
+        # Check if in quiet hours window
+        start = self.config.telegram.quiet_hours_start
+        end = self.config.telegram.quiet_hours_end
+
+        # Handle overnight quiet hours (e.g., 22:00 to 06:00)
+        if start > end:
+            return current_time >= start or current_time < end
+        else:
+            return start <= current_time < end
+
+    def _notify(self, message: str, level: str = "info", is_critical: bool = False):
         """
         Send both log and Telegram notification.
 
         Args:
             message: The message to log and send
             level: Log level (info, warning, error)
+            is_critical: If True, notification bypasses quiet hours
         """
         # Log the message
         if level == "error":
@@ -131,6 +171,11 @@ class TradingOrchestrator:
 
         # Send Telegram notification for important events
         if self.claude_manager.telegram_enabled:
+            # Check quiet hours
+            if self._is_quiet_hours(is_critical):
+                logger.debug(f"Suppressing notification during quiet hours (critical={is_critical})")
+                return
+
             # Format message for Telegram (add emoji based on level)
             if level == "error":
                 telegram_msg = f"🚨 *Error*\n\n{message}"
@@ -139,7 +184,9 @@ class TradingOrchestrator:
             else:
                 telegram_msg = f"ℹ️ {message}"
 
-            self.claude_manager._send_telegram_notification(telegram_msg)
+            # Use configured suppression window
+            suppress_minutes = self.config.telegram.duplicate_suppress_minutes
+            self.claude_manager._send_telegram_notification(telegram_msg, suppress_minutes=suppress_minutes)
 
     def _setup_schedule(self):
         """Setup scheduled trading workflows."""
@@ -749,16 +796,19 @@ class TradingOrchestrator:
         logger.info("Starting orchestrator event loop")
         self.running = True
 
-        # Send startup notification
-        startup_msg = (
-            f"🤖 *Trading Bot Started*\n\n"
-            f"Mode: `{self.mode}`\n"
-            f"Crypto: `{'enabled' if hasattr(self, 'crypto_enabled') else 'disabled'}`\n"
-            f"Multi-Agent: `{'enabled' if self.multi_agent_workflow else 'disabled'}`\n"
-            f"Daily Budget: `$5.00`\n\n"
-            f"_Monitoring markets..._"
-        )
-        self._notify(startup_msg, level="info")
+        # Send startup notification (only once per instance)
+        if not self._startup_notification_sent:
+            startup_msg = (
+                f"🤖 *Trading Bot Started*\n\n"
+                f"Mode: `{self.mode}`\n"
+                f"Crypto: `{'enabled' if hasattr(self, 'crypto_enabled') else 'disabled'}`\n"
+                f"Multi-Agent: `{'enabled' if self.multi_agent_workflow else 'disabled'}`\n"
+                f"Daily Budget: `$5.00`\n\n"
+                f"_Monitoring markets..._"
+            )
+            self._notify(startup_msg, level="info")
+            self._startup_notification_sent = True
+            logger.debug("Startup notification sent (will not repeat)")
 
         try:
             while self.running:

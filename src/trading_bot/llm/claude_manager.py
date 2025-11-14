@@ -117,6 +117,9 @@ class ClaudeCodeManager:
         # Telegram notification setup
         self._setup_telegram()
 
+        # Notification deduplication tracking
+        self._notification_cache: dict[str, float] = {}  # {message_hash: timestamp}
+
         logger.info(f"Claude Code Manager initialized: model={self.config.model.value}, "
                    f"budget=${self.config.daily_budget_usd}/day")
 
@@ -147,10 +150,39 @@ class ClaudeCodeManager:
         else:
             logger.debug("Telegram notifications disabled for LLM triggers")
 
-    def _send_telegram_notification(self, message: str):
-        """Send async Telegram notification (non-blocking)"""
+    def _send_telegram_notification(self, message: str, suppress_minutes: int = 10):
+        """
+        Send async Telegram notification (non-blocking).
+
+        Args:
+            message: Message text to send
+            suppress_minutes: Suppress duplicate messages within this many minutes (default 10)
+        """
         if not self.telegram_enabled or not self.telegram_bot_token or not self.telegram_chat_id:
             return
+
+        # Deduplication: Check if same message sent recently
+        import hashlib
+        import time
+        message_hash = hashlib.md5(message.encode()).hexdigest()
+        current_time = time.time()
+
+        if message_hash in self._notification_cache:
+            last_sent = self._notification_cache[message_hash]
+            time_since_last = (current_time - last_sent) / 60  # minutes
+
+            if time_since_last < suppress_minutes:
+                logger.debug(f"Suppressing duplicate notification (sent {time_since_last:.1f}m ago)")
+                return
+
+        # Update cache with current timestamp
+        self._notification_cache[message_hash] = current_time
+
+        # Clean old entries from cache (older than 1 hour)
+        cutoff_time = current_time - 3600
+        self._notification_cache = {
+            h: t for h, t in self._notification_cache.items() if t > cutoff_time
+        }
 
         def _send_async():
             """Helper to run async code in separate thread with new event loop"""
