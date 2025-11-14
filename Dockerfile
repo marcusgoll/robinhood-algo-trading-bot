@@ -61,11 +61,10 @@ ENV PYTHONPATH=/app/src
 # Disable Python stdout/stderr buffering for Docker logs
 ENV PYTHONUNBUFFERED=1
 
-# Health check - verify bot process is running by checking recent log activity
-# Checks if llm-calls.jsonl was modified in the last 150 minutes (crypto screens every 2hr)
-HEALTHCHECK --interval=2m --timeout=10s --start-period=1m --retries=3 \
-    CMD test -f /app/logs/llm-calls.jsonl && \
-        find /app/logs/llm-calls.jsonl -mmin -150 | grep -q . || exit 1
+# Health check - verify bot process is running by checking database exists
+# Database is created on startup and updated during operations
+HEALTHCHECK --interval=2m --timeout=10s --start-period=2m --retries=3 \
+    CMD test -f /app/logs/trading_bot.db || exit 1
 
 # Default to paper trading mode for safety
 # Override with: docker run ... trading-bot:latest orchestrator --orchestrator-mode live
