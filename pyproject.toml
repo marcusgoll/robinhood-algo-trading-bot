@@ -53,6 +53,7 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
     "--cov=src/trading_bot/order_management",
+    "--cov=src/trading_bot/technical_analysis",
     "--cov-report=html",
     "--cov-report=term-missing",
     "--cov-fail-under=90",  # Constitution v1.0.0: 90% coverage required

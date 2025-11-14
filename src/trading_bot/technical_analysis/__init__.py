@@ -6,14 +6,13 @@ quantifiable tools and concepts that work for both stocks and crypto.
 Components:
 -----------
 1. enhanced_indicators.py - All technical indicators (RSI, MACD, ATR, BB, OBV, etc.)
-2. market_structure.py - Market structure analysis (HH/HL, LH/LL detection)
-3. multi_timeframe.py - Multi-timeframe trend analysis
-4. regime_detector.py - Breakout vs Mean Reversion regime detection
-5. pattern_detector.py - Chart patterns and consolidations
-6. volume_analysis.py - Volume and order flow analysis
-7. risk_calculator.py - Position sizing, R-multiples, risk management
-8. ta_coordinator.py - Main coordinator orchestrating all analysis
-9. trading_journal.py - Performance tracking and review
+2. market_structure.py - Market structure and multi-timeframe analysis (HH/HL, LH/LL detection)
+3. regime_detector.py - Breakout vs Mean Reversion regime detection
+4. pattern_detector.py - Chart patterns and consolidations
+5. volume_analysis.py - Volume and order flow analysis
+6. risk_calculator.py - Position sizing, R-multiples, risk management
+7. ta_coordinator.py - Main coordinator orchestrating all analysis
+8. trading_journal.py - Performance tracking and review
 
 The framework is designed to be:
 - Quantifiable: All signals are measurable and backtestable
@@ -47,8 +46,7 @@ Example usage:
 __version__ = "1.0.0"
 
 from .enhanced_indicators import EnhancedIndicators
-from .market_structure import MarketStructureAnalyzer
-from .multi_timeframe import MultiTimeframeAnalyzer
+from .market_structure import MarketStructureAnalyzer, MultiTimeframeAnalyzer
 from .regime_detector import RegimeDetector
 from .pattern_detector import PatternDetector
 from .volume_analysis import VolumeAnalyzer

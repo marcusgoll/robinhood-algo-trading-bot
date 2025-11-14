@@ -31,11 +31,11 @@ class TradeRecord:
     # Trade identification
     trade_id: str
     symbol: str
+    direction: str  # 'long' or 'short'
     entry_timestamp: datetime
     exit_timestamp: Optional[datetime] = None
 
     # Trade parameters
-    direction: str  # 'long' or 'short'
     entry_price: float = 0.0
     exit_price: Optional[float] = None
     stop_loss: float = 0.0
