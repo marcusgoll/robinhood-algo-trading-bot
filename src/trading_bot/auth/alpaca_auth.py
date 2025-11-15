@@ -139,7 +139,7 @@ class AlpacaAuth:
                 api_key=self.auth_config.api_key,
                 secret_key=self.auth_config.secret_key,
                 paper=self.auth_config.paper,
-                url=self.auth_config.base_url,
+                url_override=self.auth_config.base_url,
             )
             account = self._trading_client.get_account()
             self._account_id = getattr(account, "id", None) or getattr(account, "account_number", None)
@@ -186,7 +186,7 @@ class AlpacaAuth:
             self._stock_data_client = StockHistoricalDataClient(
                 api_key=self.auth_config.api_key,
                 secret_key=self.auth_config.secret_key,
-                base_url=self.auth_config.data_base_url,
+                url_override=self.auth_config.data_base_url,
             )
         return self._stock_data_client
 
@@ -200,7 +200,6 @@ class AlpacaAuth:
             self._crypto_data_client = CryptoHistoricalDataClient(
                 api_key=self.auth_config.api_key,
                 secret_key=self.auth_config.secret_key,
-                base_url=self.auth_config.data_base_url,
+                url_override=self.auth_config.data_base_url,
             )
         return self._crypto_data_client
-
